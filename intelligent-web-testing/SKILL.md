@@ -166,32 +166,35 @@ Based on code analysis, I will create a test plan covering:
 ### Phase 3: Test Execution
 I will execute tests using Playwright directly via the helper script.
 
-**IMPORTANT: URL as Command Line Argument**
-- The test URL is passed directly as a command line argument to pw-helper.js
-- Do NOT use placeholder replacement or generate temporary files
-- Call pw-helper.js directly from the skill directory
+**IMPORTANT: Script Independence**
+- The pw-helper.js script stays in the skill directory - NEVER copy it to the user's project
+- Call it using absolute path: `node <skill-directory>/pw-helper.js <command> <args>`
+- Test URL is passed directly as a command line argument
 
 ```bash
-# Navigate and screenshot - URL is passed directly as argument
-node pw-helper.js navigate "http://localhost:3000" --screenshot home.png
+# All commands use the script from skill directory (example path)
+SKILL_DIR="/path/to/intelligent-web-testing"
+
+# Navigate and screenshot
+node $SKILL_DIR/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
 
 # Click element
-node pw-helper.js click "button.submit" --screenshot after-click.png
+node $SKILL_DIR/pw-helper.js click "button.submit" --screenshot after-click.png
 
 # Fill form
-node pw-helper.js fill "#email" "test@example.com"
+node $SKILL_DIR/pw-helper.js fill "#email" "test@example.com"
 
 # Select option
-node pw-helper.js select "#country" "US"
+node $SKILL_DIR/pw-helper.js select "#country" "US"
 
 # Check/uncheck
-node pw-helper.js check "#agree-terms"
+node $SKILL_DIR/pw-helper.js check "#agree-terms"
 
 # Get page content for validation
-node pw-helper.js content
+node $SKILL_DIR/pw-helper.js content
 
 # List all interactive elements
-node pw-helper.js list-elements
+node $SKILL_DIR/pw-helper.js list-elements
 ```
 
 ### Phase 4: Result Validation
@@ -204,11 +207,12 @@ I will validate results by:
 
 ## Instructions
 
-**KEY PRINCIPLE: Direct Execution**
-- The pw-helper.js script is called directly from this skill directory
-- Test URLs are passed as command line arguments (e.g., `node /path/to/skill/pw-helper.js navigate "http://localhost:3000"`)
-- Do NOT generate temporary scripts or use placeholder replacement
-- All test output goes to `./test-output/` in the current working directory
+**KEY PRINCIPLE: Script Independence**
+- The pw-helper.js script lives in the skill directory and is NEVER copied to the user's project
+- Call it directly using absolute path: `node <skill-directory>/pw-helper.js <command> <args>`
+- Test URLs are passed as command line arguments
+- Do NOT inject any test scripts into the user's project directory
+- All test artifacts (screenshots, logs) go to `./test-output/` in the current working directory
 
 When you ask me to test your web app, I will follow this workflow:
 
@@ -333,11 +337,13 @@ Example test execution:
 
 ```bash
 # Test: Login form submission
-# URL is determined from auto-detection or user input, then passed directly as argument
-node pw-helper.js navigate "http://localhost:3000/login" --screenshot login-before.png
-node pw-helper.js fill "#email" "test@example.com"
-node pw-helper.js fill "#password" "password123"
-node pw-helper.js click "button[type='submit']" --screenshot login-after.png --wait 2000
+# Use absolute path to skill's pw-helper.js, URL passed as argument
+SKILL_DIR="/path/to/intelligent-web-testing"
+
+node $SKILL_DIR/pw-helper.js navigate "http://localhost:3000/login" --screenshot login-before.png
+node $SKILL_DIR/pw-helper.js fill "#email" "test@example.com"
+node $SKILL_DIR/pw-helper.js fill "#password" "password123"
+node $SKILL_DIR/pw-helper.js click "button[type='submit']" --screenshot login-after.png --wait 2000
 ```
 
 ### Step 4: Validate and Report
@@ -381,20 +387,27 @@ Final report format:
 
 ## Helper Script Setup
 
-The pw-helper.js script is included in this skill directory. **Do NOT create or modify it.**
+The pw-helper.js script is part of this skill and remains in the skill directory.
 
-Before testing, ensure Playwright is installed:
+**Script Location:**
+- The script stays in `<skill-directory>/pw-helper.js`
+- It is NEVER copied, injected, or created in the user's project
+- Call it with absolute path: `node <skill-directory>/pw-helper.js <command> <args>`
 
+**Playwright Installation:**
 ```bash
-# Install Playwright if needed (run from project directory)
-npm list playwright || npm install playwright
+# Install Playwright globally (one-time setup)
+npm install -g playwright
 npx playwright install chromium
 ```
 
-**IMPORTANT:**
-- Always use the pw-helper.js from the skill directory directly
-- Pass the test URL as a command line argument (e.g., `node pw-helper.js navigate "http://localhost:3000"`)
-- Do NOT generate temporary copies or modify the script
+**Usage Example:**
+```bash
+# Assuming skill is at /path/to/intelligent-web-testing
+node /path/to/intelligent-web-testing/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
+node /path/to/intelligent-web-testing/pw-helper.js click "#submit" --wait 1000
+node /path/to/intelligent-web-testing/pw-helper.js list-elements
+```
 
 ## Test Output Directory
 
@@ -478,10 +491,13 @@ User: "1"
 
 ### Step 3: Execute Tests
 ```bash
-node pw-helper.js navigate "http://localhost:3000" --screenshot home.png
-node pw-helper.js click "nav a[href='/login']" --screenshot nav-to-login.png
-node pw-helper.js fill "#email" "test@example.com"
-node pw-helper.js click "button[type='submit']" --screenshot after-login.png
+# Using absolute path to skill directory
+SKILL_DIR="/path/to/intelligent-web-testing"
+
+node $SKILL_DIR/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
+node $SKILL_DIR/pw-helper.js click "nav a[href='/login']" --screenshot nav-to-login.png
+node $SKILL_DIR/pw-helper.js fill "#email" "test@example.com"
+node $SKILL_DIR/pw-helper.js click "button[type='submit']" --screenshot after-login.png
 # ... more tests
 ```
 
@@ -509,3 +525,5 @@ node pw-helper.js click "button[type='submit']" --screenshot after-login.png
 - I validate results myself by reading screenshots
 - No pre-written test scripts required
 - I adapt to any frontend framework
+- **The pw-helper.js script is NEVER injected into your project** - it runs from the skill directory
+- Only test artifacts (screenshots, logs) are created in your project's `./test-output/` directory
