@@ -1147,7 +1147,7 @@ Web3 DApp Testing:
   # Follow prompts to import your private key
 
   # 4. Navigate to DApp with Rabby available
-  node pw-helper.js wallet-navigate "https://staging.carrier.so"
+  node pw-helper.js wallet-navigate <url>
 
   # 5. Connect wallet to DApp
   node pw-helper.js wallet-connect

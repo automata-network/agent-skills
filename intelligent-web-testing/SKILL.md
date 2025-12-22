@@ -32,9 +32,28 @@ An AI-driven testing skill where the agent autonomously:
 ## Quick Start
 
 Ask me to test your web app:
-- "Test my web app" (I'll auto-detect the port)
+- "Test my web app" (I'll auto-detect running localhost services)
 - "Analyze my project and run comprehensive UI tests"
 - "Test all interactive elements and validate they work correctly"
+
+### Auto Local Server Detection
+
+When you ask me to test, I will:
+1. **Scan common ports** (3000, 5173, 8080, 4200, etc.) for running services
+2. **Show you detected services** and ask which one to test
+3. **Or let you provide a custom URL** if you prefer
+
+Example interaction:
+```
+Agent: I detected the following local services:
+  - http://localhost:3000 (responding)
+  - http://localhost:5173 (responding)
+
+  Which URL would you like me to test?
+  1. http://localhost:3000
+  2. http://localhost:5173
+  3. Enter a custom URL
+```
 
 ## Web3 DApp Testing Support
 
@@ -82,7 +101,7 @@ node pw-helper.js wallet-setup
 node pw-helper.js wallet-import
 
 # Step 3: Navigate to DApp with wallet
-node pw-helper.js wallet-navigate "https://staging.carrier.so"
+node pw-helper.js wallet-navigate <url>
 
 # Step 4: Connect wallet
 node pw-helper.js wallet-connect
@@ -94,6 +113,10 @@ node pw-helper.js wallet-switch-network polygon
 node pw-helper.js click "button.swap"
 node pw-helper.js fill "#amount" "100"
 ```
+
+**Note:** The URL in step 3 is determined by:
+- Auto-detecting running localhost services, or
+- Asking the user to select/input a URL
 
 ### Supported Networks
 - Ethereum Mainnet
@@ -141,11 +164,16 @@ Based on code analysis, I will create a test plan covering:
 - Error states and edge cases
 
 ### Phase 3: Test Execution
-I will execute tests using Playwright directly via the helper script:
+I will execute tests using Playwright directly via the helper script.
+
+**IMPORTANT: URL as Command Line Argument**
+- The test URL is passed directly as a command line argument to pw-helper.js
+- Do NOT use placeholder replacement or generate temporary files
+- Call pw-helper.js directly from the skill directory
 
 ```bash
-# Navigate and screenshot (using detected port, e.g., 5173 for Vite)
-node pw-helper.js navigate "http://localhost:5173" --screenshot home.png
+# Navigate and screenshot - URL is passed directly as argument
+node pw-helper.js navigate "http://localhost:3000" --screenshot home.png
 
 # Click element
 node pw-helper.js click "button.submit" --screenshot after-click.png
@@ -162,8 +190,8 @@ node pw-helper.js check "#agree-terms"
 # Get page content for validation
 node pw-helper.js content
 
-# Run multiple actions in sequence
-node pw-helper.js run-sequence actions.json --screenshots
+# List all interactive elements
+node pw-helper.js list-elements
 ```
 
 ### Phase 4: Result Validation
@@ -175,6 +203,12 @@ I will validate results by:
 - Reporting issues with specific details
 
 ## Instructions
+
+**KEY PRINCIPLE: Direct Execution**
+- The pw-helper.js script is called directly from this skill directory
+- Test URLs are passed as command line arguments (e.g., `node /path/to/skill/pw-helper.js navigate "http://localhost:3000"`)
+- Do NOT generate temporary scripts or use placeholder replacement
+- All test output goes to `./test-output/` in the current working directory
 
 When you ask me to test your web app, I will follow this workflow:
 
@@ -298,8 +332,9 @@ For each test, I'll:
 Example test execution:
 
 ```bash
-# Test: Login form submission (port auto-detected from project config)
-node pw-helper.js navigate "http://localhost:${PORT}/login" --screenshot login-before.png
+# Test: Login form submission
+# URL is determined from auto-detection or user input, then passed directly as argument
+node pw-helper.js navigate "http://localhost:3000/login" --screenshot login-before.png
 node pw-helper.js fill "#email" "test@example.com"
 node pw-helper.js fill "#password" "password123"
 node pw-helper.js click "button[type='submit']" --screenshot login-after.png --wait 2000
@@ -346,18 +381,20 @@ Final report format:
 
 ## Helper Script Setup
 
-Before testing, I'll ensure the Playwright helper is installed:
+The pw-helper.js script is included in this skill directory. **Do NOT create or modify it.**
+
+Before testing, ensure Playwright is installed:
 
 ```bash
-# Check if helper exists, create if not
-if [ ! -f pw-helper.js ]; then
-  # I will create the helper script
-fi
-
-# Install Playwright if needed
+# Install Playwright if needed (run from project directory)
 npm list playwright || npm install playwright
 npx playwright install chromium
 ```
+
+**IMPORTANT:**
+- Always use the pw-helper.js from the skill directory directly
+- Pass the test URL as a command line argument (e.g., `node pw-helper.js navigate "http://localhost:3000"`)
+- Do NOT generate temporary copies or modify the script
 
 ## Test Output Directory
 
@@ -409,44 +446,39 @@ I validate tests using these criteria:
 
 ## Example Session
 
-User: "Test my web app at /path/to/my-project"
+User: "Test my web app"
 
 Agent:
 
-### Step 0: Setup & Start Project
+### Step 0: Auto-Detect Local Services
 ```bash
-# Read package.json
-cat /path/to/my-project/package.json
-# Found: "dev": "vite", dependencies include "vite", "react"
-
-# Check for node_modules
-ls /path/to/my-project/node_modules  # Not found
-
-# Install dependencies
-cd /path/to/my-project && npm install
-
-# Detect port from vite.config.ts
-# Found: server.port = 5173
-
-# Start dev server in background
-npm run dev &
-
-# Wait for server to be ready
-curl http://localhost:5173  # Poll until success
+# Scan common ports for running services
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000  # 200 OK
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5173  # Connection refused
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080  # Connection refused
+# ...
 ```
 
+Agent: "I detected the following local services:
+- http://localhost:3000 (responding)
+
+Which URL would you like me to test?
+1. http://localhost:3000
+2. Enter a custom URL"
+
+User: "1"
+
 ### Step 1-2: Analyze & Plan
-1. **Detect Framework**: Found `vite.config.ts` → Vite + React project
-2. **Detect Port**: `server: { port: 5173 }` → http://localhost:5173
-3. **Analyze Code**: Reads `src/` directory
+1. **Target URL**: http://localhost:3000 (user confirmed)
+2. **Analyze Code**: Reads `src/` directory
    - Found `App.tsx`, `pages/`, `components/`
    - Identified routes: `/`, `/about`, `/contact`, `/login`
    - Discovered: Navbar, LoginForm, ContactForm, Modal
-4. **Create Test Plan**: 12 tests covering all pages and interactions
+3. **Create Test Plan**: 12 tests covering all pages and interactions
 
 ### Step 3: Execute Tests
 ```bash
-node pw-helper.js navigate "http://localhost:5173" --screenshot home.png
+node pw-helper.js navigate "http://localhost:3000" --screenshot home.png
 node pw-helper.js click "nav a[href='/login']" --screenshot nav-to-login.png
 node pw-helper.js fill "#email" "test@example.com"
 node pw-helper.js click "button[type='submit']" --screenshot after-login.png
@@ -454,34 +486,21 @@ node pw-helper.js click "button[type='submit']" --screenshot after-login.png
 ```
 
 ### Step 4: Validate & Report
-5. **Validate Results**: Analyze screenshots, check console logs
-6. **Report**: 11 passed, 1 failed (contact form submit error)
-7. **Suggest Fix**: "ContactForm.tsx:42 - onClick handler missing await"
+4. **Validate Results**: Analyze screenshots, check console logs
+5. **Report**: 11 passed, 1 failed (contact form submit error)
+6. **Suggest Fix**: "ContactForm.tsx:42 - onClick handler missing await"
 
-### Cleanup
-```bash
-# Stop dev server when done
-kill %1  # or find and kill the process
-```
+### Common Ports Scanned
 
-### Port Detection Examples
-
-```
-# Vite project - reads vite.config.ts
-Found: server.port = 5173 → http://localhost:5173
-
-# Next.js project - reads package.json
-Found: "dev": "next dev -p 3001" → http://localhost:3001
-
-# Custom webpack - reads webpack.config.js
-Found: devServer.port = 9000 → http://localhost:9000
-
-# No config specified - uses framework default
-Vite default → http://localhost:5173
-Next.js default → http://localhost:3000
-Vue CLI default → http://localhost:8080
-Angular default → http://localhost:4200
-```
+| Port | Common Usage |
+|------|-------------|
+| 3000 | Next.js, Create React App, Express |
+| 5173 | Vite |
+| 8080 | Webpack, Vue CLI |
+| 4200 | Angular |
+| 4321 | Astro |
+| 8000 | Django, FastAPI |
+| 5000 | Flask |
 
 ## Notes
 
