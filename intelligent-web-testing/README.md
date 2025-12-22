@@ -6,11 +6,16 @@ AI-driven web app testing where the agent autonomously:
 3. Executes tests using Playwright
 4. Validates results and reports issues
 
-## Setup
+## Prerequisites
+
+Playwright must be installed **globally** (not as a project dependency):
 
 ```bash
-cd intelligent-web-testing
-npm run setup
+# Install Playwright globally
+npm install -g playwright
+
+# Install Chrome browser
+npx playwright install chromium
 ```
 
 ## How It Works

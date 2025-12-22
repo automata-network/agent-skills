@@ -2,7 +2,7 @@
 name: intelligent-web-testing
 description: AI-driven web app testing. Agent reads code, understands functionality, plans tests, executes Playwright commands directly, and validates results autonomously. No pre-written scripts required.
 license: MIT
-compatibility: Node.js 18+, Playwright
+compatibility: Node.js 18+, Playwright (global)
 metadata:
   author: AI Agent
   version: 1.0.0
@@ -10,6 +10,18 @@ allowed-tools: Bash Read Write Glob Grep Task
 ---
 
 # Intelligent Web Testing
+
+## Prerequisites
+
+Playwright must be installed globally (not as a project dependency):
+
+```bash
+# Install Playwright globally
+npm install -g playwright
+
+# Install browser (Chrome)
+npx playwright install chromium
+```
 
 An AI-driven testing skill where the agent autonomously:
 1. **Reads and understands** project source code
@@ -23,6 +35,75 @@ Ask me to test your web app:
 - "Test my web app" (I'll auto-detect the port)
 - "Analyze my project and run comprehensive UI tests"
 - "Test all interactive elements and validate they work correctly"
+
+## Web3 DApp Testing Support
+
+For Web3 DApps that require wallet connection, I support:
+
+### Wallet Integration
+- **Rabby Wallet** - Chrome extension for multi-chain support
+- **MetaMask** - Popular Ethereum wallet (coming soon)
+
+### Security Principles
+- Private key is read from `WALLET_PRIVATE_KEY` environment variable
+- Private key is **NEVER** uploaded to AI APIs or logged
+- Private key is only used locally in Playwright browser context
+- All wallet operations happen in local browser instance
+
+### Web3 Test Flow
+```
+1. wallet-setup    → Open Chrome Web Store, install Rabby Wallet extension
+2. wallet-import   → Open Rabby settings, import wallet using private key
+3. wallet-navigate → Navigate to DApp with Rabby available
+4. wallet-connect  → Connect wallet to DApp
+5. wallet-switch-network → Switch to required network (polygon, arbitrum, etc.)
+6. Interact with DApp using click/fill commands
+7. Validate results with screenshots
+```
+
+### Environment Setup
+```bash
+# Set wallet private key in terminal (REQUIRED!)
+export WALLET_PRIVATE_KEY="your_private_key_here"
+
+# IMPORTANT:
+# - MUST be set via environment variable (no .env file support)
+# - If not set, wallet-import will exit with error
+# - Key is used locally in Chrome browser only
+# - Key is NEVER logged, transmitted to APIs, or stored in files
+```
+
+### Web3 Commands
+```bash
+# Step 1: Install Rabby Wallet (one-time)
+node pw-helper.js wallet-setup
+
+# Step 2: Import wallet (one-time)
+node pw-helper.js wallet-import
+
+# Step 3: Navigate to DApp with wallet
+node pw-helper.js wallet-navigate "https://staging.carrier.so"
+
+# Step 4: Connect wallet
+node pw-helper.js wallet-connect
+
+# Step 5: Switch network
+node pw-helper.js wallet-switch-network polygon
+
+# Step 6: Interact with DApp
+node pw-helper.js click "button.swap"
+node pw-helper.js fill "#amount" "100"
+```
+
+### Supported Networks
+- Ethereum Mainnet
+- Polygon
+- Arbitrum
+- Optimism
+- Base
+- BSC
+- Avalanche
+- And more...
 
 ## Auto Port Detection
 
@@ -97,34 +178,56 @@ I will validate results by:
 
 When you ask me to test your web app, I will follow this workflow:
 
-### Step 0: Detect Framework and Port
+### Step 0: Detect Framework, Port, and Start Project
 
-First, I'll identify the framework and dev server port:
+First, I'll identify the framework, find the dev server command, and start the project:
 
 ```
-1. Check for framework config files:
-   - vite.config.js/ts → Vite project
-   - next.config.js/mjs → Next.js project
-   - remix.config.js → Remix project
-   - webpack.config.js → Webpack project
-   - vue.config.js → Vue CLI project
-   - angular.json → Angular project
-   - nuxt.config.js/ts → Nuxt project
-   - astro.config.mjs → Astro project
-   - svelte.config.js → SvelteKit project
+1. Read package.json to find:
+   - Project name and dependencies
+   - scripts field to find dev/start command:
+     - "dev": "vite" / "next dev" / "remix dev" / etc.
+     - "start": "react-scripts start" / "webpack serve" / etc.
+   - Custom port in scripts: PORT=xxxx, --port xxxx, -p xxxx
 
-2. Read the config to find port:
-   - Vite: server.port (default 5173)
-   - Next.js: package.json "dev" script -p flag (default 3000)
-   - Webpack: devServer.port (default 8080)
-   - Vue CLI: devServer.port (default 8080)
-   - Angular: angular.json serve.options.port (default 4200)
+2. Check for framework config files:
+   - vite.config.js/ts → Vite project (default: 5173)
+   - next.config.js/mjs → Next.js project (default: 3000)
+   - remix.config.js → Remix project (default: 3000)
+   - webpack.config.js → Webpack project (default: 8080)
+   - vue.config.js → Vue CLI project (default: 8080)
+   - angular.json → Angular project (default: 4200)
+   - nuxt.config.js/ts → Nuxt project (default: 3000)
+   - astro.config.mjs → Astro project (default: 4321)
+   - svelte.config.js → SvelteKit project (default: 5173)
 
-3. Check package.json scripts for custom port:
-   - Look for PORT=xxxx or --port xxxx or -p xxxx
+3. Read config file to find custom port if specified
 
-4. Construct base URL: http://localhost:<detected_port>
+4. Install dependencies if needed:
+   npm install (if node_modules doesn't exist)
+
+5. Start the dev server in background:
+   npm run dev &  (or npm run start, depending on scripts)
+
+6. Wait for server to be ready:
+   - Poll http://localhost:<port> until it responds
+   - Or watch for "ready" / "started" in console output
+
+7. Construct base URL: http://localhost:<detected_port>
 ```
+
+**Common start commands by framework:**
+
+| Framework | Typical Script | Command |
+|-----------|---------------|---------|
+| Vite | `"dev": "vite"` | `npm run dev` |
+| Next.js | `"dev": "next dev"` | `npm run dev` |
+| Remix | `"dev": "remix dev"` | `npm run dev` |
+| Create React App | `"start": "react-scripts start"` | `npm run start` |
+| Vue CLI | `"serve": "vue-cli-service serve"` | `npm run serve` |
+| Angular | `"start": "ng serve"` | `npm run start` |
+| Nuxt | `"dev": "nuxt dev"` | `npm run dev` |
+| Astro | `"dev": "astro dev"` | `npm run dev` |
 
 ### Step 1: Understand the Project
 
@@ -306,25 +409,60 @@ I validate tests using these criteria:
 
 ## Example Session
 
-User: "Test my web app"
+User: "Test my web app at /path/to/my-project"
 
 Agent:
-1. **Detect Framework**: Found `vite.config.ts` → Vite project
-2. **Detect Port**: Read config, found `server: { port: 5173 }` → http://localhost:5173
+
+### Step 0: Setup & Start Project
+```bash
+# Read package.json
+cat /path/to/my-project/package.json
+# Found: "dev": "vite", dependencies include "vite", "react"
+
+# Check for node_modules
+ls /path/to/my-project/node_modules  # Not found
+
+# Install dependencies
+cd /path/to/my-project && npm install
+
+# Detect port from vite.config.ts
+# Found: server.port = 5173
+
+# Start dev server in background
+npm run dev &
+
+# Wait for server to be ready
+curl http://localhost:5173  # Poll until success
+```
+
+### Step 1-2: Analyze & Plan
+1. **Detect Framework**: Found `vite.config.ts` → Vite + React project
+2. **Detect Port**: `server: { port: 5173 }` → http://localhost:5173
 3. **Analyze Code**: Reads `src/` directory
    - Found `App.tsx`, `pages/`, `components/`
    - Identified routes: `/`, `/about`, `/contact`, `/login`
    - Discovered: Navbar, LoginForm, ContactForm, Modal
 4. **Create Test Plan**: 12 tests covering all pages and interactions
-5. **Execute Tests**:
-   ```bash
-   node pw-helper.js navigate "http://localhost:5173" --screenshot home.png
-   node pw-helper.js click "nav a[href='/login']" --screenshot nav-to-login.png
-   # ... more tests
-   ```
-6. **Validate Results**: Analyze screenshots, check console logs
-7. **Report**: 11 passed, 1 failed (contact form submit error)
-8. **Suggest Fix**: "ContactForm.tsx:42 - onClick handler missing await"
+
+### Step 3: Execute Tests
+```bash
+node pw-helper.js navigate "http://localhost:5173" --screenshot home.png
+node pw-helper.js click "nav a[href='/login']" --screenshot nav-to-login.png
+node pw-helper.js fill "#email" "test@example.com"
+node pw-helper.js click "button[type='submit']" --screenshot after-login.png
+# ... more tests
+```
+
+### Step 4: Validate & Report
+5. **Validate Results**: Analyze screenshots, check console logs
+6. **Report**: 11 passed, 1 failed (contact form submit error)
+7. **Suggest Fix**: "ContactForm.tsx:42 - onClick handler missing await"
+
+### Cleanup
+```bash
+# Stop dev server when done
+kill %1  # or find and kill the process
+```
 
 ### Port Detection Examples
 

@@ -1,23 +1,23 @@
 {
   "name": "intelligent-web-testing",
   "version": "1.0.0",
-  "description": "AI-driven web app testing with Playwright",
+  "description": "AI-driven web app testing with Playwright (requires global Playwright installation)",
   "main": "pw-helper.js",
   "bin": {
     "pw-helper": "./pw-helper.js"
   },
   "scripts": {
-    "setup": "npm install && npx playwright install chromium",
     "test": "node pw-helper.js help"
-  },
-  "dependencies": {
-    "playwright": "^1.40.0"
   },
   "keywords": [
     "playwright",
     "testing",
     "ai",
-    "automation"
+    "automation",
+    "web3"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
