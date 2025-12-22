@@ -11,23 +11,19 @@ allowed-tools: Bash Read Write Glob Grep Task
 
 # Intelligent Web Testing
 
-## Prerequisites
-
-Playwright must be installed globally (not as a project dependency):
-
-```bash
-# Install Playwright globally
-npm install -g playwright
-
-# Install browser (Chrome)
-npx playwright install chromium
-```
-
 An AI-driven testing skill where the agent autonomously:
 1. **Reads and understands** project source code
 2. **Plans tests** based on discovered functionality
 3. **Executes tests** using Playwright directly
 4. **Validates results** by analyzing screenshots and outputs
+
+## Prerequisites
+
+```bash
+# Install Playwright globally
+npm install -g playwright
+npx playwright install chromium
+```
 
 ## Quick Start
 
@@ -36,494 +32,175 @@ Ask me to test your web app:
 - "Analyze my project and run comprehensive UI tests"
 - "Test all interactive elements and validate they work correctly"
 
-### Auto Local Server Detection
+## Key Principles
 
-When you ask me to test, I will:
-1. **Scan common ports** (3000, 5173, 8080, 4200, etc.) for running services
-2. **Show you detected services** and ask which one to test
-3. **Or let you provide a custom URL** if you prefer
-
-Example interaction:
-```
-Agent: I detected the following local services:
-  - http://localhost:3000 (responding)
-  - http://localhost:5173 (responding)
-
-  Which URL would you like me to test?
-  1. http://localhost:3000
-  2. http://localhost:5173
-  3. Enter a custom URL
-```
-
-## Web3 DApp Testing Support
-
-For Web3 DApps that require wallet connection, I support:
-
-### Wallet Integration
-- **Rabby Wallet** - Chrome extension for multi-chain support
-- **MetaMask** - Popular Ethereum wallet (coming soon)
-
-### Security Principles
-- Private key is read from `WALLET_PRIVATE_KEY` environment variable
-- Private key is **NEVER** uploaded to AI APIs or logged
-- Private key is only used locally in Playwright browser context
-- All wallet operations happen in local browser instance
-
-### Web3 Test Flow
-```
-1. wallet-setup    → Open Chrome Web Store, install Rabby Wallet extension
-2. wallet-import   → Open Rabby settings, import wallet using private key
-3. wallet-navigate → Navigate to DApp with Rabby available
-4. wallet-connect  → Connect wallet to DApp
-5. wallet-switch-network → Switch to required network (polygon, arbitrum, etc.)
-6. Interact with DApp using click/fill commands
-7. Validate results with screenshots
-```
-
-### Environment Setup
-```bash
-# Set wallet private key in terminal (REQUIRED!)
-export WALLET_PRIVATE_KEY="your_private_key_here"
-
-# IMPORTANT:
-# - MUST be set via environment variable (no .env file support)
-# - If not set, wallet-import will exit with error
-# - Key is used locally in Chrome browser only
-# - Key is NEVER logged, transmitted to APIs, or stored in files
-```
-
-### Web3 Commands
-```bash
-# Step 1: Install Rabby Wallet (one-time)
-node pw-helper.js wallet-setup
-
-# Step 2: Import wallet (one-time)
-node pw-helper.js wallet-import
-
-# Step 3: Navigate to DApp with wallet
-node pw-helper.js wallet-navigate <url>
-
-# Step 4: Connect wallet
-node pw-helper.js wallet-connect
-
-# Step 5: Switch network
-node pw-helper.js wallet-switch-network polygon
-
-# Step 6: Interact with DApp
-node pw-helper.js click "button.swap"
-node pw-helper.js fill "#amount" "100"
-```
-
-**Note:** The URL in step 3 is determined by:
-- Auto-detecting running localhost services, or
-- Asking the user to select/input a URL
-
-### Supported Networks
-- Ethereum Mainnet
-- Polygon
-- Arbitrum
-- Optimism
-- Base
-- BSC
-- Avalanche
-- And more...
-
-## Auto Port Detection
-
-I automatically detect the dev server port from your project configuration:
-
-| Framework | Config File | Default Port |
-|-----------|-------------|--------------|
-| **Vite** | `vite.config.js/ts` → `server.port` | 5173 |
-| **Next.js** | `package.json` scripts or `-p` flag | 3000 |
-| **Remix** | `remix.config.js` or package.json | 3000 |
-| **Webpack** | `webpack.config.js` → `devServer.port` | 8080 |
-| **Create React App** | `PORT` env or package.json | 3000 |
-| **Vue CLI** | `vue.config.js` → `devServer.port` | 8080 |
-| **Angular** | `angular.json` → `serve.options.port` | 4200 |
-| **Nuxt** | `nuxt.config.js` → `server.port` | 3000 |
-| **Astro** | `astro.config.mjs` → `server.port` | 4321 |
-| **SvelteKit** | `vite.config.js` (uses Vite) | 5173 |
+**Script Independence:**
+- The `scripts/pw-helper.js` lives in this skill directory and is NEVER copied to the user's project
+- Call it using absolute path: `node <skill-directory>/scripts/pw-helper.js <command> <args>`
+- Test URLs are passed as command line arguments
+- Do NOT inject any test scripts into the user's project directory
+- Only test artifacts (screenshots, logs) go to `./test-output/` in the current working directory
 
 ## How It Works
 
 ### Phase 1: Code Analysis
-I will read your project's source code to understand:
+Read the project's source code to understand:
 - Project structure and framework (React, Vue, Next.js, etc.)
 - Available pages and routes
 - Interactive components (buttons, forms, modals, etc.)
 - Expected behaviors and user flows
 
 ### Phase 2: Test Planning
-Based on code analysis, I will create a test plan covering:
+Create a test plan covering:
 - All discoverable pages/routes
 - Interactive elements (buttons, links, inputs, dropdowns, etc.)
 - Form submissions and validations
-- Modal/dialog interactions
-- Navigation flows
-- Error states and edge cases
+- Navigation flows and edge cases
 
 ### Phase 3: Test Execution
-I will execute tests using Playwright directly via the helper script.
-
-**IMPORTANT: Script Independence**
-- The pw-helper.js script stays in the skill directory - NEVER copy it to the user's project
-- Call it using absolute path: `node <skill-directory>/pw-helper.js <command> <args>`
-- Test URL is passed directly as a command line argument
+Execute tests using Playwright via the helper script:
 
 ```bash
-# All commands use the script from skill directory (example path)
-SKILL_DIR="/path/to/intelligent-web-testing"
+SKILL_DIR="<path-to-this-skill>"
 
 # Navigate and screenshot
-node $SKILL_DIR/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
+node $SKILL_DIR/scripts/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
 
-# Click element
-node $SKILL_DIR/pw-helper.js click "button.submit" --screenshot after-click.png
+# Interact with elements
+node $SKILL_DIR/scripts/pw-helper.js click "button.submit" --screenshot after-click.png
+node $SKILL_DIR/scripts/pw-helper.js fill "#email" "test@example.com"
+node $SKILL_DIR/scripts/pw-helper.js select "#country" "US"
+node $SKILL_DIR/scripts/pw-helper.js check "#agree-terms"
 
-# Fill form
-node $SKILL_DIR/pw-helper.js fill "#email" "test@example.com"
-
-# Select option
-node $SKILL_DIR/pw-helper.js select "#country" "US"
-
-# Check/uncheck
-node $SKILL_DIR/pw-helper.js check "#agree-terms"
-
-# Get page content for validation
-node $SKILL_DIR/pw-helper.js content
-
-# List all interactive elements
-node $SKILL_DIR/pw-helper.js list-elements
+# Get page info
+node $SKILL_DIR/scripts/pw-helper.js content
+node $SKILL_DIR/scripts/pw-helper.js list-elements
 ```
 
 ### Phase 4: Result Validation
-I will validate results by:
+Validate results by:
 - Analyzing screenshots visually
 - Checking console output for errors
 - Verifying expected UI states
-- Comparing before/after states
 - Reporting issues with specific details
 
 ## Instructions
 
-**KEY PRINCIPLE: Script Independence**
-- The pw-helper.js script lives in the skill directory and is NEVER copied to the user's project
-- Call it directly using absolute path: `node <skill-directory>/pw-helper.js <command> <args>`
-- Test URLs are passed as command line arguments
-- Do NOT inject any test scripts into the user's project directory
-- All test artifacts (screenshots, logs) go to `./test-output/` in the current working directory
+When asked to test a web app, follow this workflow:
 
-When you ask me to test your web app, I will follow this workflow:
+### Step 0: Detect and Start Project
 
-### Step 0: Detect Framework, Port, and Start Project
-
-First, I'll identify the framework, find the dev server command, and start the project:
-
-```
-1. Read package.json to find:
-   - Project name and dependencies
-   - scripts field to find dev/start command:
-     - "dev": "vite" / "next dev" / "remix dev" / etc.
-     - "start": "react-scripts start" / "webpack serve" / etc.
-   - Custom port in scripts: PORT=xxxx, --port xxxx, -p xxxx
-
-2. Check for framework config files:
-   - vite.config.js/ts → Vite project (default: 5173)
-   - next.config.js/mjs → Next.js project (default: 3000)
-   - remix.config.js → Remix project (default: 3000)
-   - webpack.config.js → Webpack project (default: 8080)
-   - vue.config.js → Vue CLI project (default: 8080)
-   - angular.json → Angular project (default: 4200)
-   - nuxt.config.js/ts → Nuxt project (default: 3000)
-   - astro.config.mjs → Astro project (default: 4321)
-   - svelte.config.js → SvelteKit project (default: 5173)
-
-3. Read config file to find custom port if specified
-
-4. Install dependencies if needed:
-   npm install (if node_modules doesn't exist)
-
-5. Start the dev server in background:
-   npm run dev &  (or npm run start, depending on scripts)
-
-6. Wait for server to be ready:
-   - Poll http://localhost:<port> until it responds
-   - Or watch for "ready" / "started" in console output
-
-7. Construct base URL: http://localhost:<detected_port>
-```
-
-**Common start commands by framework:**
-
-| Framework | Typical Script | Command |
-|-----------|---------------|---------|
-| Vite | `"dev": "vite"` | `npm run dev` |
-| Next.js | `"dev": "next dev"` | `npm run dev` |
-| Remix | `"dev": "remix dev"` | `npm run dev` |
-| Create React App | `"start": "react-scripts start"` | `npm run start` |
-| Vue CLI | `"serve": "vue-cli-service serve"` | `npm run serve` |
-| Angular | `"start": "ng serve"` | `npm run start` |
-| Nuxt | `"dev": "nuxt dev"` | `npm run dev` |
-| Astro | `"dev": "astro dev"` | `npm run dev` |
+1. Read `package.json` to find dev/start command
+2. Check for framework config files to detect port
+3. Install dependencies if needed: `npm install`
+4. Start dev server in background: `npm run dev &`
+5. Wait for server to be ready
 
 ### Step 1: Understand the Project
 
-Next, I'll analyze your codebase:
-
-```
-1. Find all source files (*.tsx, *.jsx, *.vue, *.html, *.js, *.ts)
+1. Find all source files (`*.tsx`, `*.jsx`, `*.vue`, `*.html`)
 2. Identify the framework and project structure
-3. Discover routes/pages from:
-   - Router configuration files
-   - Page/route directories
-   - Navigation components
-4. Find interactive elements:
-   - Button components and click handlers
-   - Form inputs and submissions
-   - Modal/dialog triggers
-   - Dropdown menus and selects
-   - Tabs, accordions, toggles
-5. Understand expected behaviors from:
-   - Component props and state
-   - Event handlers
-   - API calls and responses
-```
+3. Discover routes/pages from router config and page directories
+4. Find interactive elements (buttons, forms, modals, etc.)
 
 ### Step 2: Create Test Plan
 
-I'll generate a structured test plan:
-
-```markdown
-## Test Plan for [Project Name]
-
-### Pages to Test
-1. / (Home) - Main landing page
-2. /login - User authentication
-3. /dashboard - User dashboard
-...
-
-### Interactive Elements
-1. Navigation menu - Click each link, verify navigation
-2. Login form - Fill credentials, submit, verify redirect
-3. Settings modal - Open, modify, save, verify changes
-...
-
-### User Flows
-1. Registration flow: Home → Sign Up → Fill Form → Verify Email
-2. Purchase flow: Product → Add to Cart → Checkout → Confirm
-...
-
-### Edge Cases
-1. Invalid form inputs - Verify error messages
-2. Network errors - Verify error handling
-3. Empty states - Verify placeholder content
-...
-```
+Generate a structured test plan covering:
+- Pages to test
+- Interactive elements
+- User flows
+- Edge cases
 
 ### Step 3: Execute Tests
 
-For each test, I'll:
+For each test:
+1. Navigate to the target page
+2. Capture screenshot of initial state
+3. Perform the action (click, fill, select, etc.)
+4. Wait for UI to update
+5. Capture screenshot of result state
+6. Validate expected outcome
 
-1. **Setup**: Ensure Playwright helper is available
-2. **Navigate**: Go to the target page
-3. **Capture Before**: Take screenshot of initial state
-4. **Interact**: Perform the action (click, fill, select, etc.)
-5. **Wait**: Allow UI to update
-6. **Capture After**: Take screenshot of result state
-7. **Validate**: Check expected outcome
-
-Example test execution:
-
+Example:
 ```bash
-# Test: Login form submission
-# Use absolute path to skill's pw-helper.js, URL passed as argument
-SKILL_DIR="/path/to/intelligent-web-testing"
+SKILL_DIR="<path-to-this-skill>"
 
-node $SKILL_DIR/pw-helper.js navigate "http://localhost:3000/login" --screenshot login-before.png
-node $SKILL_DIR/pw-helper.js fill "#email" "test@example.com"
-node $SKILL_DIR/pw-helper.js fill "#password" "password123"
-node $SKILL_DIR/pw-helper.js click "button[type='submit']" --screenshot login-after.png --wait 2000
+node $SKILL_DIR/scripts/pw-helper.js navigate "http://localhost:3000/login" --screenshot login-before.png
+node $SKILL_DIR/scripts/pw-helper.js fill "#email" "test@example.com"
+node $SKILL_DIR/scripts/pw-helper.js fill "#password" "password123"
+node $SKILL_DIR/scripts/pw-helper.js click "button[type='submit']" --screenshot login-after.png --wait 2000
 ```
 
 ### Step 4: Validate and Report
 
-After each test, I'll analyze:
+Analyze results and generate a report:
+- Summary of passed/failed tests
+- Details of failures with screenshots
+- Suggestions for fixes
 
-1. **Visual Check**: Read the screenshot to verify UI state
-2. **Console Check**: Look for JavaScript errors
-3. **Network Check**: Verify API calls succeeded
-4. **State Check**: Confirm expected changes occurred
+## Web3 DApp Testing
 
-Final report format:
+For Web3 DApps requiring wallet connection:
 
-```markdown
-## Test Results
-
-### Summary
-- Total Tests: 15
-- Passed: 13
-- Failed: 2
-- Warnings: 3
-
-### Passed Tests
-- [x] Home page loads correctly
-- [x] Navigation works
-- [x] Login form accepts input
-...
-
-### Failed Tests
-- [ ] Submit button unresponsive on mobile viewport
-  - Expected: Form submits on click
-  - Actual: No response to click event
-  - Screenshot: submit-fail.png
-  - Suggestion: Check click handler binding
-
-### Warnings
-- Loading spinner persists for 5+ seconds on /dashboard
-- Console warning: "React key prop missing"
-...
-```
-
-## Helper Script Setup
-
-The pw-helper.js script is part of this skill and remains in the skill directory.
-
-**Script Location:**
-- The script stays in `<skill-directory>/pw-helper.js`
-- It is NEVER copied, injected, or created in the user's project
-- Call it with absolute path: `node <skill-directory>/pw-helper.js <command> <args>`
-
-**Playwright Installation:**
 ```bash
-# Install Playwright globally (one-time setup)
-npm install -g playwright
-npx playwright install chromium
+SKILL_DIR="<path-to-this-skill>"
+
+# Set private key (REQUIRED - never logged or transmitted)
+export WALLET_PRIVATE_KEY="your_private_key_here"
+
+# Setup flow
+node $SKILL_DIR/scripts/pw-helper.js wallet-setup      # Install Rabby Wallet
+node $SKILL_DIR/scripts/pw-helper.js wallet-import     # Import wallet
+node $SKILL_DIR/scripts/pw-helper.js wallet-navigate "https://app.example.com"
+node $SKILL_DIR/scripts/pw-helper.js wallet-connect    # Connect to DApp
+node $SKILL_DIR/scripts/pw-helper.js wallet-switch-network polygon
 ```
 
-**Usage Example:**
-```bash
-# Assuming skill is at /path/to/intelligent-web-testing
-node /path/to/intelligent-web-testing/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
-node /path/to/intelligent-web-testing/pw-helper.js click "#submit" --wait 1000
-node /path/to/intelligent-web-testing/pw-helper.js list-elements
-```
+**Security:** Private key is read from environment variable ONLY, never logged or transmitted.
 
-## Test Output Directory
+## Auto Port Detection
 
-All test artifacts are saved to `./test-output/`:
-- `screenshots/` - All captured screenshots
-- `test-plan.md` - Generated test plan
-- `test-results.md` - Final test report
+| Framework | Default Port |
+|-----------|--------------|
+| Vite | 5173 |
+| Next.js | 3000 |
+| Create React App | 3000 |
+| Vue CLI | 8080 |
+| Angular | 4200 |
+| Astro | 4321 |
+
+## Test Output
+
+All artifacts saved to `./test-output/`:
+- `screenshots/` - Captured screenshots
 - `console-logs.txt` - Browser console output
+- `elements.json` - Interactive elements discovered
 
-## Validation Criteria
+## Command Reference
 
-I validate tests using these criteria:
+| Command | Description |
+|---------|-------------|
+| `navigate <url>` | Navigate to URL |
+| `click <selector>` | Click element |
+| `fill <selector> <value>` | Fill input field |
+| `select <selector> <value>` | Select dropdown option |
+| `check/uncheck <selector>` | Check/uncheck checkbox |
+| `hover <selector>` | Hover over element |
+| `press <selector> <key>` | Press key on element |
+| `screenshot [name]` | Take screenshot |
+| `content` | Get page HTML |
+| `list-elements` | List interactive elements |
+| `wait <ms>` | Wait milliseconds |
+| `wait-for <selector>` | Wait for element |
 
-### Visual Validation
-- Page renders without blank sections
-- Elements are visible and properly aligned
-- Colors and fonts match expected design
-- No overlapping or cut-off content
+**Options:** `--screenshot <name>`, `--wait <ms>`, `--mobile`, `--headed`, `--timeout <ms>`
 
-### Functional Validation
-- Clicks trigger expected actions
-- Forms accept and validate input
-- Navigation leads to correct pages
-- Modals open and close properly
-- Data displays correctly
-
-### Error Validation
-- No JavaScript errors in console
-- No network request failures (except expected 4xx)
-- No accessibility violations
-- No broken images or resources
-
-## Supported Interactions
-
-| Action | Command | Example |
-|--------|---------|---------|
-| Navigate | `navigate <url>` | `navigate "http://localhost:3000"` |
-| Click | `click <selector>` | `click "button.submit"` |
-| Fill | `fill <selector> <value>` | `fill "#email" "test@test.com"` |
-| Select | `select <selector> <value>` | `select "#country" "US"` |
-| Check | `check <selector>` | `check "#agree"` |
-| Uncheck | `uncheck <selector>` | `uncheck "#subscribe"` |
-| Hover | `hover <selector>` | `hover ".dropdown-trigger"` |
-| Press | `press <selector> <key>` | `press "#search" "Enter"` |
-| Wait | `wait <ms>` | `wait 2000` |
-| Screenshot | `screenshot <name>` | `screenshot "result.png"` |
-| Content | `content` | Get page HTML |
-| Evaluate | `evaluate <js>` | `evaluate "document.title"` |
-
-## Example Session
-
-User: "Test my web app"
-
-Agent:
-
-### Step 0: Auto-Detect Local Services
-```bash
-# Scan common ports for running services
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3000  # 200 OK
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5173  # Connection refused
-curl -s -o /dev/null -w "%{http_code}" http://localhost:8080  # Connection refused
-# ...
-```
-
-Agent: "I detected the following local services:
-- http://localhost:3000 (responding)
-
-Which URL would you like me to test?
-1. http://localhost:3000
-2. Enter a custom URL"
-
-User: "1"
-
-### Step 1-2: Analyze & Plan
-1. **Target URL**: http://localhost:3000 (user confirmed)
-2. **Analyze Code**: Reads `src/` directory
-   - Found `App.tsx`, `pages/`, `components/`
-   - Identified routes: `/`, `/about`, `/contact`, `/login`
-   - Discovered: Navbar, LoginForm, ContactForm, Modal
-3. **Create Test Plan**: 12 tests covering all pages and interactions
-
-### Step 3: Execute Tests
-```bash
-# Using absolute path to skill directory
-SKILL_DIR="/path/to/intelligent-web-testing"
-
-node $SKILL_DIR/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
-node $SKILL_DIR/pw-helper.js click "nav a[href='/login']" --screenshot nav-to-login.png
-node $SKILL_DIR/pw-helper.js fill "#email" "test@example.com"
-node $SKILL_DIR/pw-helper.js click "button[type='submit']" --screenshot after-login.png
-# ... more tests
-```
-
-### Step 4: Validate & Report
-4. **Validate Results**: Analyze screenshots, check console logs
-5. **Report**: 11 passed, 1 failed (contact form submit error)
-6. **Suggest Fix**: "ContactForm.tsx:42 - onClick handler missing await"
-
-### Common Ports Scanned
-
-| Port | Common Usage |
-|------|-------------|
-| 3000 | Next.js, Create React App, Express |
-| 5173 | Vite |
-| 8080 | Webpack, Vue CLI |
-| 4200 | Angular |
-| 4321 | Astro |
-| 8000 | Django, FastAPI |
-| 5000 | Flask |
+For detailed reference including Web3 commands, supported networks, validation criteria, and templates, see `references/REFERENCE.md`.
 
 ## Notes
 
-- I analyze your actual code to understand expected behavior
 - Tests are dynamically generated based on your project
-- I validate results myself by reading screenshots
+- I validate results by reading screenshots
 - No pre-written test scripts required
-- I adapt to any frontend framework
-- **The pw-helper.js script is NEVER injected into your project** - it runs from the skill directory
-- Only test artifacts (screenshots, logs) are created in your project's `./test-output/` directory
+- The pw-helper.js script is NEVER injected into your project
+- Only test artifacts are created in your project's `./test-output/`
