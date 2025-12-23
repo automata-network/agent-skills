@@ -717,7 +717,53 @@ async function startBrowser(options) {
       rabbyExtensionId = swUrl.split('/')[2];
       console.log(JSON.stringify({ status: 'info', message: 'Rabby wallet extension loaded successfully', extensionId: rabbyExtensionId }));
     } catch (e) {
-      console.log(JSON.stringify({ status: 'warning', message: 'Extension service worker not detected (may still work)' }));
+      console.log(JSON.stringify({ status: 'warning', message: 'Extension service worker not detected, trying fallback detection...' }));
+
+      // Fallback: Try to get extension ID from background pages or by navigating to chrome://extensions
+      try {
+        // Try to detect extension by checking existing pages
+        const allPages = context.pages();
+        for (const p of allPages) {
+          const url = p.url();
+          if (url.startsWith('chrome-extension://')) {
+            rabbyExtensionId = url.split('/')[2];
+            console.log(JSON.stringify({ status: 'info', message: 'Extension ID detected from page', extensionId: rabbyExtensionId }));
+            break;
+          }
+        }
+
+        // If still not found, navigate to extension and detect from there
+        if (!rabbyExtensionId) {
+          const testPage = await context.newPage();
+          await testPage.goto('chrome://extensions/', { timeout: 5000 }).catch(() => {});
+          await testPage.waitForTimeout(1000);
+
+          // Try to find extension ID from the extensions page DOM
+          const extensionIds = await testPage.evaluate(() => {
+            const items = document.querySelectorAll('extensions-item');
+            return Array.from(items).map(item => item.id).filter(id => id);
+          }).catch(() => []);
+
+          if (extensionIds.length > 0) {
+            // Use the first extension (should be Rabby)
+            rabbyExtensionId = extensionIds[0];
+            console.log(JSON.stringify({ status: 'info', message: 'Extension ID detected from chrome://extensions', extensionId: rabbyExtensionId }));
+          }
+
+          await testPage.close().catch(() => {});
+        }
+
+        // Final fallback: use the known extension ID for this unpacked extension
+        if (!rabbyExtensionId) {
+          // For unpacked extensions loaded from same path, ID is deterministic
+          rabbyExtensionId = 'dedbkciaajbkfglbaikbmmhdhelboppf';
+          console.log(JSON.stringify({ status: 'warning', message: 'Using fallback extension ID', extensionId: rabbyExtensionId }));
+        }
+      } catch (fallbackError) {
+        // Use known fallback ID
+        rabbyExtensionId = 'dedbkciaajbkfglbaikbmmhdhelboppf';
+        console.log(JSON.stringify({ status: 'warning', message: 'Using fallback extension ID', extensionId: rabbyExtensionId }));
+      }
     }
 
   } else if (useIndependentChrome) {
@@ -1797,8 +1843,8 @@ const commands = {
 
       // If wallet exists but is locked
       if (hasUnlockField && !hasNewUserIndicator) {
-        // Check if we have the password from env var
-        if (walletPassword) {
+        // Check if we have the password from env var (passwordGenerated=false means user provided it)
+        if (!passwordGenerated) {
           console.log(JSON.stringify({ status: 'info', message: 'Wallet exists but is locked, unlocking with WALLET_PASSWORD...' }));
 
           const passwordInput = await extensionPage.$('input[type="password"]');
@@ -1842,25 +1888,36 @@ const commands = {
             return;
           }
         } else {
-          // No WALLET_PASSWORD env var - need to reset wallet
+          // No WALLET_PASSWORD env var - need to reset wallet via forgot-password page
           console.log(JSON.stringify({ status: 'info', message: 'Wallet exists but WALLET_PASSWORD not set, resetting wallet...' }));
 
-          // Click "Forget password" link
-          const forgetPasswordSelectors = [
-            'text=Forget password',
-            'text=忘记密码',
-            'a:has-text("Forget")',
-            '[class*="forget"]',
+          // Navigate to forgot-password page directly
+          const forgotPasswordUrl = `chrome-extension://${rabbyExtensionId}/index.html#/forgot-password`;
+          await extensionPage.goto(forgotPasswordUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+          await extensionPage.waitForTimeout(2000);
+
+          await extensionPage.screenshot({
+            path: path.join(SCREENSHOTS_DIR, 'wallet-reset-1-forgot-page.png'),
+            fullPage: true
+          });
+
+          // Click "Begin Reset Process" button
+          const beginResetSelectors = [
+            'button:has-text("Begin Reset Process")',
+            'button:has-text("Begin")',
+            'button:has-text("Reset")',
+            '.ant-btn-primary',
+            'button[type="submit"]',
           ];
 
-          let forgetClicked = false;
-          for (const selector of forgetPasswordSelectors) {
+          let beginClicked = false;
+          for (const selector of beginResetSelectors) {
             try {
-              const link = await extensionPage.$(selector);
-              if (link && await link.isVisible()) {
-                await link.click();
-                forgetClicked = true;
-                console.log(JSON.stringify({ status: 'info', message: 'Clicked forget password' }));
+              const btn = await extensionPage.$(selector);
+              if (btn && await btn.isVisible()) {
+                await btn.click();
+                beginClicked = true;
+                console.log(JSON.stringify({ status: 'info', message: 'Clicked Begin Reset Process button' }));
                 await extensionPage.waitForTimeout(1500);
                 break;
               }
@@ -1869,9 +1926,9 @@ const commands = {
             }
           }
 
-          if (forgetClicked) {
+          if (beginClicked) {
             await extensionPage.screenshot({
-              path: path.join(SCREENSHOTS_DIR, 'wallet-reset-1-forget.png'),
+              path: path.join(SCREENSHOTS_DIR, 'wallet-reset-2-begin-clicked.png'),
               fullPage: true
             });
 
@@ -1896,22 +1953,26 @@ const commands = {
               }
             }
 
-            // Click confirm/reset button
-            const resetConfirmSelectors = [
+            await extensionPage.screenshot({
+              path: path.join(SCREENSHOTS_DIR, 'wallet-reset-3-reset-typed.png'),
+              fullPage: true
+            });
+
+            // Click "Confirm Reset" button
+            const confirmResetSelectors = [
+              'button:has-text("Confirm Reset")',
               'button:has-text("Confirm")',
-              'button:has-text("Reset")',
-              'button:has-text("确认")',
-              'button[type="submit"]',
-              '.ant-btn-primary',
               '.ant-btn-danger',
+              '.ant-btn-primary',
+              'button[type="submit"]',
             ];
 
-            for (const selector of resetConfirmSelectors) {
+            for (const selector of confirmResetSelectors) {
               try {
                 const btn = await extensionPage.$(selector);
                 if (btn && await btn.isVisible()) {
                   await btn.click();
-                  console.log(JSON.stringify({ status: 'info', message: 'Clicked reset confirm button' }));
+                  console.log(JSON.stringify({ status: 'info', message: 'Clicked Confirm Reset button' }));
                   await extensionPage.waitForTimeout(2000);
                   break;
                 }
@@ -1921,7 +1982,7 @@ const commands = {
             }
 
             await extensionPage.screenshot({
-              path: path.join(SCREENSHOTS_DIR, 'wallet-reset-2-confirmed.png'),
+              path: path.join(SCREENSHOTS_DIR, 'wallet-reset-4-confirmed.png'),
               fullPage: true
             });
 
