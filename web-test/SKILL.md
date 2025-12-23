@@ -88,7 +88,33 @@ Validate results by:
 
 When asked to test a web app, follow this workflow:
 
-### Step 0: Detect and Start Project
+### Step 0: Clean Up Previous Test Session
+
+Before starting any new test, clean up artifacts from previous test sessions:
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+AGENT_CWD="<current-working-directory>"
+
+# 1. Close any running test browsers (Chromium processes from previous tests)
+pkill -f "chromium.*--user-data-dir=.*test-output" || true
+pkill -f "chrome.*--user-data-dir=.*test-output" || true
+
+# 2. Close the persistent browser process if running
+node $SKILL_DIR/scripts/test-helper.js browser-close 2>/dev/null || true
+
+# 3. Remove previous test output folder to start fresh
+rm -rf "$AGENT_CWD/test-output"
+```
+
+This ensures:
+- No leftover browser processes interfere with new tests
+- Previous screenshots and logs don't mix with new test results
+- Clean slate for accurate test reporting
+
+**Note:** The chrome-profile directory is also removed, so wallet will need to be re-imported if testing Web3 DApps.
+
+### Step 1: Detect and Start Project
 
 1. Read `package.json` to find dev/start command
 2. Check for framework config files to detect port
@@ -96,14 +122,14 @@ When asked to test a web app, follow this workflow:
 4. Start dev server in background: `npm run dev &`
 5. Wait for server to be ready
 
-### Step 1: Understand the Project
+### Step 2: Understand the Project
 
 1. Find all source files (`*.tsx`, `*.jsx`, `*.vue`, `*.html`)
 2. Identify the framework and project structure
 3. Discover routes/pages from router config and page directories
 4. Find interactive elements (buttons, forms, modals, etc.)
 
-### Step 2: Create Test Plan
+### Step 3: Create Test Plan
 
 Generate a structured test plan covering:
 - Pages to test
@@ -111,7 +137,7 @@ Generate a structured test plan covering:
 - User flows
 - Edge cases
 
-### Step 3: Execute Tests
+### Step 4: Execute Tests
 
 For each test:
 1. Navigate to the target page
@@ -203,7 +229,7 @@ node $SKILL_DIR/scripts/test-helper.js fill "#password" "password123"
 node $SKILL_DIR/scripts/test-helper.js click "button[type='submit']" --screenshot login-after.png --wait 2000
 ```
 
-### Step 4: Validate and Report
+### Step 5: Validate and Report
 
 Analyze results and generate a report:
 - Summary of passed/failed tests
