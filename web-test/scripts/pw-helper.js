@@ -616,6 +616,26 @@ async function tryConnectExistingBrowser() {
         context = contexts[0];
         const pages = context.pages();
         page = pages.length > 0 ? pages[0] : await context.newPage();
+
+        // Try to detect extension ID from existing pages
+        for (const p of pages) {
+          const url = p.url();
+          if (url.startsWith('chrome-extension://')) {
+            rabbyExtensionId = url.split('/')[2];
+            break;
+          }
+        }
+
+        // If not found from pages, use fallback
+        if (!rabbyExtensionId) {
+          rabbyExtensionId = 'dedbkciaajbkfglbaikbmmhdhelboppf';
+        }
+
+        console.log(JSON.stringify({
+          status: 'info',
+          message: 'Connected to existing browser via CDP',
+          extensionId: rabbyExtensionId
+        }));
         return true;
       }
     }
@@ -647,7 +667,7 @@ async function startBrowser(options) {
 
   // Try to connect to existing browser first
   if (await tryConnectExistingBrowser()) {
-    console.log(JSON.stringify({ success: true, message: 'Connected to existing browser' }));
+    // Message already logged in tryConnectExistingBrowser
     return;
   }
 
@@ -692,6 +712,7 @@ async function startBrowser(options) {
         '--disable-blink-features=AutomationControlled',
         `--disable-extensions-except=${path.resolve(rabbyPath)}`,
         `--load-extension=${path.resolve(rabbyPath)}`,
+        `--remote-debugging-port=${CDP_PORT}`, // Enable CDP for browser reuse
       ],
       // IMPORTANT: Remove default --disable-extensions flag that conflicts with --load-extension
       ignoreDefaultArgs: ['--disable-extensions'],
@@ -1789,8 +1810,8 @@ const commands = {
         return;
       }
 
-      // Open browser with wallet extension loaded
-      await commands['browser-open'](args, options);
+      // Open browser with wallet extension loaded (uses CDP for reuse)
+      await startBrowser(options);
 
       const extensionPage = await context.newPage();
 
@@ -2190,8 +2211,8 @@ const commands = {
         return;
       }
 
-      // Open browser with wallet extension loaded
-      await commands['browser-open'](args, options);
+      // Open browser with wallet extension loaded (uses CDP for reuse)
+      await startBrowser(options);
 
       const extensionPage = await context.newPage();
 
@@ -2290,8 +2311,10 @@ const commands = {
         return;
       }
 
-      // Open browser with wallet extension loaded
-      await commands['browser-open'](args, options);
+      // Try to connect to existing browser first, or open new one
+      await startBrowser(options);
+
+      // Create new page (tab) for navigation
       page = await context.newPage();
 
       // Navigate to DApp
@@ -3731,7 +3754,7 @@ async function main() {
     process.exit(1);
   } finally {
     // Only close browser if --keep-open is NOT set and command is not 'start' or 'browser-open'
-    const keepOpenCommands = ['start', 'browser-open', 'wait-for-login', 'wallet-setup', 'wallet-import', 'wallet-unlock'];
+    const keepOpenCommands = ['start', 'browser-open', 'wait-for-login', 'wallet-setup', 'wallet-import', 'wallet-unlock', 'wallet-navigate'];
     if (!parsed.options.keepOpen && !keepOpenCommands.includes(parsed.command)) {
       if (persistentContext) {
         await persistentContext.close();
