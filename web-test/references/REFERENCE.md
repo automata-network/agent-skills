@@ -1,6 +1,6 @@
 # Intelligent Web Testing - Technical Reference
 
-This document contains detailed technical information for the intelligent-web-testing skill.
+This document contains detailed technical information for the web-test skill.
 
 ## Supported Interactions
 
@@ -71,7 +71,7 @@ This document contains detailed technical information for the intelligent-web-te
 ### Web3 Test Flow Example
 
 ```bash
-SKILL_DIR="/path/to/intelligent-web-testing"
+SKILL_DIR="/path/to/web-test"
 
 # Step 1: Install Rabby Wallet (one-time)
 node $SKILL_DIR/scripts/pw-helper.js wallet-setup
@@ -214,7 +214,7 @@ User: "1"
 
 ### Step 3: Execute Tests
 ```bash
-SKILL_DIR="/path/to/intelligent-web-testing"
+SKILL_DIR="/path/to/web-test"
 
 node $SKILL_DIR/scripts/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
 node $SKILL_DIR/scripts/pw-helper.js click "nav a[href='/login']" --screenshot nav-to-login.png

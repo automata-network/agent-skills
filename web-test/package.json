@@ -1,5 +1,5 @@
 {
-  "name": "intelligent-web-testing",
+  "name": "web-test",
   "version": "1.0.0",
   "description": "AI-driven web app testing with Playwright (requires global Playwright installation)",
   "main": "pw-helper.js",

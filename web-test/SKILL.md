@@ -1,5 +1,5 @@
 ---
-name: intelligent-web-testing
+name: web-test
 description: AI-driven web app testing. Agent reads code, understands functionality, plans tests, executes Playwright commands directly, and validates results autonomously. No pre-written scripts required.
 license: MIT
 compatibility: Node.js 18+, Playwright (global)
