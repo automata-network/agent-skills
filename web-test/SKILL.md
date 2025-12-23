@@ -128,6 +128,13 @@ The cleanup script:
    - "Connect Wallet" button on page
    - Web3 libraries in code (wagmi, viem, ethers, @rainbow-me, @privy-io)
    - Wallet-related UI elements
+6. **⚠️ MANDATORY: Research project technologies** - Use web search to:
+   - Understand what the project does (DeFi, NFT, Bridge, etc.)
+   - Learn about libraries/SDKs used (Rainbow Kit, Privy, etc.)
+   - Find documentation on how features work
+   - Understand expected user flows
+
+**DO NOT skip the research step!** Without understanding the technology, you cannot properly test the features.
 
 **If Web3 DApp detected → Step 4 and Step 5 are MANDATORY!**
 
