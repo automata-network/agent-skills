@@ -73,7 +73,111 @@ function getRabbyIndexUrl() {
 function getRabbyImportPrivateKeyUrl() {
   const extensionId = getRabbyExtensionId();
   if (!extensionId) throw new Error('Rabby extension not loaded');
-  return `chrome-extension://${extensionId}/index.html#/import/key`;
+  // New user import private key URL
+  return `chrome-extension://${extensionId}/index.html#/new-user/import/private-key`;
+}
+
+function getRabbyNoAddressUrl() {
+  const extensionId = getRabbyExtensionId();
+  if (!extensionId) throw new Error('Rabby extension not loaded');
+  return `chrome-extension://${extensionId}/index.html#/no-address`;
+}
+
+/**
+ * Handle Rabby welcome flow (Access All Dapps → Next → Get Started)
+ */
+async function handleWelcomeFlow(extensionPage) {
+  const currentUrl = extensionPage.url();
+  console.log(JSON.stringify({ status: 'info', message: `Checking welcome flow, current URL: ${currentUrl}` }));
+
+  // Take screenshot to see current state
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-welcome-check.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  const content = await extensionPage.content();
+
+  // Check if on "Access All Dapps" welcome page
+  if (content.includes('Access All Dapps') || content.includes('Access all Dapps')) {
+    console.log(JSON.stringify({ status: 'info', message: 'On "Access All Dapps" page, clicking Next...' }));
+
+    const nextSelectors = [
+      'button:has-text("Next")',
+      'button:has-text("next")',
+      'button:has-text("下一步")',
+      '.ant-btn-primary',
+      'button[type="button"]',
+    ];
+
+    for (const selector of nextSelectors) {
+      try {
+        const btn = await extensionPage.$(selector);
+        if (btn && await btn.isVisible()) {
+          await btn.click();
+          console.log(JSON.stringify({ status: 'info', message: 'Clicked Next button' }));
+          await extensionPage.waitForTimeout(2000);
+          break;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    await extensionPage.screenshot({
+      path: path.join(SCREENSHOTS_DIR, 'wallet-welcome-after-next.jpg'),
+      type: 'jpeg',
+      quality: 60
+    });
+  }
+
+  // Check for "Get Started" button (second page of welcome flow)
+  const contentAfterNext = await extensionPage.content();
+  if (contentAfterNext.includes('Get Started') || contentAfterNext.includes('Get started')) {
+    console.log(JSON.stringify({ status: 'info', message: 'Found "Get Started" button, clicking...' }));
+
+    const getStartedSelectors = [
+      'button:has-text("Get Started")',
+      'button:has-text("Get started")',
+      'button:has-text("开始使用")',
+      '.ant-btn-primary',
+    ];
+
+    for (const selector of getStartedSelectors) {
+      try {
+        const btn = await extensionPage.$(selector);
+        if (btn && await btn.isVisible()) {
+          await btn.click();
+          console.log(JSON.stringify({ status: 'info', message: 'Clicked Get Started button' }));
+          await extensionPage.waitForTimeout(2000);
+          break;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    await extensionPage.screenshot({
+      path: path.join(SCREENSHOTS_DIR, 'wallet-welcome-after-getstarted.jpg'),
+      type: 'jpeg',
+      quality: 60
+    });
+  }
+
+  // Check if landed on no-address page (no wallet imported)
+  const urlAfterWelcome = extensionPage.url();
+  const noAddressUrl = getRabbyNoAddressUrl();
+
+  if (urlAfterWelcome.includes('#/no-address')) {
+    console.log(JSON.stringify({
+      status: 'info',
+      message: 'On no-address page - no wallet imported yet, will redirect to import page'
+    }));
+    return 'NO_ADDRESS';
+  }
+
+  return 'CONTINUE';
 }
 
 /**
@@ -82,11 +186,27 @@ function getRabbyImportPrivateKeyUrl() {
 async function importWallet(extensionPage, privateKey, walletPassword) {
   console.log(JSON.stringify({ status: 'info', message: 'Starting wallet import flow...' }));
 
-  const importUrl = getRabbyImportPrivateKeyUrl();
-  console.log(JSON.stringify({ status: 'info', message: `Navigating to import page: ${importUrl}` }));
+  // First, handle welcome flow if present
+  const welcomeResult = await handleWelcomeFlow(extensionPage);
+  console.log(JSON.stringify({ status: 'info', message: `Welcome flow result: ${welcomeResult}` }));
 
-  await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await extensionPage.waitForTimeout(3000);
+  // Get current URL after welcome flow
+  let currentUrl = extensionPage.url();
+  console.log(JSON.stringify({ status: 'info', message: `Current URL after welcome: ${currentUrl}` }));
+
+  // If on no-address page, navigate directly to import private key page
+  if (currentUrl.includes('#/no-address') || welcomeResult === 'NO_ADDRESS') {
+    const importUrl = getRabbyImportPrivateKeyUrl();
+    console.log(JSON.stringify({ status: 'info', message: `Navigating to import page: ${importUrl}` }));
+    await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await extensionPage.waitForTimeout(3000);
+  } else {
+    // Try to navigate to import page directly
+    const importUrl = getRabbyImportPrivateKeyUrl();
+    console.log(JSON.stringify({ status: 'info', message: `Navigating to import page: ${importUrl}` }));
+    await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await extensionPage.waitForTimeout(3000);
+  }
 
   await extensionPage.screenshot({
     path: path.join(SCREENSHOTS_DIR, 'wallet-init-import-page.jpg'),
@@ -94,9 +214,10 @@ async function importWallet(extensionPage, privateKey, walletPassword) {
     quality: 60
   });
 
-  const currentUrl = extensionPage.url();
+  currentUrl = extensionPage.url();
   console.log(JSON.stringify({ status: 'info', message: `Current URL: ${currentUrl}` }));
 
+  // Handle old guide page flow (fallback for older versions)
   if (currentUrl.includes('/new-user/guide')) {
     console.log(JSON.stringify({ status: 'info', message: 'On guide page, looking for Import option...' }));
 
@@ -121,6 +242,7 @@ async function importWallet(extensionPage, privateKey, walletPassword) {
       }
     }
 
+    const importUrl = getRabbyImportPrivateKeyUrl();
     await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await extensionPage.waitForTimeout(2000);
   }
@@ -524,7 +646,22 @@ const commands = {
         quality: 60
       });
 
-      let state = await detectWalletState(extensionPage);
+      // Handle welcome flow first (Access All Dapps → Next → Get Started)
+      const welcomeResult = await handleWelcomeFlow(extensionPage);
+      console.log(JSON.stringify({ status: 'info', message: `Welcome flow result: ${welcomeResult}` }));
+
+      // Re-check URL after welcome flow
+      const urlAfterWelcome = extensionPage.url();
+      console.log(JSON.stringify({ status: 'info', message: `URL after welcome flow: ${urlAfterWelcome}` }));
+
+      // If on no-address page, treat as NEW_USER
+      let state;
+      if (urlAfterWelcome.includes('#/no-address') || welcomeResult === 'NO_ADDRESS') {
+        state = WalletState.NEW_USER;
+        console.log(JSON.stringify({ status: 'info', message: 'No wallet address found, treating as NEW_USER' }));
+      } else {
+        state = await detectWalletState(extensionPage);
+      }
       console.log(JSON.stringify({ status: 'info', message: `Detected wallet state: ${state}` }));
 
       let initSuccess = false;
