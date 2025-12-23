@@ -124,10 +124,18 @@ The cleanup script:
 2. Identify the framework and project structure
 3. Discover routes/pages from router config and page directories
 4. Find interactive elements (buttons, forms, modals, etc.)
+5. **⚠️ CRITICAL: Detect if Web3 DApp** - Check for:
+   - "Connect Wallet" button on page
+   - Web3 libraries in code (wagmi, viem, ethers, @rainbow-me, @privy-io)
+   - Wallet-related UI elements
+
+**If Web3 DApp detected → Step 4 and Step 5 are MANDATORY!**
 
 ### Step 3: Create Test Plan
 
 Generate a structured test plan covering:
+- **Is Web3 DApp: YES / NO** ← MUST answer this first!
+- If YES: "Step 4 (Wallet Setup) and Step 5 (Wallet Connect) are REQUIRED"
 - Pages to test
 - Interactive elements
 - User flows
@@ -137,10 +145,19 @@ Generate a structured test plan covering:
 
 **If NOT Web3 DApp → Skip Step 4 and Step 5, go directly to Step 6.**
 
+---
+## ⛔ MANDATORY FOR WEB3 DAPP - DO NOT SKIP ⛔
+
+**If this is a Web3 DApp, you MUST execute Step 4 and Step 5.**
+**Without wallet setup and connection, ALL subsequent tests will FAIL.**
+**DO NOT proceed to Step 6 until wallet is connected and verified.**
+
+---
+
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Install extension and import wallet (auto-fails if WALLET_PRIVATE_KEY not set)
+# MUST RUN: Install extension and import wallet
 node $SKILL_DIR/scripts/test-helper.js wallet-setup
 node $SKILL_DIR/scripts/test-helper.js wallet-init --wallet --headed
 ```
@@ -151,7 +168,12 @@ Script auto-fails if `WALLET_PRIVATE_KEY` not set. After success → proceed to 
 
 **If NOT Web3 DApp → Skip to Step 6.**
 
-## ⚠️ Wallet MUST be connected BEFORE any other tests! Without connection, all tests FAIL.
+---
+## ⛔ MANDATORY - MUST COMPLETE BEFORE STEP 6 ⛔
+
+**Wallet MUST be connected BEFORE any other tests! Without connection, all tests FAIL.**
+
+---
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
@@ -190,8 +212,41 @@ For each test:
 2. Capture screenshot of initial state
 3. Perform the action (click, fill, select, etc.)
 4. Wait for UI to update
-5. Capture screenshot of result state
-6. Validate expected outcome
+5. **If Web3 DApp: Handle wallet popups** (see below)
+6. Capture screenshot of result state
+7. Validate expected outcome
+
+**Web3 DApp: Handling Transaction/Signature Popups**
+
+When testing Web3 DApp features, actions may trigger wallet popups:
+- **Sign message** - Signature request for authentication
+- **Contract call** - Smart contract interaction
+- **Send transaction** - Token transfer, swap, etc.
+
+After clicking any DApp button that triggers blockchain interaction:
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# 1. Click DApp button (e.g., "Swap", "Mint", "Send", "Approve")
+node $SKILL_DIR/scripts/test-helper.js vision-click <x> <y> --wallet --headed --keep-open
+
+# 2. Auto-approve Rabby popup (handles sign/confirm automatically)
+node $SKILL_DIR/scripts/test-helper.js wallet-approve --wallet --headed --keep-open
+
+# 3. Wait for transaction to complete and verify result
+node $SKILL_DIR/scripts/test-helper.js wait 3000 --wallet --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-transaction.jpg --wallet --headed --keep-open
+```
+
+**Common Web3 actions that trigger popups:**
+- Swap tokens
+- Mint NFT
+- Approve token spending
+- Send/Transfer tokens
+- Stake/Unstake
+- Bridge assets
+- Any "Confirm" or "Submit" button in DeFi apps
 
 ### Step 7: Validate and Report
 
