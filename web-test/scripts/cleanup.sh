@@ -1,6 +1,6 @@
 #!/bin/bash
 # Cleanup script for web-test skill
-# Only kills TEST-RELATED browser processes, NOT dev servers or other processes
+# Closes test browser (Chrome or Chromium) and cleans up test data
 #
 # Usage:
 #   ./cleanup.sh              # Clean up browser processes and test-output
@@ -22,14 +22,38 @@ done
 echo "=== Web Test Cleanup ==="
 
 # 1. Close persistent browser via test-helper (safe - only closes our browser)
-echo "[1/3] Closing test browser..."
+echo "[1/3] Closing test browser via test-helper..."
 node "$SCRIPT_DIR/test-helper.js" browser-close 2>/dev/null || true
 
-# 2. Kill ONLY Chromium processes that use test-output directory
-# This is specific enough to not kill other browsers or processes
-echo "[2/3] Killing test Chromium processes..."
-pkill -f "chromium.*--user-data-dir=.*test-output" 2>/dev/null || true
+# 2. Kill browser processes that use test-output directory
+# Playwright uses Chrome if available, otherwise Chromium
+echo "[2/3] Killing test browser processes..."
+
+# Check which browsers are running with test-output profile
+CHROME_PROCS=$(pgrep -f "Google Chrome.*--user-data-dir=.*test-output" 2>/dev/null | wc -l | tr -d ' ')
+CHROMIUM_PROCS=$(pgrep -f "Chromium.*--user-data-dir=.*test-output" 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$CHROME_PROCS" -gt 0 ]; then
+  echo "  Found $CHROME_PROCS Chrome process(es) with test-output profile, killing..."
+  pkill -f "Google Chrome.*--user-data-dir=.*test-output" 2>/dev/null || true
+fi
+
+if [ "$CHROMIUM_PROCS" -gt 0 ]; then
+  echo "  Found $CHROMIUM_PROCS Chromium process(es) with test-output profile, killing..."
+  pkill -f "Chromium.*--user-data-dir=.*test-output" 2>/dev/null || true
+fi
+
+# Also check for lowercase patterns (Linux)
 pkill -f "chrome.*--user-data-dir=.*test-output" 2>/dev/null || true
+pkill -f "chromium.*--user-data-dir=.*test-output" 2>/dev/null || true
+
+# Kill by remote-debugging-port if CDP was used
+pkill -f "Google Chrome.*--remote-debugging-port=9222" 2>/dev/null || true
+pkill -f "Chromium.*--remote-debugging-port=9222" 2>/dev/null || true
+
+if [ "$CHROME_PROCS" -eq 0 ] && [ "$CHROMIUM_PROCS" -eq 0 ]; then
+  echo "  No test browser processes found"
+fi
 
 # 3. Clean up test-output folder (optional)
 if [ "$KEEP_DATA" = false ]; then
@@ -40,6 +64,3 @@ else
 fi
 
 echo "=== Cleanup Complete ==="
-echo ""
-echo "NOTE: Dev server processes are NOT killed by this script."
-echo "To stop dev server manually: pkill -f 'npm run dev' or Ctrl+C"
