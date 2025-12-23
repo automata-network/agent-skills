@@ -294,6 +294,40 @@ Analyze results and generate a report:
 - Details of failures with screenshots
 - Suggestions for fixes
 
+### Step 6: Cleanup After Test Completion
+
+**IMPORTANT:** After ALL tests are completed, you MUST clean up resources:
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# 1. Close the persistent browser process
+node $SKILL_DIR/scripts/test-helper.js browser-close 2>/dev/null || true
+
+# 2. Kill any remaining Chromium processes from tests
+pkill -f "chromium.*--user-data-dir=.*test-output" || true
+pkill -f "chrome.*--user-data-dir=.*test-output" || true
+
+# 3. Stop the dev server if it was started by the test
+# Find and kill the dev server process (adjust based on how it was started)
+pkill -f "npm run dev" || true
+pkill -f "next dev" || true
+pkill -f "vite" || true
+# Or kill by port (e.g., port 3000)
+lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+```
+
+This ensures:
+- No browser processes are left running after tests
+- Dev server is stopped to free up the port
+- System resources are properly released
+- Clean state for the next test session
+
+**DO NOT skip this step!** Leaving processes running can:
+- Consume system resources unnecessarily
+- Block ports for future test runs
+- Cause confusion with stale browser windows
+
 ## Web3 DApp Testing
 
 For Web3 DApps requiring wallet connection, a complete wallet setup flow must be performed.
