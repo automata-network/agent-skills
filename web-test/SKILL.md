@@ -90,30 +90,25 @@ When asked to test a web app, follow this workflow:
 
 ### Step 0: Clean Up Previous Test Session
 
-Before starting any new test, clean up artifacts from previous test sessions.
-
-**Note:** All test data (`test-output/`) is stored in the **project's root directory**, not in the skill directory. Each project has independent test configuration.
+Before starting any new test, run the cleanup script:
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# 1. Close any running test browsers (Chromium processes from previous tests)
-pkill -f "chromium.*--user-data-dir=.*test-output" || true
-pkill -f "chrome.*--user-data-dir=.*test-output" || true
+# Run cleanup script (kills browsers, dev servers, cleans test-output)
+$SKILL_DIR/scripts/cleanup.sh
 
-# 2. Close the persistent browser process if running
-node $SKILL_DIR/scripts/test-helper.js browser-close 2>/dev/null || true
-
-# 3. Remove previous test output folder to start fresh (in project root)
-rm -rf ./test-output
+# OR keep test data (wallet, extensions) but kill processes:
+$SKILL_DIR/scripts/cleanup.sh --keep-data
 ```
 
-This ensures:
-- No leftover browser processes interfere with new tests
-- Previous screenshots and logs don't mix with new test results
-- Clean slate for accurate test reporting
+**Note:** All test data (`test-output/`) is stored in the **project's root directory**, not in the skill directory. Each project has independent test configuration.
 
-**Note:** The `test-output/` directory contains `chrome-profile/` and `extensions/`. Removing it means wallet will need to be re-imported if testing Web3 DApps.
+The cleanup script:
+- Closes all test browser processes
+- Kills dev server processes
+- Frees common dev ports (3000, 5173, 8080, 4200)
+- Removes `test-output/` folder (unless `--keep-data` is specified)
 
 ### Step 1: Detect and Start Project
 
@@ -150,6 +145,82 @@ For each test:
 7. Validate expected outcome
 
 ### Login Detection and Handling
+
+## CRITICAL: MANDATORY WALLET CONNECTION FOR WEB3 DAPPS
+
+**For DApps using Rainbow Kit or Privy login, wallet connection is MANDATORY before any other tests.**
+
+The agent MUST:
+1. **Complete wallet connection BEFORE any other tests**
+2. **Verify connection success** by checking screenshots
+3. **Retry on failure** (up to 3 attempts)
+4. **FAIL the entire test** if connection fails after retries
+
+### Wallet Connection Verification
+
+After attempting wallet connection, verify success by checking:
+
+1. **Visual indicators in screenshot:**
+   - Wallet address displayed (e.g., `0x1234...5678`) in header/navbar
+   - "Connect Wallet" button is GONE or changed to address/avatar
+   - "Disconnect" or "Logout" button is visible
+
+2. **Verification workflow:**
+   ```bash
+   SKILL_DIR="<path-to-this-skill>"
+
+   # Take screenshot after connection attempt
+   node $SKILL_DIR/scripts/test-helper.js vision-screenshot verify-connection.jpg --wallet --headed --keep-open
+
+   # AI agent MUST analyze the screenshot:
+   # - If wallet address visible → CONNECTION SUCCESS
+   # - If "Connect Wallet" button still visible → CONNECTION FAILED, RETRY
+   ```
+
+3. **Connection success indicators:**
+   - `0x` address pattern visible in top-right area
+   - Main CTA button changed from "Connect Wallet" to something else
+   - User avatar or profile icon appeared
+
+4. **Connection failure indicators:**
+   - "Connect Wallet" or "Sign In" button still prominently displayed
+   - Rainbow/Privy modal still visible
+   - No wallet address visible
+
+### Retry Logic (MANDATORY)
+
+```
+FOR attempt = 1 to 3:
+    1. Click "Connect Wallet" button
+    2. Select "Installed" wallet in Rainbow/Privy modal
+    3. Approve connection in Rabby popup
+    4. Approve signature if required
+    5. Take screenshot and verify connection
+
+    IF connection verified:
+        CONTINUE with tests
+    ELSE:
+        IF attempt < 3:
+            RETRY from step 1
+        ELSE:
+            FAIL entire test with error: "Wallet connection failed after 3 attempts"
+```
+
+### Quick Start: Use wallet-connect-flow.js
+
+For automated wallet setup and connection:
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# Complete flow: setup → import → navigate → connection ready
+WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-connect-flow.js "https://your-dapp.com" --headed
+
+# Skip setup/import if already done:
+WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-connect-flow.js "https://your-dapp.com" --skip-setup --skip-import --headed
+```
+
+---
 
 Many features require user authentication. The agent should:
 
@@ -297,32 +368,19 @@ Analyze results and generate a report:
 
 ### Step 6: Cleanup After Test Completion
 
-**IMPORTANT:** After ALL tests are completed, you MUST clean up resources:
+**IMPORTANT:** After ALL tests are completed, you MUST run the cleanup script:
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# 1. Close the persistent browser process
-node $SKILL_DIR/scripts/test-helper.js browser-close 2>/dev/null || true
-
-# 2. Kill any remaining Chromium processes from tests
-pkill -f "chromium.*--user-data-dir=.*test-output" || true
-pkill -f "chrome.*--user-data-dir=.*test-output" || true
-
-# 3. Stop the dev server if it was started by the test
-# Find and kill the dev server process (adjust based on how it was started)
-pkill -f "npm run dev" || true
-pkill -f "next dev" || true
-pkill -f "vite" || true
-# Or kill by port (e.g., port 3000)
-lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+# Run cleanup script (keeps test data for review)
+$SKILL_DIR/scripts/cleanup.sh --keep-data
 ```
 
-This ensures:
-- No browser processes are left running after tests
-- Dev server is stopped to free up the port
-- System resources are properly released
-- Clean state for the next test session
+The cleanup script handles:
+- Closing all browser processes (Chromium, Chrome)
+- Stopping dev server processes (npm, vite, next, webpack)
+- Freeing common dev ports (3000, 5173, 8080, 4200, 4321)
 
 **DO NOT skip this step!** Leaving processes running can:
 - Consume system resources unnecessarily
