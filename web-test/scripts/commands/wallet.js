@@ -1,6 +1,14 @@
 /**
  * Web3 Wallet commands
- * Handles wallet setup, import, unlock, connect, and network operations
+ * Handles wallet setup, initialization, import, unlock, connect, and network operations
+ *
+ * Wallet initialization flow:
+ * 1. Check if extension is loaded
+ * 2. Detect wallet state (NEW_USER / LOCKED / UNLOCKED)
+ * 3. Handle based on state:
+ *    - NEW_USER → Import wallet with private key
+ *    - LOCKED → Try unlock → If fail, reset and re-import
+ *    - UNLOCKED → Ready
  */
 
 const fs = require('fs');
@@ -14,13 +22,622 @@ const {
   ensureBrowser,
   getContext,
   getPage,
+  setPage,
   takeScreenshot,
   getRabbyPopupUrl,
   getRabbyImportPrivateKeyUrl,
   getRabbyExtensionId,
 } = require('../lib/browser');
 
+// Wallet states
+const WalletState = {
+  NEW_USER: 'NEW_USER',       // No wallet, shows onboarding
+  LOCKED: 'LOCKED',           // Has wallet but locked
+  UNLOCKED: 'UNLOCKED',       // Wallet ready to use
+  UNKNOWN: 'UNKNOWN',         // Cannot determine state
+};
+
+/**
+ * Detect the current wallet state from the extension page
+ */
+async function detectWalletState(page) {
+  const content = await page.content();
+  const url = page.url();
+
+  // Check for password input (locked state)
+  const hasPasswordInput = await page.$('input[type="password"]').catch(() => null);
+
+  // Check for new user indicators
+  const isNewUser = content.includes('new-user') ||
+                    content.includes('Get Started') ||
+                    content.includes('Create a new address') ||
+                    content.includes('Import') && content.includes('Create');
+
+  // Check for unlocked indicators (address display, balance, assets)
+  const hasAddressDisplay = await page.$('[class*="address"]').catch(() => null) ||
+                            await page.$('[class*="balance"]').catch(() => null) ||
+                            await page.$('[class*="asset"]').catch(() => null) ||
+                            await page.$('[class*="CurrentAccount"]').catch(() => null);
+
+  // Check for "Forgot Password" link (indicates locked state with existing wallet)
+  const hasForgotPassword = content.includes('Forgot Password') ||
+                            content.includes('forgot-password') ||
+                            content.includes('Forgot password');
+
+  if (isNewUser && !hasPasswordInput) {
+    return WalletState.NEW_USER;
+  }
+
+  if (hasPasswordInput && !hasAddressDisplay) {
+    return WalletState.LOCKED;
+  }
+
+  if (hasAddressDisplay && !hasPasswordInput) {
+    return WalletState.UNLOCKED;
+  }
+
+  // Additional check: if we see forgot password, it's locked
+  if (hasForgotPassword) {
+    return WalletState.LOCKED;
+  }
+
+  return WalletState.UNKNOWN;
+}
+
+/**
+ * Get the base extension URL for verification
+ */
+function getRabbyIndexUrl() {
+  const extensionId = getRabbyExtensionId();
+  if (!extensionId) throw new Error('Rabby extension not loaded');
+  return `chrome-extension://${extensionId}/index.html`;
+}
+
+/**
+ * Import wallet using private key
+ */
+async function importWallet(extensionPage, privateKey, walletPassword) {
+  console.log(JSON.stringify({ status: 'info', message: 'Starting wallet import flow...' }));
+
+  // Navigate directly to import private key page
+  const importUrl = getRabbyImportPrivateKeyUrl();
+  console.log(JSON.stringify({ status: 'info', message: `Navigating to import page: ${importUrl}` }));
+
+  await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await extensionPage.waitForTimeout(3000);
+
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-init-import-page.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Check current URL - if redirected to guide page, we need to handle it
+  const currentUrl = extensionPage.url();
+  console.log(JSON.stringify({ status: 'info', message: `Current URL: ${currentUrl}` }));
+
+  if (currentUrl.includes('/new-user/guide')) {
+    // We're on the guide page, need to click "Import" button to go to import page
+    console.log(JSON.stringify({ status: 'info', message: 'On guide page, looking for Import option...' }));
+
+    const importButtonSelectors = [
+      'text=Import an address',
+      'text=Import',
+      '[class*="import"]',
+      'button:has-text("Import")',
+    ];
+
+    for (const selector of importButtonSelectors) {
+      try {
+        const btn = await extensionPage.$(selector);
+        if (btn && await btn.isVisible()) {
+          await btn.click();
+          console.log(JSON.stringify({ status: 'info', message: 'Clicked Import option' }));
+          await extensionPage.waitForTimeout(2000);
+          break;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    // Now navigate to private key import
+    await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await extensionPage.waitForTimeout(2000);
+  }
+
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-init-pk-input-page.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Fill private key - try multiple selectors
+  const pkInputSelectors = [
+    'textarea[placeholder*="private"]',
+    'textarea[placeholder*="Private"]',
+    'textarea',
+    'input[type="text"][placeholder*="private"]',
+    'input[type="password"]',
+  ];
+  let pkFilled = false;
+
+  for (const selector of pkInputSelectors) {
+    try {
+      const inputs = await extensionPage.$$(selector);
+      for (const input of inputs) {
+        if (await input.isVisible()) {
+          await input.fill(privateKey);
+          pkFilled = true;
+          console.log(JSON.stringify({ status: 'info', message: `Private key filled using selector: ${selector}` }));
+          break;
+        }
+      }
+      if (pkFilled) break;
+    } catch (e) {
+      continue;
+    }
+  }
+
+  if (!pkFilled) {
+    await extensionPage.screenshot({
+      path: path.join(SCREENSHOTS_DIR, 'wallet-init-pk-input-failed.jpg'),
+      type: 'jpeg',
+      quality: 60
+    });
+    throw new Error('Failed to find private key input field');
+  }
+
+  await extensionPage.waitForTimeout(1000);
+
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-init-pk-filled.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Click confirm button
+  const confirmSelectors = [
+    'button:has-text("Confirm")',
+    'button:has-text("Next")',
+    'button:has-text("Import")',
+    'button[type="submit"]',
+    '.ant-btn-primary',
+  ];
+
+  let confirmClicked = false;
+  for (const selector of confirmSelectors) {
+    try {
+      const btn = await extensionPage.$(selector);
+      if (btn && await btn.isVisible()) {
+        await btn.click();
+        confirmClicked = true;
+        console.log(JSON.stringify({ status: 'info', message: 'Confirm button clicked' }));
+        await extensionPage.waitForTimeout(3000);
+        break;
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-init-after-confirm.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Handle password setup - check if we're on password page
+  const passwordInputs = await extensionPage.$$('input[type="password"]');
+  console.log(JSON.stringify({ status: 'info', message: `Found ${passwordInputs.length} password inputs` }));
+
+  if (passwordInputs.length >= 2) {
+    await passwordInputs[0].fill(walletPassword);
+    await passwordInputs[1].fill(walletPassword);
+    console.log(JSON.stringify({ status: 'info', message: 'Password fields filled' }));
+
+    await extensionPage.waitForTimeout(500);
+
+    await extensionPage.screenshot({
+      path: path.join(SCREENSHOTS_DIR, 'wallet-init-password-filled.jpg'),
+      type: 'jpeg',
+      quality: 60
+    });
+
+    for (const selector of confirmSelectors) {
+      try {
+        const btn = await extensionPage.$(selector);
+        if (btn && await btn.isVisible()) {
+          await btn.click();
+          console.log(JSON.stringify({ status: 'info', message: 'Password confirm clicked' }));
+          await extensionPage.waitForTimeout(3000);
+          break;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+  }
+
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-init-import-complete.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Verify wallet import by visiting index.html
+  console.log(JSON.stringify({ status: 'info', message: 'Verifying wallet import...' }));
+  const indexUrl = getRabbyIndexUrl();
+  await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await extensionPage.waitForTimeout(2000);
+
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-init-verify.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Check if we can see wallet content (not new-user page)
+  const verifyUrl = extensionPage.url();
+  const isStillNewUser = verifyUrl.includes('/new-user');
+
+  if (isStillNewUser) {
+    console.log(JSON.stringify({ status: 'warning', message: 'Still on new-user page after import, wallet may not be imported correctly' }));
+    return false;
+  }
+
+  console.log(JSON.stringify({ status: 'info', message: 'Wallet import verified successfully' }));
+  return true;
+}
+
+/**
+ * Try to unlock wallet with password
+ */
+async function unlockWallet(extensionPage, walletPassword) {
+  console.log(JSON.stringify({ status: 'info', message: 'Attempting to unlock wallet...' }));
+
+  const passwordInput = await extensionPage.$('input[type="password"]');
+  if (!passwordInput || !(await passwordInput.isVisible())) {
+    throw new Error('Password input not found');
+  }
+
+  await passwordInput.fill(walletPassword);
+  await extensionPage.waitForTimeout(500);
+
+  const unlockSelectors = [
+    'button:has-text("Unlock")',
+    'button:has-text("解锁")',
+    'button[type="submit"]',
+    '.ant-btn-primary',
+  ];
+
+  for (const selector of unlockSelectors) {
+    try {
+      const btn = await extensionPage.$(selector);
+      if (btn && await btn.isVisible()) {
+        await btn.click();
+        await extensionPage.waitForTimeout(2000);
+        break;
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-init-after-unlock.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Check if unlock succeeded
+  const newState = await detectWalletState(extensionPage);
+  return newState === WalletState.UNLOCKED;
+}
+
+/**
+ * Reset wallet using Forgot Password flow
+ */
+async function resetWallet(extensionPage) {
+  console.log(JSON.stringify({ status: 'info', message: 'Starting wallet reset (Forgot Password) flow...' }));
+
+  // Click Forgot Password link
+  const forgotPasswordSelectors = [
+    'text=Forgot Password',
+    'text=Forgot password',
+    'a:has-text("Forgot")',
+    '[class*="forgot"]',
+  ];
+
+  let clicked = false;
+  for (const selector of forgotPasswordSelectors) {
+    try {
+      const link = await extensionPage.$(selector);
+      if (link && await link.isVisible()) {
+        await link.click();
+        clicked = true;
+        console.log(JSON.stringify({ status: 'info', message: 'Clicked Forgot Password' }));
+        await extensionPage.waitForTimeout(2000);
+        break;
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+
+  if (!clicked) {
+    throw new Error('Could not find Forgot Password link');
+  }
+
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-init-reset-page.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Click Reset/Confirm button to proceed with reset
+  const resetSelectors = [
+    'button:has-text("Reset")',
+    'button:has-text("Confirm")',
+    'button:has-text("I understand")',
+    'button:has-text("Continue")',
+    '.ant-btn-primary',
+    '.ant-btn-danger',
+  ];
+
+  for (const selector of resetSelectors) {
+    try {
+      const btn = await extensionPage.$(selector);
+      if (btn && await btn.isVisible()) {
+        await btn.click();
+        console.log(JSON.stringify({ status: 'info', message: 'Clicked reset confirm button' }));
+        await extensionPage.waitForTimeout(2000);
+        break;
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+
+  await extensionPage.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'wallet-init-reset-complete.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  return true;
+}
+
+/**
+ * Generate random password if not provided
+ */
+function generatePassword() {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  const randomBytes = crypto.randomBytes(16);
+  let password = '';
+  for (let i = 0; i < 16; i++) {
+    password += chars[randomBytes[i] % chars.length];
+  }
+  return password;
+}
+
 const commands = {
+  /**
+   * Complete wallet initialization flow
+   * Handles all states: NEW_USER, LOCKED, UNLOCKED
+   */
+  async 'wallet-init'(args, options) {
+    const privateKey = process.env.WALLET_PRIVATE_KEY;
+
+    if (!privateKey) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'WALLET_PRIVATE_KEY environment variable is NOT set',
+        fix: 'Set it in your terminal before running this command:',
+        command: 'export WALLET_PRIVATE_KEY="your_private_key_here"'
+      }));
+      process.exit(1);
+    }
+
+    if (!/^(0x)?[a-fA-F0-9]{64}$/.test(privateKey)) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'Invalid private key format. Must be 64 hex characters (with optional 0x prefix)'
+      }));
+      return;
+    }
+
+    // Get or generate password
+    let walletPassword = process.env.WALLET_PASSWORD;
+    let passwordGenerated = false;
+
+    if (!walletPassword) {
+      walletPassword = generatePassword();
+      process.env.WALLET_PASSWORD = walletPassword;
+      passwordGenerated = true;
+      console.log(JSON.stringify({
+        status: 'info',
+        message: 'Generated new wallet password (saved to WALLET_PASSWORD env var)'
+      }));
+    }
+
+    try {
+      if (!options.wallet) {
+        console.log(JSON.stringify({
+          success: false,
+          error: 'wallet-init requires --wallet flag',
+          hint: 'Run: node test-helper.js wallet-init --wallet [--headed]'
+        }));
+        return;
+      }
+
+      // Start browser with wallet extension
+      await startBrowser(options);
+      const context = getContext();
+
+      // Step 1: Open extension page to check state
+      // Use index.html instead of popup.html as popup may auto-close
+      console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby extension page...' }));
+      const extensionPage = await context.newPage();
+      const extensionId = getRabbyExtensionId();
+      const indexUrl = `chrome-extension://${extensionId}/index.html`;
+      console.log(JSON.stringify({ status: 'info', message: `Extension URL: ${indexUrl}` }));
+
+      await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await extensionPage.waitForTimeout(3000);
+
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-init-state-check.jpg'),
+        type: 'jpeg',
+        quality: 60
+      });
+
+      // Step 2: Detect current wallet state
+      let state = await detectWalletState(extensionPage);
+      console.log(JSON.stringify({ status: 'info', message: `Detected wallet state: ${state}` }));
+
+      // Step 3: Handle based on state
+      let initSuccess = false;
+      let steps = [];
+
+      switch (state) {
+        case WalletState.NEW_USER:
+          // No wallet exists, import new one
+          steps.push('detected_new_user');
+          await importWallet(extensionPage, privateKey, walletPassword);
+          steps.push('imported_wallet');
+          initSuccess = true;
+          break;
+
+        case WalletState.LOCKED:
+          // Wallet exists but locked
+          steps.push('detected_locked');
+
+          if (!process.env.WALLET_PASSWORD || passwordGenerated) {
+            // No known password, reset wallet
+            console.log(JSON.stringify({
+              status: 'info',
+              message: 'No existing password, will reset wallet...'
+            }));
+            steps.push('no_password_resetting');
+            await resetWallet(extensionPage);
+            steps.push('wallet_reset');
+
+            // After reset, import wallet
+            await extensionPage.waitForTimeout(1000);
+            await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await extensionPage.waitForTimeout(2000);
+
+            await importWallet(extensionPage, privateKey, walletPassword);
+            steps.push('imported_wallet_after_reset');
+            initSuccess = true;
+          } else {
+            // Try to unlock with existing password
+            const unlocked = await unlockWallet(extensionPage, walletPassword);
+
+            if (unlocked) {
+              steps.push('unlock_success');
+              initSuccess = true;
+            } else {
+              // Unlock failed, reset and re-import
+              console.log(JSON.stringify({
+                status: 'info',
+                message: 'Unlock failed, resetting wallet...'
+              }));
+              steps.push('unlock_failed_resetting');
+
+              // Navigate back to index to find forgot password
+              await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+              await extensionPage.waitForTimeout(2000);
+
+              await resetWallet(extensionPage);
+              steps.push('wallet_reset');
+
+              // After reset, import wallet
+              await extensionPage.waitForTimeout(1000);
+              await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+              await extensionPage.waitForTimeout(2000);
+
+              await importWallet(extensionPage, privateKey, walletPassword);
+              steps.push('imported_wallet_after_reset');
+              initSuccess = true;
+            }
+          }
+          break;
+
+        case WalletState.UNLOCKED:
+          // Already unlocked, nothing to do
+          steps.push('already_unlocked');
+          initSuccess = true;
+          break;
+
+        case WalletState.UNKNOWN:
+          // Try to determine state from content
+          console.log(JSON.stringify({
+            status: 'warning',
+            message: 'Unknown wallet state, attempting import flow...'
+          }));
+          steps.push('unknown_state_trying_import');
+
+          try {
+            await importWallet(extensionPage, privateKey, walletPassword);
+            steps.push('import_attempted');
+            initSuccess = true;
+          } catch (e) {
+            steps.push('import_failed');
+            console.log(JSON.stringify({
+              status: 'error',
+              message: `Import attempt failed: ${e.message}`
+            }));
+          }
+          break;
+      }
+
+      // Final state check
+      await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await extensionPage.waitForTimeout(2000);
+      const finalState = await detectWalletState(extensionPage);
+
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-init-final.jpg'),
+        type: 'jpeg',
+        quality: 60
+      });
+
+      if (finalState === WalletState.UNLOCKED || initSuccess) {
+        console.log(JSON.stringify({
+          success: true,
+          message: 'Wallet initialization completed successfully',
+          initialState: state,
+          finalState: finalState,
+          steps: steps,
+          passwordGenerated: passwordGenerated,
+          screenshots: [
+            'wallet-init-state-check.jpg',
+            'wallet-init-final.jpg'
+          ],
+          security: 'Private key and password read from env vars - NEVER logged or transmitted'
+        }));
+      } else {
+        console.log(JSON.stringify({
+          success: false,
+          error: 'Wallet initialization failed',
+          initialState: state,
+          finalState: finalState,
+          steps: steps,
+          hint: 'Check screenshots for details'
+        }));
+      }
+
+    } catch (error) {
+      console.log(JSON.stringify({
+        success: false,
+        error: `Wallet initialization failed: ${error.message}`,
+        hint: 'Make sure you ran wallet-setup first and the extension is installed'
+      }));
+    }
+  },
+
   async 'wallet-setup'(args, options) {
     try {
       if (!fs.existsSync(EXTENSIONS_DIR)) {
@@ -93,8 +710,8 @@ const commands = {
         instructions: [
           '1. Extension is now ready to use',
           '2. Use --wallet flag with any command to load the extension',
-          '3. Example: node test-helper.js navigate "https://app.example.com" --wallet --headed',
-          '4. Run wallet-import to import your wallet using private key'
+          '3. Example: node test-helper.js wallet-init --wallet --headed',
+          '4. Run wallet-init to initialize your wallet'
         ],
         note: 'Extension will be loaded automatically when using --wallet flag'
       }));
@@ -108,303 +725,22 @@ const commands = {
     }
   },
 
+  // Legacy command - redirects to wallet-init
   async 'wallet-import'(args, options) {
-    const privateKey = process.env.WALLET_PRIVATE_KEY;
-
-    if (!privateKey) {
-      console.error(JSON.stringify({
-        success: false,
-        error: 'WALLET_PRIVATE_KEY environment variable is NOT set',
-        fix: 'Set it in your terminal before running this command:',
-        command: 'export WALLET_PRIVATE_KEY="your_private_key_here"'
-      }));
-      process.exit(1);
-    }
-
-    if (!/^(0x)?[a-fA-F0-9]{64}$/.test(privateKey)) {
-      console.log(JSON.stringify({
-        success: false,
-        error: 'Invalid private key format. Must be 64 hex characters (with optional 0x prefix)'
-      }));
-      return;
-    }
-
-    let walletPassword = process.env.WALLET_PASSWORD;
-    let passwordGenerated = false;
-
-    if (!walletPassword) {
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-      const randomBytes = crypto.randomBytes(16);
-      walletPassword = '';
-      for (let i = 0; i < 16; i++) {
-        walletPassword += chars[randomBytes[i] % chars.length];
-      }
-      process.env.WALLET_PASSWORD = walletPassword;
-      passwordGenerated = true;
-    }
-
-    try {
-      if (!options.wallet) {
-        console.log(JSON.stringify({
-          success: false,
-          error: 'wallet-import requires --wallet flag',
-          hint: 'Run: node test-helper.js wallet-import --wallet [--headless]'
-        }));
-        return;
-      }
-
-      await startBrowser(options);
-      const context = getContext();
-
-      const extensionPage = await context.newPage();
-      const popupUrl = getRabbyPopupUrl();
-
-      console.log(JSON.stringify({ status: 'info', message: 'Checking if wallet already exists...' }));
-      await extensionPage.goto(popupUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await extensionPage.waitForTimeout(2000);
-
-      await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-0-check.png'),
-        fullPage: true
-      });
-
-      // Check wallet state
-      const pageContent = await extensionPage.content();
-      const hasUnlockField = await extensionPage.$('input[type="password"]');
-      const hasNewUserIndicator = pageContent.includes('new-user') ||
-                                  pageContent.includes('Get Started') ||
-                                  pageContent.includes('Create') ||
-                                  pageContent.includes('Import');
-
-      const hasAddressDisplay = await extensionPage.$('[class*="address"]') ||
-                                await extensionPage.$('[class*="balance"]') ||
-                                await extensionPage.$('[class*="asset"]');
-
-      if (hasAddressDisplay && !hasUnlockField) {
-        console.log(JSON.stringify({
-          success: true,
-          message: 'Wallet already imported and unlocked.',
-          skipped: true,
-          screenshots: ['wallet-import-0-check.png'],
-          security: 'No action needed - wallet already exists'
-        }));
-        return;
-      }
-
-      // Continue with import flow...
-      console.log(JSON.stringify({ status: 'info', message: 'No existing wallet found, proceeding with import...' }));
-
-      const importUrl = getRabbyImportPrivateKeyUrl();
-      await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await extensionPage.waitForTimeout(2000);
-
-      await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-1-page.png'),
-        fullPage: true
-      });
-
-      // Fill private key
-      const pkInputSelectors = ['textarea', 'input[type="text"]', 'input[type="password"]'];
-      let pkFilled = false;
-
-      for (const selector of pkInputSelectors) {
-        try {
-          const input = await extensionPage.$(selector);
-          if (input && await input.isVisible()) {
-            await input.fill(privateKey);
-            pkFilled = true;
-            console.log(JSON.stringify({ status: 'info', message: 'Private key filled' }));
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-2-pk-filled.png'),
-        fullPage: true
-      });
-
-      // Click confirm button
-      const confirmSelectors = [
-        'button:has-text("Confirm")',
-        'button:has-text("Next")',
-        'button:has-text("Import")',
-        'button[type="submit"]',
-        '.ant-btn-primary',
-      ];
-
-      let confirmClicked = false;
-      for (const selector of confirmSelectors) {
-        try {
-          const btn = await extensionPage.$(selector);
-          if (btn && await btn.isVisible()) {
-            await btn.click();
-            confirmClicked = true;
-            console.log(JSON.stringify({ status: 'info', message: 'Confirm button clicked' }));
-            await extensionPage.waitForTimeout(2000);
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-3-confirmed.png'),
-        fullPage: true
-      });
-
-      // Handle password setup
-      const passwordInputs = await extensionPage.$$('input[type="password"]');
-      let passwordSet = false;
-
-      if (passwordInputs.length >= 2) {
-        await passwordInputs[0].fill(walletPassword);
-        await passwordInputs[1].fill(walletPassword);
-        passwordSet = true;
-        console.log(JSON.stringify({ status: 'info', message: 'Password fields filled' }));
-
-        await extensionPage.waitForTimeout(500);
-        for (const selector of confirmSelectors) {
-          try {
-            const btn = await extensionPage.$(selector);
-            if (btn && await btn.isVisible()) {
-              await btn.click();
-              await extensionPage.waitForTimeout(2000);
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-      }
-
-      await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-5-complete.png'),
-        fullPage: true
-      });
-
-      const result = {
-        success: true,
-        message: 'Wallet import process completed.',
-        steps: {
-          privateKeyFilled: pkFilled,
-          confirmClicked: confirmClicked,
-          passwordSet: passwordSet,
-        },
-        screenshots: [
-          'wallet-import-1-page.png',
-          'wallet-import-2-pk-filled.png',
-          'wallet-import-3-confirmed.png',
-          'wallet-import-5-complete.png',
-        ],
-        security: 'Private key and password read from env vars - NEVER logged or transmitted',
-      };
-
-      if (passwordGenerated) {
-        result.passwordGenerated = true;
-        result.note = 'A random password was generated and set to WALLET_PASSWORD env var';
-      }
-
-      console.log(JSON.stringify(result));
-
-    } catch (error) {
-      console.log(JSON.stringify({
-        success: false,
-        error: `Failed to import wallet: ${error.message}`,
-        hint: 'Make sure you ran wallet-setup first and installed the extension'
-      }));
-    }
+    console.log(JSON.stringify({
+      status: 'info',
+      message: 'wallet-import is deprecated, use wallet-init instead'
+    }));
+    await commands['wallet-init'](args, options);
   },
 
+  // Legacy command - redirects to wallet-init
   async 'wallet-unlock'(args, options) {
-    const walletPassword = process.env.WALLET_PASSWORD;
-
-    if (!walletPassword) {
-      console.log(JSON.stringify({
-        success: false,
-        error: 'WALLET_PASSWORD environment variable is NOT set',
-        fix: 'Run wallet-import first to generate and set the password, or set it manually:',
-        command: 'export WALLET_PASSWORD="your_wallet_password"'
-      }));
-      return;
-    }
-
-    try {
-      if (!options.wallet) {
-        console.log(JSON.stringify({
-          success: false,
-          error: 'wallet-unlock requires --wallet flag',
-          hint: 'Run: node test-helper.js wallet-unlock --wallet [--headless]'
-        }));
-        return;
-      }
-
-      await startBrowser(options);
-      const context = getContext();
-
-      const extensionPage = await context.newPage();
-      console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby Wallet...' }));
-      await extensionPage.goto(getRabbyPopupUrl(), { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await extensionPage.waitForTimeout(2000);
-
-      await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-unlock-1-start.png'),
-        fullPage: true
-      });
-
-      const passwordInput = await extensionPage.$('input[type="password"]');
-      if (passwordInput && await passwordInput.isVisible()) {
-        await passwordInput.fill(walletPassword);
-        await extensionPage.waitForTimeout(500);
-
-        const unlockSelectors = [
-          'button:has-text("Unlock")',
-          'button:has-text("解锁")',
-          'button[type="submit"]',
-          '.ant-btn-primary',
-        ];
-
-        for (const selector of unlockSelectors) {
-          try {
-            const btn = await extensionPage.$(selector);
-            if (btn && await btn.isVisible()) {
-              await btn.click();
-              await extensionPage.waitForTimeout(2000);
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-
-        await extensionPage.screenshot({
-          path: path.join(SCREENSHOTS_DIR, 'wallet-unlock-3-complete.png'),
-          fullPage: true
-        });
-
-        console.log(JSON.stringify({
-          success: true,
-          message: 'Wallet unlock attempted.',
-          screenshots: ['wallet-unlock-1-start.png', 'wallet-unlock-3-complete.png'],
-          security: 'Password read from WALLET_PASSWORD env var - NEVER logged or transmitted'
-        }));
-      } else {
-        console.log(JSON.stringify({
-          success: true,
-          message: 'Wallet appears to be already unlocked (no password input found).',
-          screenshot: 'wallet-unlock-1-start.png'
-        }));
-      }
-
-    } catch (error) {
-      console.log(JSON.stringify({
-        success: false,
-        error: `Failed to unlock wallet: ${error.message}`
-      }));
-    }
+    console.log(JSON.stringify({
+      status: 'info',
+      message: 'wallet-unlock is deprecated, use wallet-init instead'
+    }));
+    await commands['wallet-init'](args, options);
   },
 
   async 'wallet-navigate'(args, options) {
@@ -422,27 +758,30 @@ const commands = {
         console.log(JSON.stringify({
           success: false,
           error: 'wallet-navigate requires --wallet flag to load the wallet extension',
-          hint: 'Run: node test-helper.js wallet-navigate <url> --wallet [--headless]'
+          hint: 'Run: node test-helper.js wallet-navigate <url> --wallet [--headed]'
         }));
         return;
       }
 
       await startBrowser(options);
       const context = getContext();
-      const page = await context.newPage();
+      const newPage = await context.newPage();
+
+      // Set this as the active page for subsequent commands
+      setPage(newPage);
 
       console.log(JSON.stringify({ status: 'info', message: `Navigating to ${url}...` }));
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(2000);
+      await newPage.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await newPage.waitForTimeout(2000);
 
-      const screenshotPath = path.join(SCREENSHOTS_DIR, 'dapp-home.png');
-      await page.screenshot({ path: screenshotPath, fullPage: true });
+      const screenshotPath = path.join(SCREENSHOTS_DIR, 'dapp-home.jpg');
+      await newPage.screenshot({ path: screenshotPath, type: 'jpeg', quality: 60 });
 
       console.log(JSON.stringify({
         success: true,
         message: `Navigated to ${url} with Rabby Wallet available`,
-        url: page.url(),
-        screenshot: 'dapp-home.png',
+        url: newPage.url(),
+        screenshot: 'dapp-home.jpg',
         nextSteps: [
           'Use wallet-connect to connect wallet to DApp',
           'Use wallet-switch-network <network> to change network',
@@ -468,11 +807,10 @@ const commands = {
       return;
     }
 
-    // Simplified wallet-connect - see original for full implementation
     console.log(JSON.stringify({
       success: true,
-      message: 'wallet-connect command. See original test-helper.js for full implementation.',
-      hint: 'Use vision commands for AI-guided wallet connection'
+      message: 'wallet-connect command. Use vision commands for AI-guided wallet connection',
+      hint: 'Use vision-screenshot to see the page, then vision-click to interact'
     }));
   },
 

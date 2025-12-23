@@ -59,16 +59,24 @@ async function tryConnectExistingBrowser() {
       if (contexts.length > 0) {
         context = contexts[0];
         const pages = context.pages();
-        page = pages.length > 0 ? pages[0] : await context.newPage();
 
-        // Try to detect extension ID from existing pages
+        // Find a non-extension page first, or use the first page
+        let selectedPage = null;
         for (const p of pages) {
           const url = p.url();
           if (url.startsWith('chrome-extension://')) {
-            rabbyExtensionId = url.split('/')[2];
-            break;
+            // Detect extension ID
+            if (!rabbyExtensionId) {
+              rabbyExtensionId = url.split('/')[2];
+            }
+          } else if (!selectedPage && url !== 'about:blank') {
+            // Prefer non-extension, non-blank pages
+            selectedPage = p;
           }
         }
+
+        // If no non-extension page found, use first page or create new
+        page = selectedPage || (pages.length > 0 ? pages[0] : await context.newPage());
 
         // If not found from pages, use fallback
         if (!rabbyExtensionId) {
@@ -78,7 +86,8 @@ async function tryConnectExistingBrowser() {
         console.log(JSON.stringify({
           status: 'info',
           message: 'Connected to existing browser via CDP',
-          extensionId: rabbyExtensionId
+          extensionId: rabbyExtensionId,
+          currentPage: page.url()
         }));
         return true;
       }
@@ -92,6 +101,11 @@ async function tryConnectExistingBrowser() {
     fs.unlinkSync(CDP_FILE);
   }
   return false;
+}
+
+// Set the active page (used when navigating to a new page)
+function setPage(newPage) {
+  page = newPage;
 }
 
 // Save browser CDP info for reconnection
@@ -364,6 +378,7 @@ module.exports = {
   getBrowser,
   getContext,
   getPage,
+  setPage,
   getPersistentContext,
   getRabbyExtensionId,
   setRabbyExtensionId,
