@@ -4,9 +4,9 @@ A collection of AI agent skills following the [agentskills.io](https://agentskil
 
 ## Available Skills
 
-| Skill | Description |
-|-------|-------------|
-| [web-app-testing](./web-app-testing/SKILL.md) | Comprehensive web app testing with Playwright ensuring 100% UI coverage |
+| Skill                           | Description                                                             |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| [web-test](./web-test/SKILL.md) | Comprehensive web app testing with Playwright ensuring 100% UI coverage |
 
 ## Installation
 
@@ -15,24 +15,25 @@ Use the [ai-agent-skills](https://www.npmjs.com/package/ai-agent-skills) CLI to 
 ### Claude Code
 
 ```bash
-npx ai-agent-skills install automata-network/web-app-testing-skill --agent claude
+npx ai-agent-skills install automata-network/agent-skills --agent claude
 ```
 
 ### Cursor
 
 ```bash
-npx ai-agent-skills install automata-network/web-app-testing-skill --agent cursor
+npx ai-agent-skills install automata-network/agent-skills --agent cursor
 ```
 
 ### Codex
 
 ```bash
-npx ai-agent-skills install automata-network/web-app-testing-skill --agent codex
+npx ai-agent-skills install automata-network/agent-skills --agent codex
 ```
 
 ## Supported Agents
 
 The skills in this repository work with:
+
 - Claude Code
 - Cursor
 - Codex
@@ -48,7 +49,7 @@ The skills in this repository work with:
 agent-skills/
 ├── README.md
 ├── LICENSE
-├── web-app-testing/          # Each subfolder is a skill
+├── web-test/          # Each subfolder is a skill
 │   ├── SKILL.md              # Main skill definition (required)
 │   ├── references/           # Supporting documentation
 │   │   ├── CHECKLIST.md
@@ -65,6 +66,7 @@ agent-skills/
 ### Skill Format
 
 Each skill folder should contain:
+
 - `SKILL.md` - Main skill definition with metadata and instructions (required)
 - `references/` - Supporting documentation and checklists (optional)
 - `scripts/` - Implementation scripts and tools (optional)

@@ -214,169 +214,65 @@ Analyze results and generate a report:
 
 For Web3 DApps requiring wallet connection, a complete wallet setup flow must be performed.
 
-### Wallet Setup Flow (Required Steps)
+### Important: Extension Requirements
 
-The wallet testing requires three main phases:
+**Extensions ONLY work in Playwright's bundled Chromium**, NOT in Chrome or Edge (they removed extension CLI flags).
+All wallet commands MUST use the `--wallet` flag to load the extension properly.
 
-#### Phase 1: Install Rabby Wallet Extension (Automated)
+### Wallet Setup Flow (3 Steps)
 
-Use vision-based automation to install Rabby Wallet from Chrome Web Store:
+#### Step 1: Download Rabby Wallet Extension
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Step 1: Navigate to Chrome Web Store Rabby Wallet page
-node $SKILL_DIR/scripts/pw-helper.js navigate "https://chromewebstore.google.com/detail/rabby-wallet/acmacodkjbdgmoleebolmdjonilkdbch" --headed --keep-open --screenshot webstore-1.png
-
-# Step 2: Take screenshot and analyze to find "Add to Chrome" button
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot webstore-2.png --headed --keep-open
-# AI agent analyzes screenshot: Look for blue "Add to Chrome" button (typically at top-right of page)
-# Common coordinates: x=1050-1150, y=180-220 (varies by screen resolution)
-
-# Step 3: Click "Add to Chrome" button using coordinates from visual analysis
-node $SKILL_DIR/scripts/pw-helper.js vision-click <x> <y> --headed --keep-open --screenshot webstore-3-clicked.png
-# Example: node $SKILL_DIR/scripts/pw-helper.js vision-click 1100 200 --headed --keep-open
-
-# Step 4: Wait for installation dialog and take screenshot
-node $SKILL_DIR/scripts/pw-helper.js wait 2000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot webstore-4-dialog.png --headed --keep-open
-# AI agent analyzes: Look for "Add extension" confirmation button in dialog
-
-# Step 5: Click "Add extension" in the confirmation dialog
-node $SKILL_DIR/scripts/pw-helper.js vision-click <dialog-x> <dialog-y> --headed --keep-open --screenshot webstore-5-confirmed.png
-# The dialog typically appears at center of screen
-
-# Step 6: Wait for installation to complete
-node $SKILL_DIR/scripts/pw-helper.js wait 3000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot webstore-6-installed.png --headed --keep-open
-# Verify: Look for "Remove from Chrome" button or extension icon in toolbar
+# Download and install Rabby Wallet extension (one-time setup)
+node $SKILL_DIR/scripts/pw-helper.js wallet-setup
 ```
 
-**Automated Installation Workflow:**
-1. Navigate to Chrome Web Store Rabby Wallet page
-2. AI visually identifies "Add to Chrome" button position from screenshot
-3. Click the button using vision-click with analyzed coordinates
-4. AI identifies confirmation dialog and "Add extension" button
-5. Click to confirm installation
-6. Verify installation by checking for "Remove from Chrome" button or extension icon
+This downloads the latest Rabby Wallet to `test-output/extensions/rabby/`.
 
-**Troubleshooting:**
-- If button positions are different, re-analyze the screenshot
-- The dialog appears after clicking "Add to Chrome" - wait 1-2 seconds
-- Extension icon appears in browser toolbar after successful installation
-
-#### Phase 2: Import Wallet with Private Key (Automated)
-
-After extension is installed, use vision-based automation to import wallet:
+#### Step 2: Import Wallet with Private Key
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
 # Set private key in environment (REQUIRED - never logged or transmitted)
-export WALLET_PRIVATE_KEY="your_private_key_here"
+export WALLET_PRIVATE_KEY="0x..."
 
-# Step 1: Open Rabby Wallet extension page
-node $SKILL_DIR/scripts/pw-helper.js navigate "chrome-extension://acmacodkjbdgmoleebolmdjonilkdbch/popup.html" --headed --keep-open --screenshot wallet-import-1.png
-
-# Step 2: Take screenshot and analyze the wallet UI
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot wallet-import-2.png --headed --keep-open
-# AI analyzes: Look for "Add Address" or "Import" button
-
-# Step 3: Click "Add Address" button
-node $SKILL_DIR/scripts/pw-helper.js vision-click <x> <y> --headed --keep-open --screenshot wallet-import-3.png
-
-# Step 4: Analyze import options and find "Private Key" option
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot wallet-import-4.png --headed --keep-open
-# AI analyzes: Look for "Private Key" option in the list
-
-# Step 5: Click "Private Key" option
-node $SKILL_DIR/scripts/pw-helper.js vision-click <x> <y> --headed --keep-open --screenshot wallet-import-5.png
-
-# Step 6: Find the private key input field and enter the key
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot wallet-import-6.png --headed --keep-open
-# AI analyzes: Look for textarea or input field for private key
-node $SKILL_DIR/scripts/pw-helper.js vision-click <input-x> <input-y> --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-type "$WALLET_PRIVATE_KEY" --headed --keep-open
-
-# Step 7: Click "Confirm" or "Next" button
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot wallet-import-7.png --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-click <confirm-x> <confirm-y> --headed --keep-open
-
-# Step 8: Set wallet password (if prompted)
-node $SKILL_DIR/scripts/pw-helper.js wait 1000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot wallet-import-8.png --headed --keep-open
-# AI analyzes: Look for password input fields
-# Enter password in both fields (use same password)
-node $SKILL_DIR/scripts/pw-helper.js vision-click <password1-x> <password1-y> --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-type "YourSecurePassword123!" --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-click <password2-x> <password2-y> --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-type "YourSecurePassword123!" --headed --keep-open
-
-# Step 9: Click final confirm button
-node $SKILL_DIR/scripts/pw-helper.js vision-click <final-confirm-x> <final-confirm-y> --headed --keep-open --screenshot wallet-import-9-complete.png
-
-# Step 10: Verify wallet is imported
-node $SKILL_DIR/scripts/pw-helper.js wait 2000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot wallet-import-complete.png --headed --keep-open
-# AI verifies: Wallet address should be visible in the UI
+# Import wallet - this opens the extension and fills in the private key
+# Use --wallet flag to load the extension, --headless for background execution
+node $SKILL_DIR/scripts/pw-helper.js wallet-import --wallet --headless
+# OR use --headed to see the browser
+node $SKILL_DIR/scripts/pw-helper.js wallet-import --wallet --headed
 ```
 
-**Automated Import Workflow:**
-1. Navigate to Rabby Wallet extension popup page
-2. AI visually identifies "Add Address" button and clicks it
-3. AI identifies "Private Key" option and selects it
-4. AI finds the private key input field and enters the key
-5. AI clicks confirm buttons through the flow
-6. AI sets wallet password when prompted
-7. AI verifies wallet import success by checking for wallet address
+**Internal Flow:**
+1. Opens Chromium with `--load-extension` flag pointing to Rabby
+2. Waits for extension service worker to load
+3. Extracts dynamic extension ID from service worker URL
+4. Navigates directly to: `chrome-extension://{extensionId}/index.html#/new-user/import/private-key`
+5. Fills private key from `WALLET_PRIVATE_KEY` env var
+6. Clicks confirm button
+7. Sets up wallet password (auto-generated, stored in `WALLET_PASSWORD` env var)
+8. Takes screenshots at each step for debugging
 
-**Alternative: Use wallet-import command (semi-automated):**
-```bash
-export WALLET_PRIVATE_KEY="your_private_key_here"
-node $SKILL_DIR/scripts/pw-helper.js wallet-import --headed --keep-open
-```
+**Extension URLs (dynamic ID):**
+- Import page: `chrome-extension://{id}/index.html#/new-user/import/private-key`
+- Profile page: `chrome-extension://{id}/desktop.html#/desktop/profile`
+- Popup: `chrome-extension://{id}/popup.html`
 
-#### Phase 3: Connect Wallet to DApp (Automated)
-
-Once wallet is imported and unlocked:
+#### Step 3: Navigate to DApp and Connect Wallet
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Step 1: Navigate to DApp with wallet extension loaded
-node $SKILL_DIR/scripts/pw-helper.js navigate "https://app.example.com" --headed --keep-open --screenshot dapp-1.png
+# Navigate to DApp with wallet extension loaded
+node $SKILL_DIR/scripts/pw-helper.js navigate "https://app.example.com" --wallet --headless --screenshot dapp-home.png
 
-# Step 2: Take screenshot and find "Connect Wallet" button
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot dapp-2.png --headed --keep-open
-# AI analyzes: Look for "Connect Wallet" or similar button
-
-# Step 3: Click "Connect Wallet" button
-node $SKILL_DIR/scripts/pw-helper.js vision-click <x> <y> --headed --keep-open --screenshot dapp-3-wallet-modal.png
-
-# Step 4: Wallet selection modal appears - find and click "Rabby" option
-node $SKILL_DIR/scripts/pw-helper.js wait 1000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot dapp-4-select-wallet.png --headed --keep-open
-# AI analyzes: Look for "Rabby" option in the wallet list
-node $SKILL_DIR/scripts/pw-helper.js vision-click <rabby-x> <rabby-y> --headed --keep-open
-
-# Step 5: Rabby popup appears - click "Connect" to approve connection
-node $SKILL_DIR/scripts/pw-helper.js wait 2000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot dapp-5-rabby-popup.png --headed --keep-open
-# AI analyzes: Look for "Connect" or "Approve" button in Rabby popup
-node $SKILL_DIR/scripts/pw-helper.js vision-click <connect-x> <connect-y> --headed --keep-open --screenshot dapp-6-connected.png
-
-# Step 6: Verify wallet is connected
-node $SKILL_DIR/scripts/pw-helper.js wait 2000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot dapp-7-verify.png --headed --keep-open
-# AI verifies: Wallet address should be visible on the DApp, "Connect Wallet" button should be gone
+# Connect wallet to DApp (clicks "Connect" button in wallet popup)
+node $SKILL_DIR/scripts/pw-helper.js wallet-connect --wallet --headless
 ```
-
-**Automated Connection Workflow:**
-1. Navigate to the target DApp
-2. AI identifies and clicks "Connect Wallet" button
-3. AI selects "Rabby" from wallet options if modal appears
-4. AI approves connection in Rabby popup
-5. AI verifies successful connection by checking for wallet address display
 
 ### Complete Example Workflow
 
@@ -384,105 +280,50 @@ node $SKILL_DIR/scripts/pw-helper.js vision-screenshot dapp-7-verify.png --heade
 SKILL_DIR="<path-to-this-skill>"
 
 # ============================================
-# Phase 1: Install Rabby Wallet Extension
+# Step 1: Install Rabby Wallet Extension (one-time)
 # ============================================
-# Navigate to Chrome Web Store
-node $SKILL_DIR/scripts/pw-helper.js navigate "https://chromewebstore.google.com/detail/rabby-wallet/acmacodkjbdgmoleebolmdjonilkdbch" --headed --keep-open --screenshot install-1.png
-
-# Take screenshot and analyze
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot install-2.png --headed --keep-open
-# AI: Find "Add to Chrome" button coordinates
-
-# Click "Add to Chrome"
-node $SKILL_DIR/scripts/pw-helper.js vision-click <x> <y> --headed --keep-open --screenshot install-3.png
-
-# Wait for dialog and confirm
-node $SKILL_DIR/scripts/pw-helper.js wait 2000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot install-4.png --headed --keep-open
-# AI: Find "Add extension" button in dialog
-node $SKILL_DIR/scripts/pw-helper.js vision-click <dialog-x> <dialog-y> --headed --keep-open
-
-# Wait for installation
-node $SKILL_DIR/scripts/pw-helper.js wait 3000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot install-5-complete.png --headed --keep-open
+node $SKILL_DIR/scripts/pw-helper.js wallet-setup
 
 # ============================================
-# Phase 2: Import Wallet
+# Step 2: Import Wallet (first time or after profile reset)
 # ============================================
-export WALLET_PRIVATE_KEY="0x..."  # Your private key (REQUIRED)
+export WALLET_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
-# Open Rabby extension popup
-node $SKILL_DIR/scripts/pw-helper.js navigate "chrome-extension://acmacodkjbdgmoleebolmdjonilkdbch/popup.html" --headed --keep-open --screenshot import-1.png
-
-# Take screenshot and find "Add Address" button
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot import-2.png --headed --keep-open
-# AI: Find "Add Address" button coordinates
-node $SKILL_DIR/scripts/pw-helper.js vision-click <x> <y> --headed --keep-open
-
-# Find and click "Private Key" option
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot import-3.png --headed --keep-open
-# AI: Find "Private Key" option
-node $SKILL_DIR/scripts/pw-helper.js vision-click <x> <y> --headed --keep-open
-
-# Enter private key
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot import-4.png --headed --keep-open
-# AI: Find input field
-node $SKILL_DIR/scripts/pw-helper.js vision-click <input-x> <input-y> --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-type "$WALLET_PRIVATE_KEY" --headed --keep-open
-
-# Confirm and set password
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot import-5.png --headed --keep-open
-# AI: Find Confirm button
-node $SKILL_DIR/scripts/pw-helper.js vision-click <confirm-x> <confirm-y> --headed --keep-open
-
-# Set password if prompted
-node $SKILL_DIR/scripts/pw-helper.js wait 1000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot import-6.png --headed --keep-open
-# Enter password in both fields
-export WALLET_PASSWORD="YourSecurePassword123!"
-node $SKILL_DIR/scripts/pw-helper.js vision-click <pwd1-x> <pwd1-y> --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-type "$WALLET_PASSWORD" --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-click <pwd2-x> <pwd2-y> --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-type "$WALLET_PASSWORD" --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-click <final-confirm-x> <final-confirm-y> --headed --keep-open
-
-# Verify import success
-node $SKILL_DIR/scripts/pw-helper.js wait 2000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot import-7-complete.png --headed --keep-open
-# AI: Verify wallet address is visible
+# Import wallet in headless mode
+node $SKILL_DIR/scripts/pw-helper.js wallet-import --wallet --headless
 
 # ============================================
-# Phase 3: Connect to DApp
+# Step 3: Test DApp
 # ============================================
-# Navigate to target DApp
-node $SKILL_DIR/scripts/pw-helper.js navigate "http://staging.carrier.so/" --headed --keep-open --screenshot connect-1.png
+# Navigate to DApp with wallet loaded
+node $SKILL_DIR/scripts/pw-helper.js navigate "https://staging.carrier.so/" --wallet --headless --screenshot dapp-1.png
 
-# Find and click "Connect Wallet" button
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot connect-2.png --headed --keep-open
-# AI: Find "Connect Wallet" button
-node $SKILL_DIR/scripts/pw-helper.js vision-click <x> <y> --headed --keep-open --screenshot connect-3.png
+# Connect wallet
+node $SKILL_DIR/scripts/pw-helper.js wallet-connect --wallet --headless --screenshot dapp-2-connected.png
 
-# Select Rabby wallet from modal
-node $SKILL_DIR/scripts/pw-helper.js wait 1000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot connect-4.png --headed --keep-open
-# AI: Find "Rabby" option in wallet list
-node $SKILL_DIR/scripts/pw-helper.js vision-click <rabby-x> <rabby-y> --headed --keep-open
+# Switch network if needed
+node $SKILL_DIR/scripts/pw-helper.js wallet-switch-network polygon --wallet --headless
 
-# Approve connection in Rabby popup
-node $SKILL_DIR/scripts/pw-helper.js wait 2000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot connect-5.png --headed --keep-open
-# AI: Find "Connect" button in Rabby popup
-node $SKILL_DIR/scripts/pw-helper.js vision-click <connect-x> <connect-y> --headed --keep-open
+# Continue with normal testing
+node $SKILL_DIR/scripts/pw-helper.js click "button:has-text('Bridge')" --wallet --headless --screenshot dapp-3.png
+```
 
-# Verify connection success
-node $SKILL_DIR/scripts/pw-helper.js wait 2000 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot connect-6-complete.png --headed --keep-open
-# AI: Verify wallet address is displayed on DApp
+### Session Persistence
 
-# ============================================
-# Phase 4: Switch Network if needed
-# ============================================
-node $SKILL_DIR/scripts/pw-helper.js wallet-switch-network polygon --headed --keep-open
+Browser state (cookies, localStorage, extension data) is persisted in:
+```
+test-output/chrome-profile/
+```
+
+After importing wallet once, subsequent tests can reuse the wallet:
+```bash
+# Wallet already imported - just use --wallet flag to load extension
+node $SKILL_DIR/scripts/pw-helper.js navigate "https://dapp.example.com" --wallet --headless
+```
+
+To reset wallet state, delete the chrome-profile directory:
+```bash
+rm -rf test-output/chrome-profile/
 ```
 
 ### Wallet Commands Reference
