@@ -133,40 +133,56 @@ Generate a structured test plan covering:
 - User flows
 - Edge cases
 
-### Step 4: Web3 Wallet Setup (if needed)
+### Step 4: Wallet Setup (if Web3 DApp)
 
-**Skip this step if the website is NOT a Web3 DApp.**
+**If NOT Web3 DApp → Skip Step 4 and Step 5, go directly to Step 6.**
 
-How to detect Web3 DApp:
-- Has "Connect Wallet" button
-- Uses Rainbow Kit, Privy, or similar wallet connection
-- Requires wallet for core functionality
-
-**If Web3 DApp → Execute wallet setup BEFORE Step 5:**
+This step installs wallet extension and imports wallet. Does NOT connect to DApp yet.
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Setup and import wallet (run FIRST, before any DApp interaction)
-WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-connect-flow.js "<dapp-url>" --headed
+# 1. Install Rabby wallet extension (downloads to test-output/extensions/)
+node $SKILL_DIR/scripts/test-helper.js wallet-setup
+
+# 2. Import wallet with private key
+WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/test-helper.js wallet-init --wallet --headed
 ```
 
-**After script completes, connect wallet:**
-1. Take screenshot: `vision-screenshot`
-2. Click "Connect Wallet" button: `vision-click`
+After wallet-init succeeds → proceed to Step 5.
+
+### Step 5: Wallet Connect (if Web3 DApp)
+
+**If NOT Web3 DApp → Skip to Step 6.**
+
+## ⚠️ Wallet MUST be connected BEFORE any other tests! Without connection, all tests FAIL.
+
+**Refresh page with wallet extension loaded, then connect:**
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# 1. Navigate to DApp with wallet extension activated
+node $SKILL_DIR/scripts/test-helper.js wallet-navigate "<dapp-url>" --wallet --headed --keep-open
+
+# 2. Take screenshot to find Connect Wallet button
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot before-connect.jpg --wallet --headed --keep-open
+```
+
+**Use vision commands to connect:**
+1. Find "Connect Wallet" button in screenshot (usually top-right)
+2. Click it: `vision-click <x> <y>`
 3. In Rainbow/Privy modal, click "Installed" wallet option
-4. Approve in Rabby popup
+4. Approve connection in Rabby popup
 5. Approve signature if required
-6. **VERIFY**: Screenshot must show wallet address (0x...) in header
+6. Take screenshot: `vision-screenshot after-connect.jpg`
 
 **Verification:**
-- ✅ SUCCESS: Wallet address visible, "Connect" button gone → proceed to Step 5
+- ✅ SUCCESS: Wallet address (0x...) visible → proceed to Step 6
 - ❌ FAILURE: "Connect Wallet" still visible → RETRY (max 3 times)
-- ❌ FAIL TEST: Connection fails after 3 retries
+- ❌ FAIL: After 3 retries → STOP, do not continue
 
-**If NOT Web3 DApp → Skip to Step 5.**
-
-### Step 5: Execute Tests
+### Step 6: Execute Tests
 
 For each test:
 1. Navigate to the target page
@@ -176,14 +192,14 @@ For each test:
 5. Capture screenshot of result state
 6. Validate expected outcome
 
-### Step 6: Validate and Report
+### Step 7: Validate and Report
 
 Analyze results and generate a report:
 - Summary of passed/failed tests
 - Details of failures with screenshots
 - Suggestions for fixes
 
-### Step 7: Cleanup After Test Completion
+### Step 8: Cleanup After Test Completion
 
 **IMPORTANT:** After ALL tests are completed, you MUST run the cleanup script:
 
@@ -206,7 +222,7 @@ The cleanup script handles:
 
 ## Web3 DApp Testing
 
-See **Step 3.5** above for wallet setup flow. The `wallet-connect-flow.js` script must run BEFORE any other tests.
+See **Step 4** (Wallet Setup) and **Step 5** (Wallet Connect) above. Both must complete BEFORE Step 6 (Execute Tests).
 
 ### Data Storage
 
