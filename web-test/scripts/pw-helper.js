@@ -70,10 +70,20 @@ const CDP_FILE = path.join(OUTPUT_DIR, '.browser-cdp.json'); // For persistent b
 const CDP_PORT = 9222; // Fixed CDP port for browser reconnection
 
 // Wallet extension configuration
-const RABBY_EXTENSION_ID = 'acmacodkjbdgmoleebolmdjonilkdbch';
 const RABBY_WEBSTORE_URL = 'https://chromewebstore.google.com/detail/rabby-wallet/acmacodkjbdgmoleebolmdjonilkdbch';
-const RABBY_PROFILE_URL = `chrome-extension://${RABBY_EXTENSION_ID}/desktop.html#/desktop/profile`;
-const RABBY_POPUP_URL = `chrome-extension://${RABBY_EXTENSION_ID}/popup.html`;
+// Dynamic extension ID - will be set when extension is loaded
+// When using Playwright's bundled Chromium, the extension ID is dynamically generated
+let rabbyExtensionId = null;
+
+// Helper functions to get extension URLs (use after extension is loaded)
+function getRabbyProfileUrl() {
+  if (!rabbyExtensionId) throw new Error('Rabby extension not loaded. Run wallet-import or wallet-unlock first with --wallet flag.');
+  return `chrome-extension://${rabbyExtensionId}/desktop.html#/desktop/profile`;
+}
+function getRabbyPopupUrl() {
+  if (!rabbyExtensionId) throw new Error('Rabby extension not loaded. Run wallet-import or wallet-unlock first with --wallet flag.');
+  return `chrome-extension://${rabbyExtensionId}/popup.html`;
+}
 
 // User data directory for persistent browser profile
 const USER_DATA_DIR = path.join(OUTPUT_DIR, 'chrome-profile');
@@ -146,6 +156,385 @@ async function extractCrx(crxPath, destDir) {
   }
 }
 
+// Dev server state file
+const DEV_SERVER_FILE = path.join(OUTPUT_DIR, '.dev-server.json');
+
+// Check if a port is available
+async function isPortAvailable(port) {
+  const net = require('net');
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+// Find an available port starting from startPort
+async function findAvailablePort(startPort, maxTries = 10) {
+  for (let i = 0; i < maxTries; i++) {
+    const port = startPort + i;
+    if (await isPortAvailable(port)) {
+      return port;
+    }
+  }
+  throw new Error(`No available port found in range ${startPort}-${startPort + maxTries - 1}`);
+}
+
+// Detect package manager based on lock files
+function detectPackageManager(projectDir) {
+  if (fs.existsSync(path.join(projectDir, 'pnpm-lock.yaml'))) return 'pnpm';
+  if (fs.existsSync(path.join(projectDir, 'yarn.lock'))) return 'yarn';
+  if (fs.existsSync(path.join(projectDir, 'package-lock.json'))) return 'npm';
+  return 'npm'; // default
+}
+
+// Detect framework based on config files and package.json
+function detectFramework(projectDir) {
+  // Check for config files
+  if (fs.existsSync(path.join(projectDir, 'vite.config.js')) ||
+      fs.existsSync(path.join(projectDir, 'vite.config.ts')) ||
+      fs.existsSync(path.join(projectDir, 'vite.config.mjs'))) {
+    return 'vite';
+  }
+  if (fs.existsSync(path.join(projectDir, 'next.config.js')) ||
+      fs.existsSync(path.join(projectDir, 'next.config.mjs')) ||
+      fs.existsSync(path.join(projectDir, 'next.config.ts'))) {
+    return 'next';
+  }
+
+  // Check package.json for clues
+  const pkgPath = path.join(projectDir, 'package.json');
+  if (fs.existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      if (deps['vite']) return 'vite';
+      if (deps['next']) return 'next';
+      if (deps['react-scripts']) return 'cra';
+      if (deps['@angular/cli']) return 'angular';
+      if (deps['vue']) return 'vue';
+    } catch (e) {}
+  }
+
+  return 'unknown';
+}
+
+// Get the dev server command for a framework
+function getDevCommand(framework, packageManager, port) {
+  const runCmd = packageManager === 'npm' ? 'npm run' : packageManager;
+
+  switch (framework) {
+    case 'vite':
+      return `${runCmd} dev -- --port ${port}`;
+    case 'next':
+      return `${runCmd} dev -- -p ${port}`;
+    case 'cra':
+      return `PORT=${port} ${runCmd} start`;
+    case 'angular':
+      return `${runCmd} start -- --port ${port}`;
+    case 'vue':
+      return `${runCmd} serve -- --port ${port}`;
+    default:
+      // Try generic npm start with PORT env var
+      return `PORT=${port} ${runCmd} dev || PORT=${port} ${runCmd} start`;
+  }
+}
+
+// Wait for server to be ready
+async function waitForServer(url, timeoutMs = 30000) {
+  const http = require('http');
+  const https = require('https');
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      await new Promise((resolve, reject) => {
+        const client = url.startsWith('https') ? https : http;
+        const req = client.get(url, (res) => {
+          resolve(res.statusCode);
+        });
+        req.on('error', reject);
+        req.setTimeout(2000, () => { req.destroy(); reject(new Error('timeout')); });
+      });
+      return true; // Server is responding
+    } catch (e) {
+      await new Promise(r => setTimeout(r, 500)); // Wait 500ms before retry
+    }
+  }
+  return false;
+}
+
+// ==================== Parallel Test Scheduler ====================
+
+// Build dependency graph and detect cycles
+function buildDependencyGraph(tasks) {
+  const taskMap = new Map();
+  const graph = new Map();
+
+  // Create task map and initialize graph
+  for (const task of tasks) {
+    if (!task.id) throw new Error('Each task must have an "id" field');
+    if (taskMap.has(task.id)) throw new Error(`Duplicate task id: ${task.id}`);
+    taskMap.set(task.id, task);
+    graph.set(task.id, new Set(task.depends || []));
+  }
+
+  // Validate dependencies exist
+  for (const [taskId, deps] of graph) {
+    for (const dep of deps) {
+      if (!taskMap.has(dep)) {
+        throw new Error(`Task "${taskId}" depends on unknown task "${dep}"`);
+      }
+    }
+  }
+
+  // Detect cycles using DFS
+  const visited = new Set();
+  const inStack = new Set();
+
+  function hasCycle(taskId) {
+    if (inStack.has(taskId)) return true;
+    if (visited.has(taskId)) return false;
+
+    visited.add(taskId);
+    inStack.add(taskId);
+
+    for (const dep of graph.get(taskId) || []) {
+      if (hasCycle(dep)) return true;
+    }
+
+    inStack.delete(taskId);
+    return false;
+  }
+
+  for (const taskId of graph.keys()) {
+    if (hasCycle(taskId)) {
+      throw new Error(`Circular dependency detected involving task "${taskId}"`);
+    }
+  }
+
+  return { taskMap, graph };
+}
+
+// Execute a single step on a page
+async function executeStep(taskPage, step, screenshotsDir) {
+  const { action, ...params } = step;
+
+  switch (action) {
+    case 'navigate':
+      await taskPage.goto(params.url, { waitUntil: 'networkidle', timeout: params.timeout || 30000 });
+      break;
+    case 'click':
+      await taskPage.click(params.selector, { timeout: params.timeout || 10000 });
+      break;
+    case 'fill':
+      await taskPage.fill(params.selector, params.value, { timeout: params.timeout || 10000 });
+      break;
+    case 'select':
+      await taskPage.selectOption(params.selector, params.value, { timeout: params.timeout || 10000 });
+      break;
+    case 'check':
+      await taskPage.check(params.selector, { timeout: params.timeout || 10000 });
+      break;
+    case 'uncheck':
+      await taskPage.uncheck(params.selector, { timeout: params.timeout || 10000 });
+      break;
+    case 'wait':
+      await taskPage.waitForTimeout(params.ms || 1000);
+      break;
+    case 'waitForSelector':
+      await taskPage.waitForSelector(params.selector, { timeout: params.timeout || 30000 });
+      break;
+    case 'screenshot':
+      const ssPath = path.join(screenshotsDir, params.name || `step-${Date.now()}.png`);
+      await taskPage.screenshot({ path: ssPath, fullPage: params.fullPage || false });
+      break;
+    case 'evaluate':
+      return await taskPage.evaluate(params.script);
+    case 'type':
+      await taskPage.type(params.selector, params.text, { delay: params.delay || 50 });
+      break;
+    case 'hover':
+      await taskPage.hover(params.selector, { timeout: params.timeout || 10000 });
+      break;
+    case 'press':
+      await taskPage.press(params.selector || 'body', params.key);
+      break;
+    default:
+      throw new Error(`Unknown action: ${action}`);
+  }
+
+  // Take screenshot after step if requested
+  if (step.screenshot) {
+    const ssPath = path.join(screenshotsDir, step.screenshot);
+    await taskPage.screenshot({ path: ssPath, fullPage: step.fullPage || false });
+  }
+}
+
+// Parallel task scheduler class
+class ParallelScheduler {
+  constructor(browserContext, tasks, options = {}) {
+    this.context = browserContext;
+    this.tasks = tasks;
+    this.maxParallel = options.maxParallel || 5;
+    this.failFast = options.failFast || false;
+    this.screenshotsDir = options.screenshotsDir || SCREENSHOTS_DIR;
+
+    const { taskMap, graph } = buildDependencyGraph(tasks);
+    this.taskMap = taskMap;
+    this.dependencyGraph = graph;
+
+    this.completed = new Set();
+    this.failed = new Set();
+    this.running = new Map(); // taskId -> Promise
+    this.results = new Map(); // taskId -> { success, steps, error }
+    this.aborted = false;
+  }
+
+  // Get tasks that are ready to run (all deps completed, not yet started)
+  getReadyTasks() {
+    const ready = [];
+    for (const [taskId, deps] of this.dependencyGraph) {
+      if (this.completed.has(taskId) || this.running.has(taskId) || this.failed.has(taskId)) {
+        continue;
+      }
+
+      // Check if all dependencies are completed
+      let allDepsCompleted = true;
+      let anyDepFailed = false;
+      for (const dep of deps) {
+        if (!this.completed.has(dep)) {
+          allDepsCompleted = false;
+        }
+        if (this.failed.has(dep)) {
+          anyDepFailed = true;
+        }
+      }
+
+      if (anyDepFailed) {
+        // Skip this task as a dependency failed
+        this.failed.add(taskId);
+        this.results.set(taskId, {
+          success: false,
+          error: 'Skipped due to failed dependency',
+          skipped: true
+        });
+        continue;
+      }
+
+      if (allDepsCompleted) {
+        ready.push(taskId);
+      }
+    }
+    return ready;
+  }
+
+  // Run a single task
+  async runTask(taskId) {
+    const task = this.taskMap.get(taskId);
+    const stepResults = [];
+
+    // Create a new page for this task
+    const taskPage = await this.context.newPage();
+
+    try {
+      for (const step of task.steps || []) {
+        if (this.aborted) break;
+
+        try {
+          const result = await executeStep(taskPage, step, this.screenshotsDir);
+          stepResults.push({ step, success: true, result });
+        } catch (error) {
+          stepResults.push({ step, success: false, error: error.message });
+
+          if (task.stopOnError !== false) {
+            throw error;
+          }
+        }
+      }
+
+      this.results.set(taskId, {
+        success: stepResults.every(r => r.success),
+        steps: stepResults
+      });
+
+      if (stepResults.every(r => r.success)) {
+        this.completed.add(taskId);
+      } else {
+        this.failed.add(taskId);
+        if (this.failFast) {
+          this.aborted = true;
+        }
+      }
+    } catch (error) {
+      this.results.set(taskId, {
+        success: false,
+        steps: stepResults,
+        error: error.message
+      });
+      this.failed.add(taskId);
+
+      if (this.failFast) {
+        this.aborted = true;
+      }
+    } finally {
+      await taskPage.close();
+      this.running.delete(taskId);
+    }
+  }
+
+  // Main execution loop
+  async run() {
+    while (!this.aborted) {
+      const ready = this.getReadyTasks();
+
+      if (ready.length === 0 && this.running.size === 0) {
+        // All tasks completed or no more can run
+        break;
+      }
+
+      // Start new tasks up to maxParallel limit
+      const toStart = ready.slice(0, this.maxParallel - this.running.size);
+
+      for (const taskId of toStart) {
+        const promise = this.runTask(taskId);
+        this.running.set(taskId, promise);
+      }
+
+      // Wait for at least one task to complete
+      if (this.running.size > 0) {
+        await Promise.race(Array.from(this.running.values()));
+      }
+    }
+
+    // Wait for any remaining running tasks
+    await Promise.all(Array.from(this.running.values()));
+
+    // Build results summary
+    const results = [];
+    for (const taskId of this.taskMap.keys()) {
+      const result = this.results.get(taskId);
+      results.push({
+        taskId,
+        ...result
+      });
+    }
+
+    return {
+      success: this.failed.size === 0,
+      completed: this.completed.size,
+      failed: this.failed.size,
+      total: this.taskMap.size,
+      aborted: this.aborted,
+      results
+    };
+  }
+}
+
 // Parse command line arguments
 function parseArgs(args) {
   const result = {
@@ -168,18 +557,22 @@ function parseArgs(args) {
     const arg = args[i];
     if (arg.startsWith('--')) {
       const option = arg.slice(2);
-      if (option === 'mobile' || option === 'headed' || option === 'wallet' || option === 'keep-open') {
+      if (option === 'mobile' || option === 'headed' || option === 'wallet' || option === 'keep-open' || option === 'fail-fast') {
         if (option === 'headed') {
           result.options.headless = false;
         } else if (option === 'wallet') {
           result.options.wallet = true;
         } else if (option === 'keep-open') {
           result.options.keepOpen = true;
+        } else if (option === 'fail-fast') {
+          result.options.failFast = true;
         } else {
           result.options[option] = true;
         }
       } else if (option === 'headless') {
         result.options.headless = true;
+      } else if (option === 'max-parallel' && i + 1 < args.length && !args[i + 1].startsWith('--')) {
+        result.options.maxParallel = parseInt(args[++i]) || 5;
       } else if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
         result.options[option] = args[++i];
       }
@@ -267,10 +660,63 @@ async function startBrowser(options) {
     contextOptions.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15';
   }
 
-  // Check if we should launch Chrome independently for CDP support
-  const useIndependentChrome = !options.headless; // Use independent Chrome for headed mode
+  // When using --wallet flag, MUST use Playwright's Chromium with launchPersistentContext
+  // Chrome/Edge removed command-line flags for side-loading extensions
+  // Only Playwright's bundled Chromium supports --load-extension
+  const useWalletMode = options.wallet;
+  const useIndependentChrome = !options.headless && !useWalletMode; // Use independent Chrome for headed mode (without wallet)
 
-  if (useIndependentChrome) {
+  if (useWalletMode) {
+    // Wallet mode: Use Playwright's Chromium with extension loading
+    // This is the ONLY way to load extensions - must use channel: 'chromium'
+    const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
+
+    if (!fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'Rabby wallet extension not found. Run wallet-setup first.',
+        hint: 'node pw-helper.js wallet-setup'
+      }));
+      process.exit(1);
+    }
+
+    const launchOptions = {
+      headless: options.headless, // Chromium channel supports extensions in headless mode
+      channel: 'chromium', // MUST use Playwright's Chromium, NOT 'chrome'
+      args: [
+        '--no-first-run',
+        '--disable-blink-features=AutomationControlled',
+        `--disable-extensions-except=${path.resolve(rabbyPath)}`,
+        `--load-extension=${path.resolve(rabbyPath)}`,
+      ],
+      // IMPORTANT: Remove default --disable-extensions flag that conflicts with --load-extension
+      ignoreDefaultArgs: ['--disable-extensions'],
+      ...contextOptions,
+    };
+
+    console.log(JSON.stringify({ status: 'info', message: 'Starting Chromium with Rabby wallet extension...' }));
+
+    persistentContext = await chromium.launchPersistentContext(USER_DATA_DIR, launchOptions);
+    context = persistentContext;
+
+    const pages = context.pages();
+    page = pages.length > 0 ? pages[0] : await context.newPage();
+
+    // Wait for extension service worker to be ready (Manifest v3) and extract extension ID
+    try {
+      let serviceWorker = persistentContext.serviceWorkers()[0];
+      if (!serviceWorker) {
+        serviceWorker = await persistentContext.waitForEvent('serviceworker', { timeout: 10000 });
+      }
+      // Extract extension ID from service worker URL: chrome-extension://<extensionId>/...
+      const swUrl = serviceWorker.url();
+      rabbyExtensionId = swUrl.split('/')[2];
+      console.log(JSON.stringify({ status: 'info', message: 'Rabby wallet extension loaded successfully', extensionId: rabbyExtensionId }));
+    } catch (e) {
+      console.log(JSON.stringify({ status: 'warning', message: 'Extension service worker not detected (may still work)' }));
+    }
+
+  } else if (useIndependentChrome) {
     // Launch Chrome independently with CDP port (stays open after Node exits)
     const chromeArgs = [
       '--no-first-run',
@@ -278,14 +724,6 @@ async function startBrowser(options) {
       `--remote-debugging-port=${CDP_PORT}`,
       `--user-data-dir=${path.resolve(USER_DATA_DIR)}`,
     ];
-
-    if (options.wallet) {
-      const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
-      if (fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
-        chromeArgs.push(`--disable-extensions-except=${rabbyPath}`);
-        chromeArgs.push(`--load-extension=${rabbyPath}`);
-      }
-    }
 
     // Spawn Chrome independently
     const { spawn } = require('child_process');
@@ -330,7 +768,7 @@ async function startBrowser(options) {
 
     saveCDPInfo(CDP_PORT);
   } else {
-    // Headless mode: use launchPersistentContext (faster, but no CDP reconnect)
+    // Headless mode without wallet: use launchPersistentContext with Chrome
     const launchOptions = {
       headless: options.headless,
       channel: 'chrome',
@@ -340,16 +778,6 @@ async function startBrowser(options) {
       ],
       ...contextOptions,
     };
-
-    if (options.wallet) {
-      const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
-      if (!fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
-        console.log(JSON.stringify({ status: 'info', message: 'Rabby wallet extension not found. Run wallet-setup first.' }));
-      }
-      launchOptions.headless = false;
-      launchOptions.args.push(`--disable-extensions-except=${rabbyPath}`);
-      launchOptions.args.push(`--load-extension=${rabbyPath}`);
-    }
 
     persistentContext = await chromium.launchPersistentContext(USER_DATA_DIR, launchOptions);
     context = persistentContext;
@@ -454,6 +882,225 @@ const commands = {
       message: 'Browser closed.',
       note: 'Login state and extensions are preserved in the user data directory.'
     }));
+  },
+
+  async 'dev-server-start'(args, options) {
+    // Start a dev server for testing
+    // args[0]: project directory (default: '.')
+    // args[1]: preferred port (default: 3000)
+    const { spawn } = require('child_process');
+
+    const projectDir = path.resolve(args[0] || '.');
+    const preferredPort = parseInt(args[1]) || 3000;
+
+    // Check if project exists
+    if (!fs.existsSync(path.join(projectDir, 'package.json'))) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'No package.json found in project directory',
+        projectDir
+      }));
+      process.exit(1);
+    }
+
+    // Check if a dev server is already running (from this tool)
+    if (fs.existsSync(DEV_SERVER_FILE)) {
+      try {
+        const existing = JSON.parse(fs.readFileSync(DEV_SERVER_FILE, 'utf-8'));
+        // Check if process is still running
+        try {
+          process.kill(existing.pid, 0); // Just check, don't kill
+          console.log(JSON.stringify({
+            success: false,
+            error: 'A dev server is already running',
+            existing,
+            hint: 'Use dev-server-stop to stop it first'
+          }));
+          process.exit(1);
+        } catch (e) {
+          // Process not running, clean up stale file
+          fs.unlinkSync(DEV_SERVER_FILE);
+        }
+      } catch (e) {}
+    }
+
+    // Detect package manager and framework
+    const packageManager = detectPackageManager(projectDir);
+    const framework = detectFramework(projectDir);
+
+    console.log(JSON.stringify({
+      status: 'info',
+      message: `Detected ${framework} project with ${packageManager}`
+    }));
+
+    // Find available port
+    let port = preferredPort;
+    if (!(await isPortAvailable(port))) {
+      console.log(JSON.stringify({
+        status: 'info',
+        message: `Port ${preferredPort} is in use, finding available port...`
+      }));
+      port = await findAvailablePort(preferredPort);
+    }
+
+    // Get the command to run
+    const devCommand = options.command || getDevCommand(framework, packageManager, port);
+
+    console.log(JSON.stringify({
+      status: 'info',
+      message: `Starting dev server: ${devCommand}`
+    }));
+
+    // Start the dev server
+    const serverProcess = spawn('sh', ['-c', devCommand], {
+      cwd: projectDir,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    // Capture some initial output for debugging
+    let output = '';
+    serverProcess.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    serverProcess.stderr.on('data', (data) => {
+      output += data.toString();
+    });
+
+    serverProcess.unref();
+
+    const serverUrl = `http://localhost:${port}`;
+
+    // Save server info
+    const serverInfo = {
+      pid: serverProcess.pid,
+      port,
+      url: serverUrl,
+      projectDir,
+      framework,
+      packageManager,
+      command: devCommand,
+      startedAt: new Date().toISOString()
+    };
+
+    fs.writeFileSync(DEV_SERVER_FILE, JSON.stringify(serverInfo, null, 2));
+
+    // Wait for server to be ready
+    console.log(JSON.stringify({
+      status: 'info',
+      message: 'Waiting for server to be ready...'
+    }));
+
+    const isReady = await waitForServer(serverUrl, 30000);
+
+    if (isReady) {
+      console.log(JSON.stringify({
+        success: true,
+        message: 'Dev server started successfully',
+        ...serverInfo
+      }));
+    } else {
+      console.log(JSON.stringify({
+        success: true,
+        warning: 'Server started but may not be ready yet',
+        hint: 'The server process is running, but could not verify it is responding. Check the output manually.',
+        ...serverInfo,
+        initialOutput: output.slice(0, 500)
+      }));
+    }
+  },
+
+  async 'dev-server-stop'(args, options) {
+    // Stop the dev server started by dev-server-start
+    if (!fs.existsSync(DEV_SERVER_FILE)) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'No dev server is currently running (no state file found)'
+      }));
+      process.exit(1);
+    }
+
+    try {
+      const serverInfo = JSON.parse(fs.readFileSync(DEV_SERVER_FILE, 'utf-8'));
+
+      // Try to kill the process and its children
+      try {
+        // Kill the process group (negative PID)
+        process.kill(-serverInfo.pid, 'SIGTERM');
+      } catch (e) {
+        // Try killing just the process
+        try {
+          process.kill(serverInfo.pid, 'SIGTERM');
+        } catch (e2) {
+          // Process might already be dead
+        }
+      }
+
+      // Clean up state file
+      fs.unlinkSync(DEV_SERVER_FILE);
+
+      console.log(JSON.stringify({
+        success: true,
+        message: 'Dev server stopped',
+        stoppedServer: serverInfo
+      }));
+    } catch (e) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'Failed to stop dev server',
+        details: e.message
+      }));
+      process.exit(1);
+    }
+  },
+
+  async 'dev-server-status'(args, options) {
+    // Check the status of the dev server
+    if (!fs.existsSync(DEV_SERVER_FILE)) {
+      console.log(JSON.stringify({
+        success: true,
+        running: false,
+        message: 'No dev server is currently running'
+      }));
+      return;
+    }
+
+    try {
+      const serverInfo = JSON.parse(fs.readFileSync(DEV_SERVER_FILE, 'utf-8'));
+
+      // Check if process is still running
+      let isRunning = false;
+      try {
+        process.kill(serverInfo.pid, 0);
+        isRunning = true;
+      } catch (e) {
+        isRunning = false;
+      }
+
+      // Check if server is responding
+      const isResponding = isRunning ? await waitForServer(serverInfo.url, 3000) : false;
+
+      if (!isRunning) {
+        // Clean up stale state file
+        fs.unlinkSync(DEV_SERVER_FILE);
+      }
+
+      console.log(JSON.stringify({
+        success: true,
+        running: isRunning,
+        responding: isResponding,
+        serverInfo: isRunning ? serverInfo : null,
+        message: isRunning
+          ? (isResponding ? 'Dev server is running and responding' : 'Dev server is running but not responding')
+          : 'Dev server process has stopped (stale state cleaned up)'
+      }));
+    } catch (e) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'Failed to check dev server status',
+        details: e.message
+      }));
+    }
   },
 
   async navigate(args, options) {
@@ -854,106 +1501,180 @@ const commands = {
     if (!jsonFile) throw new Error('JSON file required');
 
     const testConfig = JSON.parse(fs.readFileSync(jsonFile, 'utf-8'));
-    const results = [];
 
     await ensureBrowser(options);
 
-    for (const step of testConfig.steps || []) {
-      try {
-        const { action, ...params } = step;
+    // Check if this is a parallel test configuration (has "tasks" array)
+    if (testConfig.parallel && testConfig.tasks) {
+      // Parallel execution mode
+      console.log(JSON.stringify({
+        status: 'info',
+        message: `Running ${testConfig.tasks.length} tasks in parallel mode (max ${options.maxParallel || 5} concurrent)`
+      }));
 
-        if (action === 'navigate') {
-          await page.goto(params.url, { waitUntil: 'networkidle' });
-        } else if (action === 'click') {
-          await page.click(params.selector);
-        } else if (action === 'fill') {
-          await page.fill(params.selector, params.value);
-        } else if (action === 'select') {
-          await page.selectOption(params.selector, params.value);
-        } else if (action === 'check') {
-          await page.check(params.selector);
-        } else if (action === 'wait') {
-          await page.waitForTimeout(params.ms || 1000);
-        } else if (action === 'screenshot') {
-          await takeScreenshot(params.name);
+      const scheduler = new ParallelScheduler(context, testConfig.tasks, {
+        maxParallel: parseInt(options.maxParallel) || 5,
+        failFast: options.failFast === 'true' || options.failFast === true,
+        screenshotsDir: SCREENSHOTS_DIR
+      });
+
+      const result = await scheduler.run();
+
+      console.log(JSON.stringify({
+        success: result.success,
+        mode: 'parallel',
+        summary: {
+          total: result.total,
+          completed: result.completed,
+          failed: result.failed,
+          aborted: result.aborted
+        },
+        results: result.results
+      }));
+    } else {
+      // Sequential execution mode (original behavior, backward compatible)
+      const results = [];
+
+      for (const step of testConfig.steps || []) {
+        try {
+          const { action, ...params } = step;
+
+          if (action === 'navigate') {
+            await page.goto(params.url, { waitUntil: 'networkidle' });
+          } else if (action === 'click') {
+            await page.click(params.selector);
+          } else if (action === 'fill') {
+            await page.fill(params.selector, params.value);
+          } else if (action === 'select') {
+            await page.selectOption(params.selector, params.value);
+          } else if (action === 'check') {
+            await page.check(params.selector);
+          } else if (action === 'wait') {
+            await page.waitForTimeout(params.ms || 1000);
+          } else if (action === 'screenshot') {
+            await takeScreenshot(params.name);
+          }
+
+          results.push({ step, success: true });
+
+          // Take screenshot if requested
+          if (step.screenshot) {
+            await takeScreenshot(step.screenshot);
+          }
+
+        } catch (error) {
+          results.push({ step, success: false, error: error.message });
         }
-
-        results.push({ step, success: true });
-
-        // Take screenshot if requested
-        if (step.screenshot) {
-          await takeScreenshot(step.screenshot);
-        }
-
-      } catch (error) {
-        results.push({ step, success: false, error: error.message });
       }
-    }
 
-    console.log(JSON.stringify({
-      success: results.every(r => r.success),
-      results
-    }));
+      console.log(JSON.stringify({
+        success: results.every(r => r.success),
+        mode: 'sequential',
+        results
+      }));
+    }
   },
 
   // ==================== Web3 Wallet Commands ====================
 
   async 'wallet-setup'(args, options) {
-    // Open Chrome Web Store to install Rabby Wallet extension
-    // This uses a persistent browser profile so the extension stays installed
+    // Download and install Rabby Wallet extension from GitHub releases
+    // This downloads the extension zip, extracts it, and configures it for use with --load-extension
+
+    const { execSync } = require('child_process');
 
     try {
-      // Ensure user data directory exists
-      if (!fs.existsSync(USER_DATA_DIR)) {
-        fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+      // Ensure extensions directory exists
+      if (!fs.existsSync(EXTENSIONS_DIR)) {
+        fs.mkdirSync(EXTENSIONS_DIR, { recursive: true });
       }
 
-      // Launch Chrome with persistent profile (must use headed mode)
-      // Note: We use channel: 'chrome' to use the real Chrome browser
-      const browserContext = await chromium.launchPersistentContext(USER_DATA_DIR, {
-        headless: false,
-        channel: 'chrome', // Use real Chrome instead of Chromium
-        args: [
-          '--no-first-run',
-          '--disable-blink-features=AutomationControlled',
-        ],
-        viewport: { width: 1280, height: 800 },
-      });
+      const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
+      const rabbyZipPath = path.join(EXTENSIONS_DIR, 'rabby.zip');
 
-      const page = await browserContext.newPage();
+      // Check if already installed
+      if (fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
+        const manifest = JSON.parse(fs.readFileSync(path.join(rabbyPath, 'manifest.json'), 'utf8'));
+        console.log(JSON.stringify({
+          success: true,
+          message: `Rabby Wallet v${manifest.version} is already installed`,
+          extensionPath: rabbyPath,
+          note: 'Use --force to reinstall'
+        }));
 
-      // Navigate to Chrome Web Store - Rabby Wallet page
-      console.log(JSON.stringify({ status: 'info', message: 'Opening Chrome Web Store...' }));
-      await page.goto(RABBY_WEBSTORE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        // Check for --force flag to reinstall
+        if (!args.includes('--force')) {
+          return;
+        }
+        console.log(JSON.stringify({ status: 'info', message: 'Force reinstalling...' }));
+      }
 
-      // Take screenshot
-      await page.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-webstore.png'),
-        fullPage: true
-      });
+      // Get latest release info from GitHub API
+      console.log(JSON.stringify({ status: 'info', message: 'Fetching latest Rabby release from GitHub...' }));
+
+      let releaseInfo;
+      try {
+        const releaseJson = execSync('curl -s "https://api.github.com/repos/RabbyHub/Rabby/releases/latest"', { encoding: 'utf8' });
+        releaseInfo = JSON.parse(releaseJson);
+      } catch (e) {
+        throw new Error('Failed to fetch release info from GitHub API');
+      }
+
+      const tagName = releaseInfo.tag_name;
+      const version = tagName.replace('v', '');
+      const downloadUrl = `https://github.com/RabbyHub/Rabby/releases/download/${tagName}/Rabby_${tagName}.zip`;
+
+      console.log(JSON.stringify({ status: 'info', message: `Downloading Rabby ${tagName}...`, url: downloadUrl }));
+
+      // Download the extension zip
+      try {
+        execSync(`curl -L -o "${rabbyZipPath}" "${downloadUrl}"`, { stdio: 'pipe' });
+      } catch (e) {
+        throw new Error(`Failed to download extension: ${e.message}`);
+      }
+
+      // Remove old extension directory if exists
+      if (fs.existsSync(rabbyPath)) {
+        fs.rmSync(rabbyPath, { recursive: true, force: true });
+      }
+
+      // Extract the zip
+      console.log(JSON.stringify({ status: 'info', message: 'Extracting extension...' }));
+      try {
+        execSync(`unzip -o "${rabbyZipPath}" -d "${rabbyPath}"`, { stdio: 'pipe' });
+      } catch (e) {
+        throw new Error(`Failed to extract extension: ${e.message}`);
+      }
+
+      // Clean up zip file
+      fs.unlinkSync(rabbyZipPath);
+
+      // Verify installation
+      if (!fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
+        throw new Error('Extension extraction failed - manifest.json not found');
+      }
+
+      const manifest = JSON.parse(fs.readFileSync(path.join(rabbyPath, 'manifest.json'), 'utf8'));
 
       console.log(JSON.stringify({
         success: true,
-        message: 'Chrome Web Store opened. Please click "Add to Chrome" to install Rabby Wallet.',
+        message: `Rabby Wallet v${manifest.version} installed successfully`,
+        extensionPath: rabbyPath,
+        manifestVersion: manifest.manifest_version,
         instructions: [
-          '1. Click "Add to Chrome" button on the page',
-          '2. Confirm the installation in the popup',
-          '3. Wait for installation to complete',
-          '4. Run wallet-import to setup your wallet'
+          '1. Extension is now ready to use',
+          '2. Use --wallet flag with any command to load the extension',
+          '3. Example: node pw-helper.js navigate "https://app.example.com" --wallet --headed',
+          '4. Run wallet-import to import your wallet using private key'
         ],
-        webstoreUrl: RABBY_WEBSTORE_URL,
-        screenshot: 'wallet-webstore.png',
-        note: 'Browser will stay open. Close it manually after installation.'
+        note: 'Extension will be loaded automatically when using --wallet flag'
       }));
-
-      // Keep browser open for user to install
-      // Don't close the browser - let user install manually
 
     } catch (error) {
       console.log(JSON.stringify({
         success: false,
-        error: `Failed to open Chrome Web Store: ${error.message}`,
-        hint: 'Make sure Google Chrome is installed on your system'
+        error: `Failed to setup wallet: ${error.message}`,
+        hint: 'Make sure you have curl and unzip installed'
       }));
     }
   },
@@ -1022,7 +1743,7 @@ const commands = {
 
       // Navigate to Rabby Wallet profile/import page
       console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby Wallet...' }));
-      await extensionPage.goto(RABBY_PROFILE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await extensionPage.goto(getRabbyProfileUrl(), { waitUntil: 'domcontentloaded', timeout: 30000 });
       await extensionPage.waitForTimeout(2000);
 
       // Take screenshot
@@ -1273,7 +1994,7 @@ const commands = {
 
       // Navigate to Rabby Wallet popup
       console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby Wallet...' }));
-      await extensionPage.goto(RABBY_POPUP_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await extensionPage.goto(getRabbyPopupUrl(), { waitUntil: 'domcontentloaded', timeout: 30000 });
       await extensionPage.waitForTimeout(2000);
 
       await extensionPage.screenshot({
