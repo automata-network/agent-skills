@@ -153,25 +153,30 @@ Script auto-fails if `WALLET_PRIVATE_KEY` not set. After success → proceed to 
 
 ## ⚠️ Wallet MUST be connected BEFORE any other tests! Without connection, all tests FAIL.
 
-**Refresh page with wallet extension loaded, then connect:**
-
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# 1. Navigate to DApp with wallet extension activated
+# 1. Navigate to DApp with wallet extension
 node $SKILL_DIR/scripts/test-helper.js wallet-navigate "<dapp-url>" --wallet --headed --keep-open
 
-# 2. Take screenshot to find Connect Wallet button
+# 2. Take screenshot, find and click "Connect Wallet" button
 node $SKILL_DIR/scripts/test-helper.js vision-screenshot before-connect.jpg --wallet --headed --keep-open
+# Use vision-click to click the Connect Wallet button
+
+# 3. In Rainbow/Privy modal, click "Installed" wallet option (use vision-click)
+
+# 4. Auto-approve Rabby popup (handles new window automatically)
+node $SKILL_DIR/scripts/test-helper.js wallet-approve --wallet --headed --keep-open
+
+# 5. Verify connection
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-connect.jpg --wallet --headed --keep-open
 ```
 
-**Use vision commands to connect:**
-1. Find "Connect Wallet" button in screenshot (usually top-right)
-2. Click it: `vision-click <x> <y>`
-3. In Rainbow/Privy modal, click "Installed" wallet option
-4. Approve connection in Rabby popup
-5. Approve signature if required
-6. Take screenshot: `vision-screenshot after-connect.jpg`
+The `wallet-approve` command automatically:
+- Waits for Rabby popup window to open
+- Clicks Connect/Confirm/Sign button
+- Handles signature requests if needed
+- Takes screenshots at each step
 
 **Verification:**
 - ✅ SUCCESS: Wallet address (0x...) visible → proceed to Step 6

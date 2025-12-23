@@ -814,6 +814,144 @@ const commands = {
     }));
   },
 
+  /**
+   * Wait for and approve Rabby wallet popup
+   * Handles the popup window that appears when connecting to a DApp
+   */
+  async 'wallet-approve'(args, options) {
+    const context = getContext();
+    if (!context) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'No browser context. Run wallet-navigate first.'
+      }));
+      return;
+    }
+
+    const timeout = parseInt(options.timeout) || 30000;
+    console.log(JSON.stringify({ status: 'info', message: 'Waiting for Rabby popup window...' }));
+
+    try {
+      // Wait for new page (popup) to open
+      const popupPromise = context.waitForEvent('page', { timeout });
+
+      // Get the popup page
+      const popup = await popupPromise;
+      await popup.waitForLoadState('domcontentloaded');
+      await popup.waitForTimeout(1000);
+
+      const popupUrl = popup.url();
+      console.log(JSON.stringify({ status: 'info', message: `Popup opened: ${popupUrl}` }));
+
+      // Take screenshot of popup
+      await popup.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'rabby-popup.jpg'),
+        type: 'jpeg',
+        quality: 60
+      });
+
+      // Check if it's a Rabby extension popup
+      if (!popupUrl.includes('chrome-extension://')) {
+        console.log(JSON.stringify({
+          success: false,
+          error: 'Popup is not a Chrome extension',
+          url: popupUrl
+        }));
+        return;
+      }
+
+      // Find and click the Connect/Confirm/Approve button
+      const approveSelectors = [
+        'button:has-text("Connect")',
+        'button:has-text("Confirm")',
+        'button:has-text("Approve")',
+        'button:has-text("Sign")',
+        'button:has-text("确认")',
+        'button:has-text("连接")',
+        '.ant-btn-primary',
+        'button[type="submit"]',
+      ];
+
+      let approved = false;
+      for (const selector of approveSelectors) {
+        try {
+          const btn = await popup.$(selector);
+          if (btn && await btn.isVisible()) {
+            await btn.click();
+            approved = true;
+            console.log(JSON.stringify({ status: 'info', message: `Clicked approve button: ${selector}` }));
+            await popup.waitForTimeout(1000);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      // Take screenshot after clicking
+      await popup.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'rabby-popup-after-approve.jpg'),
+        type: 'jpeg',
+        quality: 60
+      }).catch(() => {});
+
+      // Wait for popup to close or handle additional prompts
+      await popup.waitForTimeout(2000);
+
+      // Check if popup is still open (might need signature)
+      if (!popup.isClosed()) {
+        console.log(JSON.stringify({ status: 'info', message: 'Popup still open, checking for signature request...' }));
+
+        // Try to click sign button if present
+        for (const selector of approveSelectors) {
+          try {
+            const btn = await popup.$(selector);
+            if (btn && await btn.isVisible()) {
+              await btn.click();
+              console.log(JSON.stringify({ status: 'info', message: `Clicked signature button: ${selector}` }));
+              await popup.waitForTimeout(1000);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+
+      // Final screenshot
+      const mainPage = getPage();
+      if (mainPage) {
+        await mainPage.waitForTimeout(2000);
+        await mainPage.screenshot({
+          path: path.join(SCREENSHOTS_DIR, 'after-wallet-approve.jpg'),
+          type: 'jpeg',
+          quality: 60
+        });
+      }
+
+      console.log(JSON.stringify({
+        success: true,
+        message: 'Wallet approval completed',
+        approved: approved,
+        screenshots: ['rabby-popup.jpg', 'rabby-popup-after-approve.jpg', 'after-wallet-approve.jpg']
+      }));
+
+    } catch (error) {
+      if (error.message.includes('Timeout')) {
+        console.log(JSON.stringify({
+          success: false,
+          error: 'No popup window detected within timeout',
+          hint: 'Make sure you clicked Connect Wallet button first'
+        }));
+      } else {
+        console.log(JSON.stringify({
+          success: false,
+          error: `Failed to approve wallet: ${error.message}`
+        }));
+      }
+    }
+  },
+
   async 'wallet-switch-network'(args, options) {
     const page = getPage();
     const networkName = args[0]?.toLowerCase() || options.network;
