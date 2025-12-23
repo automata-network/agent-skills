@@ -212,22 +212,122 @@ Analyze results and generate a report:
 
 ## Web3 DApp Testing
 
-For Web3 DApps requiring wallet connection:
+For Web3 DApps requiring wallet connection, a complete wallet setup flow must be performed.
+
+### Wallet Setup Flow (Required Steps)
+
+The wallet testing requires three main phases:
+
+#### Phase 1: Install Rabby Wallet Extension
+
+The `wallet-setup` command opens Chrome Web Store to install Rabby Wallet extension:
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Set private key (REQUIRED - never logged or transmitted)
+# Step 1: Open Chrome Web Store Rabby Wallet page
+node $SKILL_DIR/scripts/pw-helper.js wallet-setup --headed --keep-open
+```
+
+This will:
+1. Open Chrome browser with persistent profile
+2. Navigate to Chrome Web Store Rabby Wallet page
+3. Take screenshot of the page
+
+**IMPORTANT: You must manually click "Add to Chrome" button to install the extension!**
+
+After the page loads, use vision-based testing to click the install button:
+```bash
+# Take screenshot to identify the "Add to Chrome" button position
+node $SKILL_DIR/scripts/pw-helper.js vision-screenshot webstore.png --headed --keep-open
+
+# Click "Add to Chrome" button (coordinates determined from screenshot analysis)
+node $SKILL_DIR/scripts/pw-helper.js vision-click <x> <y> --headed --keep-open
+
+# Confirm installation dialog if appears
+node $SKILL_DIR/scripts/pw-helper.js vision-click <confirm-x> <confirm-y> --headed --keep-open
+```
+
+#### Phase 2: Import Wallet with Private Key
+
+After extension is installed, import your wallet:
+
+```bash
+# Set private key in environment (REQUIRED - never logged or transmitted)
 export WALLET_PRIVATE_KEY="your_private_key_here"
 
-# Setup flow
-node $SKILL_DIR/scripts/pw-helper.js wallet-setup      # Install Rabby Wallet
-node $SKILL_DIR/scripts/pw-helper.js wallet-import     # Import wallet (auto-generates WALLET_PASSWORD)
-node $SKILL_DIR/scripts/pw-helper.js wallet-unlock     # Unlock if locked (uses WALLET_PASSWORD)
-node $SKILL_DIR/scripts/pw-helper.js wallet-navigate "https://app.example.com"
-node $SKILL_DIR/scripts/pw-helper.js wallet-connect    # Connect to DApp
-node $SKILL_DIR/scripts/pw-helper.js wallet-switch-network polygon
+# Step 2: Import wallet using private key
+node $SKILL_DIR/scripts/pw-helper.js wallet-import --headed --keep-open
 ```
+
+This will:
+1. Open Rabby Wallet extension page
+2. Navigate through the import flow using vision-based clicks
+3. Input the private key securely
+4. Set up wallet password (auto-generated)
+
+**Manual steps may be required:** If automatic import fails, use vision-based commands to:
+1. Click "Add Address" or "Import" button
+2. Select "Private Key" option
+3. Paste private key into input field
+4. Confirm and create password
+
+#### Phase 3: Connect Wallet to DApp
+
+Once wallet is imported and unlocked:
+
+```bash
+# Step 3: Navigate to DApp with wallet loaded
+node $SKILL_DIR/scripts/pw-helper.js wallet-navigate "https://app.example.com" --headed --keep-open
+
+# Step 4: Click "Connect Wallet" on DApp
+node $SKILL_DIR/scripts/pw-helper.js click "button:has-text('Connect Wallet')" --headed --keep-open
+
+# Step 5: Handle Rabby wallet connection popup
+node $SKILL_DIR/scripts/pw-helper.js wallet-connect --headed --keep-open
+```
+
+### Complete Example Workflow
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# ============================================
+# Step 1: Install Rabby Wallet Extension
+# ============================================
+node $SKILL_DIR/scripts/pw-helper.js wallet-setup --headed --keep-open
+# Wait and manually click "Add to Chrome" OR use vision-click
+
+# ============================================
+# Step 2: Import Wallet
+# ============================================
+export WALLET_PRIVATE_KEY="0x..."  # Your private key
+node $SKILL_DIR/scripts/pw-helper.js wallet-import --headed --keep-open
+
+# ============================================
+# Step 3: Connect to DApp
+# ============================================
+node $SKILL_DIR/scripts/pw-helper.js wallet-navigate "http://staging.carrier.so/" --headed --keep-open
+node $SKILL_DIR/scripts/pw-helper.js click "button:has-text('Connect Wallet')" --screenshot wallet-modal.png --headed --keep-open
+node $SKILL_DIR/scripts/pw-helper.js wallet-connect --headed --keep-open
+
+# ============================================
+# Step 4: Switch Network if needed
+# ============================================
+node $SKILL_DIR/scripts/pw-helper.js wallet-switch-network polygon --headed --keep-open
+```
+
+### Wallet Commands Reference
+
+| Command | Description |
+|---------|-------------|
+| `wallet-setup` | Open Chrome Web Store to install Rabby Wallet extension |
+| `wallet-import` | Import wallet using WALLET_PRIVATE_KEY env var |
+| `wallet-unlock` | Unlock wallet using WALLET_PASSWORD env var |
+| `wallet-navigate <url>` | Navigate to DApp with Rabby Wallet loaded |
+| `wallet-connect` | Connect wallet to current DApp |
+| `wallet-switch-network <name>` | Switch to specified network |
+| `wallet-get-address` | Get current wallet address |
 
 **Security:**
 - `WALLET_PRIVATE_KEY`: Your wallet private key (required, never logged or transmitted)
