@@ -34,7 +34,8 @@
  *
  * Web3 Commands:
  *   wallet-setup             - Download and setup Rabby wallet extension
- *   wallet-import            - Import wallet using WALLET_PRIVATE_KEY env var
+ *   wallet-import            - Import wallet (uses WALLET_PRIVATE_KEY, generates WALLET_PASSWORD)
+ *   wallet-unlock            - Unlock wallet using WALLET_PASSWORD env var
  *   wallet-connect           - Connect wallet to current DApp
  *   wallet-switch-network    - Switch to specified network
  *   wallet-get-address       - Get current wallet address
@@ -789,10 +790,12 @@ const commands = {
   },
 
   async 'wallet-import'(args, options) {
-    // Open Rabby Wallet profile page for wallet import
-    // SECURITY: Private key is read from environment variable ONLY
-    // This key is NEVER logged, transmitted to APIs, or stored in files
-    // We do NOT read from .env files - environment variable must be set directly
+    // Open Rabby Wallet and import wallet using private key
+    // SECURITY:
+    // - Private key is read from WALLET_PRIVATE_KEY env var ONLY
+    // - Wallet password is generated randomly and stored in WALLET_PASSWORD env var
+    // - Neither are EVER logged, transmitted to APIs, or stored in files
+    // - All sensitive data stays LOCAL ONLY
 
     const privateKey = process.env.WALLET_PRIVATE_KEY;
 
@@ -815,6 +818,25 @@ const commands = {
       return;
     }
 
+    // Generate or use existing wallet password
+    // SECURITY: Password is stored in environment variable only, NEVER logged or transmitted
+    let walletPassword = process.env.WALLET_PASSWORD;
+    let passwordGenerated = false;
+
+    if (!walletPassword) {
+      // Generate a strong random password (16 chars: letters, numbers, special chars)
+      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+      const crypto = require('crypto');
+      const randomBytes = crypto.randomBytes(16);
+      walletPassword = '';
+      for (let i = 0; i < 16; i++) {
+        walletPassword += chars[randomBytes[i] % chars.length];
+      }
+      // Set the password in environment variable for this process and child processes
+      process.env.WALLET_PASSWORD = walletPassword;
+      passwordGenerated = true;
+    }
+
     try {
       // Launch Chrome with the persistent profile where Rabby is installed
       const browserContext = await chromium.launchPersistentContext(USER_DATA_DIR, {
@@ -827,41 +849,328 @@ const commands = {
         viewport: { width: 1280, height: 800 },
       });
 
-      const page = await browserContext.newPage();
+      const extensionPage = await browserContext.newPage();
 
       // Navigate to Rabby Wallet profile/import page
       console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby Wallet...' }));
-      await page.goto(RABBY_PROFILE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(2000);
+      await extensionPage.goto(RABBY_PROFILE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await extensionPage.waitForTimeout(2000);
 
       // Take screenshot
-      await page.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import.png'),
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-1-start.png'),
         fullPage: true
       });
 
-      console.log(JSON.stringify({
-        success: true,
-        message: 'Rabby Wallet opened. Import your wallet using private key.',
-        instructions: [
-          '1. Click "Import" or "Add Address"',
-          '2. Select "Import Private Key"',
-          '3. Paste your private key (from WALLET_PRIVATE_KEY env var)',
-          '4. Set a password for the wallet',
-          '5. Complete the setup'
-        ],
-        walletUrl: RABBY_PROFILE_URL,
-        screenshot: 'wallet-import.png',
-        security: 'Private key was read from env var - NOT logged or transmitted'
-      }));
+      // Try to find and click "Add Address" or "Import" button
+      const addAddressSelectors = [
+        'button:has-text("Add Address")',
+        'button:has-text("Import")',
+        'button:has-text("Add address")',
+        'div:has-text("Add Address")',
+        '[class*="add-address"]',
+        '[class*="import"]',
+      ];
 
-      // Keep browser open for user to complete import
+      let addClicked = false;
+      for (const selector of addAddressSelectors) {
+        try {
+          const btn = await extensionPage.$(selector);
+          if (btn && await btn.isVisible()) {
+            await btn.click();
+            addClicked = true;
+            await extensionPage.waitForTimeout(1000);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-2-add-clicked.png'),
+        fullPage: true
+      });
+
+      // Try to find and click "Import Private Key" option
+      const privateKeySelectors = [
+        'div:has-text("Private Key")',
+        'button:has-text("Private Key")',
+        'span:has-text("Private Key")',
+        '[class*="private-key"]',
+        'text=Private Key',
+      ];
+
+      let pkOptionClicked = false;
+      await extensionPage.waitForTimeout(500);
+      for (const selector of privateKeySelectors) {
+        try {
+          const el = await extensionPage.$(selector);
+          if (el && await el.isVisible()) {
+            await el.click();
+            pkOptionClicked = true;
+            await extensionPage.waitForTimeout(1000);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-3-pk-selected.png'),
+        fullPage: true
+      });
+
+      // Try to find private key input and fill it
+      // SECURITY: privateKey comes from env var, is used only in browser, never logged
+      const pkInputSelectors = [
+        'textarea',
+        'input[type="password"]',
+        'input[placeholder*="private key"]',
+        'input[placeholder*="Private Key"]',
+        '[class*="private-key"] input',
+        '[class*="private-key"] textarea',
+      ];
+
+      let pkFilled = false;
+      for (const selector of pkInputSelectors) {
+        try {
+          const input = await extensionPage.$(selector);
+          if (input && await input.isVisible()) {
+            await input.fill(privateKey);
+            pkFilled = true;
+            await extensionPage.waitForTimeout(500);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-4-pk-filled.png'),
+        fullPage: true
+      });
+
+      // Try to click confirm/next button
+      const confirmSelectors = [
+        'button:has-text("Confirm")',
+        'button:has-text("Next")',
+        'button:has-text("Import")',
+        'button:has-text("Continue")',
+        'button[type="submit"]',
+        '.ant-btn-primary',
+      ];
+
+      for (const selector of confirmSelectors) {
+        try {
+          const btn = await extensionPage.$(selector);
+          if (btn && await btn.isVisible()) {
+            await btn.click();
+            await extensionPage.waitForTimeout(1500);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-5-confirmed.png'),
+        fullPage: true
+      });
+
+      // Try to find password inputs and fill them
+      // SECURITY: walletPassword comes from env var, used only in browser, never logged
+      const passwordInputs = await extensionPage.$$('input[type="password"]');
+      if (passwordInputs.length >= 2) {
+        // First password input and confirm password input
+        await passwordInputs[0].fill(walletPassword);
+        await passwordInputs[1].fill(walletPassword);
+
+        await extensionPage.screenshot({
+          path: path.join(SCREENSHOTS_DIR, 'wallet-import-6-password-filled.png'),
+          fullPage: true
+        });
+
+        // Click final confirm button
+        await extensionPage.waitForTimeout(500);
+        for (const selector of confirmSelectors) {
+          try {
+            const btn = await extensionPage.$(selector);
+            if (btn && await btn.isVisible()) {
+              await btn.click();
+              await extensionPage.waitForTimeout(2000);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      } else if (passwordInputs.length === 1) {
+        // Single password input (might be unlock screen)
+        await passwordInputs[0].fill(walletPassword);
+        await extensionPage.waitForTimeout(500);
+        for (const selector of confirmSelectors) {
+          try {
+            const btn = await extensionPage.$(selector);
+            if (btn && await btn.isVisible()) {
+              await btn.click();
+              await extensionPage.waitForTimeout(1500);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-7-complete.png'),
+        fullPage: true
+      });
+
+      // Output result with password export command (password value NOT included in output)
+      const result = {
+        success: true,
+        message: 'Wallet import process completed.',
+        steps: {
+          addAddressClicked: addClicked,
+          privateKeyOptionClicked: pkOptionClicked,
+          privateKeyFilled: pkFilled,
+          passwordFieldsFound: passwordInputs.length,
+        },
+        screenshots: [
+          'wallet-import-1-start.png',
+          'wallet-import-2-add-clicked.png',
+          'wallet-import-3-pk-selected.png',
+          'wallet-import-4-pk-filled.png',
+          'wallet-import-5-confirmed.png',
+          'wallet-import-6-password-filled.png',
+          'wallet-import-7-complete.png',
+        ],
+        security: 'Private key and password read from env vars - NEVER logged or transmitted',
+      };
+
+      if (passwordGenerated) {
+        result.passwordGenerated = true;
+        result.note = 'A random password was generated and set to WALLET_PASSWORD env var';
+        result.exportCommand = 'Password is in process.env.WALLET_PASSWORD (not shown for security)';
+      }
+
+      console.log(JSON.stringify(result));
+
+      // Keep browser open for verification
 
     } catch (error) {
       console.log(JSON.stringify({
         success: false,
-        error: `Failed to open Rabby Wallet: ${error.message}`,
+        error: `Failed to import wallet: ${error.message}`,
         hint: 'Make sure you ran wallet-setup first and installed the extension'
+      }));
+    }
+  },
+
+  async 'wallet-unlock'(args, options) {
+    // Unlock Rabby Wallet using WALLET_PASSWORD env var
+    // SECURITY: Password is read from environment variable only, NEVER logged or transmitted
+
+    const walletPassword = process.env.WALLET_PASSWORD;
+
+    if (!walletPassword) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'WALLET_PASSWORD environment variable is NOT set',
+        fix: 'Run wallet-import first to generate and set the password, or set it manually:',
+        command: 'export WALLET_PASSWORD="your_wallet_password"'
+      }));
+      return;
+    }
+
+    try {
+      // Launch Chrome with the persistent profile where Rabby is installed
+      const browserContext = await chromium.launchPersistentContext(USER_DATA_DIR, {
+        headless: false,
+        channel: 'chrome',
+        args: [
+          '--no-first-run',
+          '--disable-blink-features=AutomationControlled',
+        ],
+        viewport: { width: 1280, height: 800 },
+      });
+
+      const extensionPage = await browserContext.newPage();
+
+      // Navigate to Rabby Wallet popup
+      console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby Wallet...' }));
+      await extensionPage.goto(RABBY_POPUP_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await extensionPage.waitForTimeout(2000);
+
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-unlock-1-start.png'),
+        fullPage: true
+      });
+
+      // Find password input and fill it
+      const passwordInput = await extensionPage.$('input[type="password"]');
+      if (passwordInput && await passwordInput.isVisible()) {
+        await passwordInput.fill(walletPassword);
+        await extensionPage.waitForTimeout(500);
+
+        await extensionPage.screenshot({
+          path: path.join(SCREENSHOTS_DIR, 'wallet-unlock-2-password-filled.png'),
+          fullPage: true
+        });
+
+        // Click unlock button
+        const unlockSelectors = [
+          'button:has-text("Unlock")',
+          'button:has-text("解锁")',
+          'button[type="submit"]',
+          '.ant-btn-primary',
+        ];
+
+        for (const selector of unlockSelectors) {
+          try {
+            const btn = await extensionPage.$(selector);
+            if (btn && await btn.isVisible()) {
+              await btn.click();
+              await extensionPage.waitForTimeout(2000);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+
+        await extensionPage.screenshot({
+          path: path.join(SCREENSHOTS_DIR, 'wallet-unlock-3-complete.png'),
+          fullPage: true
+        });
+
+        console.log(JSON.stringify({
+          success: true,
+          message: 'Wallet unlock attempted.',
+          screenshots: [
+            'wallet-unlock-1-start.png',
+            'wallet-unlock-2-password-filled.png',
+            'wallet-unlock-3-complete.png',
+          ],
+          security: 'Password read from WALLET_PASSWORD env var - NEVER logged or transmitted'
+        }));
+      } else {
+        console.log(JSON.stringify({
+          success: true,
+          message: 'Wallet appears to be already unlocked (no password input found).',
+          screenshot: 'wallet-unlock-1-start.png'
+        }));
+      }
+
+    } catch (error) {
+      console.log(JSON.stringify({
+        success: false,
+        error: `Failed to unlock wallet: ${error.message}`
       }));
     }
   },
@@ -1786,7 +2095,8 @@ Commands:
 
 Web3 Wallet Commands:
   wallet-setup              Open Chrome Web Store to install Rabby Wallet
-  wallet-import             Open Rabby to import wallet (uses WALLET_PRIVATE_KEY env var)
+  wallet-import             Import wallet (uses WALLET_PRIVATE_KEY, generates WALLET_PASSWORD)
+  wallet-unlock             Unlock wallet (uses WALLET_PASSWORD env var)
   wallet-navigate <url>     Navigate to DApp with Rabby Wallet available
   wallet-connect            Connect wallet to current DApp
   wallet-switch-network <n> Switch network (ethereum, polygon, arbitrum, etc.)

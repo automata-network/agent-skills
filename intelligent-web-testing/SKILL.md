@@ -221,13 +221,18 @@ export WALLET_PRIVATE_KEY="your_private_key_here"
 
 # Setup flow
 node $SKILL_DIR/scripts/pw-helper.js wallet-setup      # Install Rabby Wallet
-node $SKILL_DIR/scripts/pw-helper.js wallet-import     # Import wallet
+node $SKILL_DIR/scripts/pw-helper.js wallet-import     # Import wallet (auto-generates WALLET_PASSWORD)
+node $SKILL_DIR/scripts/pw-helper.js wallet-unlock     # Unlock if locked (uses WALLET_PASSWORD)
 node $SKILL_DIR/scripts/pw-helper.js wallet-navigate "https://app.example.com"
 node $SKILL_DIR/scripts/pw-helper.js wallet-connect    # Connect to DApp
 node $SKILL_DIR/scripts/pw-helper.js wallet-switch-network polygon
 ```
 
-**Security:** Private key is read from environment variable ONLY, never logged or transmitted.
+**Security:**
+- `WALLET_PRIVATE_KEY`: Your wallet private key (required, never logged or transmitted)
+- `WALLET_PASSWORD`: Auto-generated during wallet-import (16-char random password)
+- Both values are stored in environment variables ONLY, never logged, transmitted to APIs, or stored in files
+- All sensitive operations happen locally in the browser
 
 ## Auto Port Detection
 

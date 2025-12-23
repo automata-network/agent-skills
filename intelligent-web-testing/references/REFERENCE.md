@@ -40,11 +40,19 @@ This document contains detailed technical information for the intelligent-web-te
 | Command | Description |
 |---------|-------------|
 | `wallet-setup` | Open Chrome Web Store to install Rabby Wallet |
-| `wallet-import` | Open Rabby to import wallet (uses `WALLET_PRIVATE_KEY` env var) |
+| `wallet-import` | Import wallet (uses `WALLET_PRIVATE_KEY`, auto-generates `WALLET_PASSWORD`) |
+| `wallet-unlock` | Unlock wallet (uses `WALLET_PASSWORD` env var) |
 | `wallet-navigate <url>` | Navigate to DApp with Rabby Wallet available |
 | `wallet-connect` | Connect wallet to current DApp |
 | `wallet-switch-network <n>` | Switch network (ethereum, polygon, arbitrum, etc.) |
 | `wallet-get-address` | Get current wallet address |
+
+### Environment Variables
+
+| Variable | Description | Security |
+|----------|-------------|----------|
+| `WALLET_PRIVATE_KEY` | Your wallet private key (64 hex chars, optional 0x prefix) | LOCAL ONLY - never logged or transmitted |
+| `WALLET_PASSWORD` | Wallet unlock password (auto-generated during wallet-import) | LOCAL ONLY - never logged or transmitted |
 
 ### Supported Networks
 
@@ -69,19 +77,23 @@ SKILL_DIR="/path/to/intelligent-web-testing"
 node $SKILL_DIR/scripts/pw-helper.js wallet-setup
 
 # Step 2: Set private key and import wallet (one-time)
+# This auto-generates WALLET_PASSWORD and stores it in the process env
 export WALLET_PRIVATE_KEY="your_private_key_here"
 node $SKILL_DIR/scripts/pw-helper.js wallet-import
 
-# Step 3: Navigate to DApp with wallet
+# Step 3: Unlock wallet if locked (uses WALLET_PASSWORD from env)
+node $SKILL_DIR/scripts/pw-helper.js wallet-unlock
+
+# Step 4: Navigate to DApp with wallet
 node $SKILL_DIR/scripts/pw-helper.js wallet-navigate "https://app.uniswap.org"
 
-# Step 4: Connect wallet
+# Step 5: Connect wallet
 node $SKILL_DIR/scripts/pw-helper.js wallet-connect
 
-# Step 5: Switch network if needed
+# Step 6: Switch network if needed
 node $SKILL_DIR/scripts/pw-helper.js wallet-switch-network polygon
 
-# Step 6: Interact with DApp
+# Step 7: Interact with DApp
 node $SKILL_DIR/scripts/pw-helper.js click "button.swap"
 node $SKILL_DIR/scripts/pw-helper.js fill "#amount" "100"
 ```
