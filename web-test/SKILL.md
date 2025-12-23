@@ -276,6 +276,14 @@ All artifacts saved to `./test-output/`:
 
 **Options:** `--screenshot <name>`, `--wait <ms>`, `--mobile`, `--headed`, `--headless`, `--keep-open`, `--timeout <ms>`
 
+## Headless vs Headed Mode
+
+**Default: Headless mode** - All commands run in headless mode by default, enabling CI/container compatibility.
+
+**Automatic headed mode**: The `wait-for-login` command automatically switches to headed mode since manual login requires a visible browser window.
+
+**CI/Container behavior**: If `wait-for-login` fails to open a browser window (no display available), the test will fail immediately with error `HEADED_MODE_FAILED`. In CI environments, use automated login methods (`wallet-connect`) instead of manual login.
+
 For detailed reference including Web3 commands, supported networks, validation criteria, and templates, see `references/REFERENCE.md`.
 
 ## Browser Persistence and OAuth

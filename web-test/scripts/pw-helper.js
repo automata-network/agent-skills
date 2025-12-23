@@ -42,7 +42,7 @@
  *
  * Login Detection Commands:
  *   detect-login-required    - Detect if login/auth is required on current page
- *   wait-for-login           - Wait for manual login completion (polls for login state)
+ *   wait-for-login           - Wait for manual login (auto-switches to headed mode, fails if no display)
  *
  * Options:
  *   --screenshot <name>      - Take screenshot after action
@@ -2064,7 +2064,29 @@ const commands = {
     // Wait for manual login completion
     // Opens headed browser and polls for login state change
     // Handles OAuth redirects gracefully by catching page navigation errors
-    await ensureBrowser(options);
+
+    // Force headed mode - manual login requires visible browser
+    if (options.headless) {
+      options.headless = false;
+      console.log(JSON.stringify({
+        status: 'info',
+        message: 'Switching to headed mode for manual login (headless mode cannot be used for manual login)'
+      }));
+    }
+
+    try {
+      await ensureBrowser(options);
+    } catch (error) {
+      // Headed mode failed - likely running in CI/container without display
+      console.log(JSON.stringify({
+        success: false,
+        error: 'HEADED_MODE_FAILED',
+        message: 'Cannot open browser window for manual login. This command requires a display (headed mode).',
+        details: error.message,
+        suggestion: 'If running in CI/container, use automated login methods (wallet-connect) or skip manual login tests.'
+      }));
+      process.exit(1);
+    }
 
     const maxWaitTime = parseInt(options.timeout) || 300000; // 5 minutes default
     const pollInterval = 2000;
@@ -2627,7 +2649,7 @@ Web3 Wallet Commands:
 
 Login Detection Commands:
   detect-login-required     Detect if login/auth is required (checks for modals, forms)
-  wait-for-login            Wait for manual login completion (polls for login state)
+  wait-for-login            Wait for manual login (auto-switches to headed mode, fails if no display)
 
 Vision-Based Commands (AI Agent Visual Analysis):
   vision-screenshot [name]  Take screenshot for AI to analyze (use Read tool to view)
