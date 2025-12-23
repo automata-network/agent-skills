@@ -84,6 +84,10 @@ function getRabbyPopupUrl() {
   if (!rabbyExtensionId) throw new Error('Rabby extension not loaded. Run wallet-import or wallet-unlock first with --wallet flag.');
   return `chrome-extension://${rabbyExtensionId}/popup.html`;
 }
+function getRabbyImportPrivateKeyUrl() {
+  if (!rabbyExtensionId) throw new Error('Rabby extension not loaded. Run wallet-import or wallet-unlock first with --wallet flag.');
+  return `chrome-extension://${rabbyExtensionId}/index.html#/new-user/import/private-key`;
+}
 
 // User data directory for persistent browser profile
 const USER_DATA_DIR = path.join(OUTPUT_DIR, 'chrome-profile');
@@ -768,10 +772,11 @@ async function startBrowser(options) {
 
     saveCDPInfo(CDP_PORT);
   } else {
-    // Headless mode without wallet: use launchPersistentContext with Chrome
+    // Headless mode without wallet: use launchPersistentContext with Chromium
+    // Note: Extensions only work in Chromium, not Chrome - so we use Playwright's bundled Chromium
     const launchOptions = {
       headless: options.headless,
-      channel: 'chrome',
+      // Don't specify channel to use Playwright's bundled Chromium (required for extensions)
       args: [
         '--no-first-run',
         '--disable-blink-features=AutomationControlled',
@@ -1728,102 +1733,44 @@ const commands = {
     }
 
     try {
-      // Launch Chrome with the persistent profile where Rabby is installed
-      const browserContext = await chromium.launchPersistentContext(USER_DATA_DIR, {
-        headless: false,
-        channel: 'chrome',
-        args: [
-          '--no-first-run',
-          '--disable-blink-features=AutomationControlled',
-        ],
-        viewport: { width: 1280, height: 800 },
-      });
+      // Wallet import MUST use wallet mode to load the extension
+      if (!options.wallet) {
+        console.log(JSON.stringify({
+          success: false,
+          error: 'wallet-import requires --wallet flag',
+          hint: 'Run: node pw-helper.js wallet-import --wallet [--headless]'
+        }));
+        return;
+      }
 
-      const extensionPage = await browserContext.newPage();
+      // Open browser with wallet extension loaded
+      await commands['browser-open'](args, options);
 
-      // Navigate to Rabby Wallet profile/import page
-      console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby Wallet...' }));
-      await extensionPage.goto(getRabbyProfileUrl(), { waitUntil: 'domcontentloaded', timeout: 30000 });
+      const extensionPage = await context.newPage();
+
+      // Navigate directly to Rabby's private key import page
+      const importUrl = getRabbyImportPrivateKeyUrl();
+      console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby Wallet import page...' }));
+      await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await extensionPage.waitForTimeout(2000);
 
-      // Take screenshot
+      // Take screenshot of import page
       await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-1-start.png'),
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-1-page.png'),
         fullPage: true
       });
 
-      // Try to find and click "Add Address" or "Import" button
-      const addAddressSelectors = [
-        'button:has-text("Add Address")',
-        'button:has-text("Import")',
-        'button:has-text("Add address")',
-        'div:has-text("Add Address")',
-        '[class*="add-address"]',
-        '[class*="import"]',
-      ];
-
-      let addClicked = false;
-      for (const selector of addAddressSelectors) {
-        try {
-          const btn = await extensionPage.$(selector);
-          if (btn && await btn.isVisible()) {
-            await btn.click();
-            addClicked = true;
-            await extensionPage.waitForTimeout(1000);
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-2-add-clicked.png'),
-        fullPage: true
-      });
-
-      // Try to find and click "Import Private Key" option
-      const privateKeySelectors = [
-        'div:has-text("Private Key")',
-        'button:has-text("Private Key")',
-        'span:has-text("Private Key")',
-        '[class*="private-key"]',
-        'text=Private Key',
-      ];
-
-      let pkOptionClicked = false;
-      await extensionPage.waitForTimeout(500);
-      for (const selector of privateKeySelectors) {
-        try {
-          const el = await extensionPage.$(selector);
-          if (el && await el.isVisible()) {
-            await el.click();
-            pkOptionClicked = true;
-            await extensionPage.waitForTimeout(1000);
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-3-pk-selected.png'),
-        fullPage: true
-      });
-
-      // Try to find private key input and fill it
+      // Find and fill the private key textarea
       // SECURITY: privateKey comes from env var, is used only in browser, never logged
+      let pkFilled = false;
       const pkInputSelectors = [
         'textarea',
+        'input[type="text"]',
         'input[type="password"]',
-        'input[placeholder*="private key"]',
-        'input[placeholder*="Private Key"]',
-        '[class*="private-key"] input',
         '[class*="private-key"] textarea',
+        '[class*="private-key"] input',
       ];
 
-      let pkFilled = false;
       for (const selector of pkInputSelectors) {
         try {
           const input = await extensionPage.$(selector);
@@ -1831,6 +1778,7 @@ const commands = {
             await input.fill(privateKey);
             pkFilled = true;
             await extensionPage.waitForTimeout(500);
+            console.log(JSON.stringify({ status: 'info', message: 'Private key filled' }));
             break;
           }
         } catch (e) {
@@ -1839,11 +1787,11 @@ const commands = {
       }
 
       await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-4-pk-filled.png'),
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-2-pk-filled.png'),
         fullPage: true
       });
 
-      // Try to click confirm/next button
+      // Click confirm/next button to proceed
       const confirmSelectors = [
         'button:has-text("Confirm")',
         'button:has-text("Next")',
@@ -1853,12 +1801,15 @@ const commands = {
         '.ant-btn-primary',
       ];
 
+      let confirmClicked = false;
       for (const selector of confirmSelectors) {
         try {
           const btn = await extensionPage.$(selector);
           if (btn && await btn.isVisible()) {
             await btn.click();
-            await extensionPage.waitForTimeout(1500);
+            confirmClicked = true;
+            console.log(JSON.stringify({ status: 'info', message: 'Confirm button clicked' }));
+            await extensionPage.waitForTimeout(2000);
             break;
           }
         } catch (e) {
@@ -1867,24 +1818,28 @@ const commands = {
       }
 
       await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-5-confirmed.png'),
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-3-confirmed.png'),
         fullPage: true
       });
 
-      // Try to find password inputs and fill them
+      // Handle password setup if needed (first time setup requires password)
       // SECURITY: walletPassword comes from env var, used only in browser, never logged
       const passwordInputs = await extensionPage.$$('input[type="password"]');
+      let passwordSet = false;
+
       if (passwordInputs.length >= 2) {
-        // First password input and confirm password input
+        // Two password fields = password setup (new password + confirm)
         await passwordInputs[0].fill(walletPassword);
         await passwordInputs[1].fill(walletPassword);
+        passwordSet = true;
+        console.log(JSON.stringify({ status: 'info', message: 'Password fields filled' }));
 
         await extensionPage.screenshot({
-          path: path.join(SCREENSHOTS_DIR, 'wallet-import-6-password-filled.png'),
+          path: path.join(SCREENSHOTS_DIR, 'wallet-import-4-password.png'),
           fullPage: true
         });
 
-        // Click final confirm button
+        // Click final confirm
         await extensionPage.waitForTimeout(500);
         for (const selector of confirmSelectors) {
           try {
@@ -1899,9 +1854,10 @@ const commands = {
           }
         }
       } else if (passwordInputs.length === 1) {
-        // Single password input (might be unlock screen)
+        // Single password field = unlock existing wallet
         await passwordInputs[0].fill(walletPassword);
-        await extensionPage.waitForTimeout(500);
+        passwordSet = true;
+
         for (const selector of confirmSelectors) {
           try {
             const btn = await extensionPage.$(selector);
@@ -1916,8 +1872,9 @@ const commands = {
         }
       }
 
+      // Final screenshot
       await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-import-7-complete.png'),
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-5-complete.png'),
         fullPage: true
       });
 
@@ -1926,19 +1883,16 @@ const commands = {
         success: true,
         message: 'Wallet import process completed.',
         steps: {
-          addAddressClicked: addClicked,
-          privateKeyOptionClicked: pkOptionClicked,
           privateKeyFilled: pkFilled,
-          passwordFieldsFound: passwordInputs.length,
+          confirmClicked: confirmClicked,
+          passwordSet: passwordSet,
         },
         screenshots: [
-          'wallet-import-1-start.png',
-          'wallet-import-2-add-clicked.png',
-          'wallet-import-3-pk-selected.png',
-          'wallet-import-4-pk-filled.png',
-          'wallet-import-5-confirmed.png',
-          'wallet-import-6-password-filled.png',
-          'wallet-import-7-complete.png',
+          'wallet-import-1-page.png',
+          'wallet-import-2-pk-filled.png',
+          'wallet-import-3-confirmed.png',
+          'wallet-import-4-password.png',
+          'wallet-import-5-complete.png',
         ],
         security: 'Private key and password read from env vars - NEVER logged or transmitted',
       };
@@ -1979,18 +1933,20 @@ const commands = {
     }
 
     try {
-      // Launch Chrome with the persistent profile where Rabby is installed
-      const browserContext = await chromium.launchPersistentContext(USER_DATA_DIR, {
-        headless: false,
-        channel: 'chrome',
-        args: [
-          '--no-first-run',
-          '--disable-blink-features=AutomationControlled',
-        ],
-        viewport: { width: 1280, height: 800 },
-      });
+      // Wallet unlock MUST use wallet mode to load the extension
+      if (!options.wallet) {
+        console.log(JSON.stringify({
+          success: false,
+          error: 'wallet-unlock requires --wallet flag',
+          hint: 'Run: node pw-helper.js wallet-unlock --wallet [--headless]'
+        }));
+        return;
+      }
 
-      const extensionPage = await browserContext.newPage();
+      // Open browser with wallet extension loaded
+      await commands['browser-open'](args, options);
+
+      const extensionPage = await context.newPage();
 
       // Navigate to Rabby Wallet popup
       console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby Wallet...' }));
@@ -2077,20 +2033,19 @@ const commands = {
     }
 
     try {
-      // Launch Chrome with the persistent profile where Rabby is installed
-      const browserContext = await chromium.launchPersistentContext(USER_DATA_DIR, {
-        headless: false,
-        channel: 'chrome',
-        args: [
-          '--no-first-run',
-          '--disable-blink-features=AutomationControlled',
-        ],
-        viewport: { width: 1920, height: 1080 },
-      });
+      // wallet-navigate should use --wallet flag to properly load the extension
+      if (!options.wallet) {
+        console.log(JSON.stringify({
+          success: false,
+          error: 'wallet-navigate requires --wallet flag to load the wallet extension',
+          hint: 'Run: node pw-helper.js wallet-navigate <url> --wallet [--headless]'
+        }));
+        return;
+      }
 
-      // Store context and page globally for subsequent commands
-      context = browserContext;
-      page = await browserContext.newPage();
+      // Open browser with wallet extension loaded
+      await commands['browser-open'](args, options);
+      page = await context.newPage();
 
       // Navigate to DApp
       console.log(JSON.stringify({ status: 'info', message: `Navigating to ${url}...` }));
