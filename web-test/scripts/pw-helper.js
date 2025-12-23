@@ -67,6 +67,7 @@ const SCREENSHOTS_DIR = path.join(OUTPUT_DIR, 'screenshots');
 const EXTENSIONS_DIR = path.join(OUTPUT_DIR, 'extensions');
 const STATE_FILE = path.join(OUTPUT_DIR, '.browser-state.json');
 const CDP_FILE = path.join(OUTPUT_DIR, '.browser-cdp.json'); // For persistent browser connection
+const CDP_PORT = 9222; // Fixed CDP port for browser reconnection
 
 // Wallet extension configuration
 const RABBY_EXTENSION_ID = 'acmacodkjbdgmoleebolmdjonilkdbch';
@@ -200,33 +201,33 @@ let persistentContext = null; // For launchPersistentContext
 
 // Try to connect to existing browser via CDP
 async function tryConnectExistingBrowser() {
-  if (fs.existsSync(CDP_FILE)) {
-    try {
-      const cdpInfo = JSON.parse(fs.readFileSync(CDP_FILE, 'utf-8'));
-      // Check if browser is still alive
-      const http = require('http');
-      const checkAlive = () => new Promise((resolve) => {
-        const req = http.get(`http://127.0.0.1:${cdpInfo.port}/json/version`, (res) => {
-          resolve(res.statusCode === 200);
-        });
-        req.on('error', () => resolve(false));
-        req.setTimeout(1000, () => { req.destroy(); resolve(false); });
-      });
+  // Always try to connect to the fixed CDP port first
+  const http = require('http');
+  const checkAlive = () => new Promise((resolve) => {
+    const req = http.get(`http://127.0.0.1:${CDP_PORT}/json/version`, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(2000, () => { req.destroy(); resolve(false); });
+  });
 
-      if (await checkAlive()) {
-        browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpInfo.port}`);
-        const contexts = browser.contexts();
-        if (contexts.length > 0) {
-          context = contexts[0];
-          const pages = context.pages();
-          page = pages.length > 0 ? pages[0] : await context.newPage();
-          return true;
-        }
+  try {
+    if (await checkAlive()) {
+      browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`);
+      const contexts = browser.contexts();
+      if (contexts.length > 0) {
+        context = contexts[0];
+        const pages = context.pages();
+        page = pages.length > 0 ? pages[0] : await context.newPage();
+        return true;
       }
-    } catch (e) {
-      // Connection failed, will launch new browser
     }
-    // Clean up stale CDP file
+  } catch (e) {
+    // Connection failed, will launch new browser
+  }
+
+  // Clean up stale CDP file if exists
+  if (fs.existsSync(CDP_FILE)) {
     fs.unlinkSync(CDP_FILE);
   }
   return false;
@@ -266,34 +267,96 @@ async function startBrowser(options) {
     contextOptions.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15';
   }
 
-  // Always use persistent context with Chrome for login persistence
-  const launchOptions = {
-    headless: options.headless,
-    channel: 'chrome', // Use real Chrome for better compatibility
-    args: [
+  // Check if we should launch Chrome independently for CDP support
+  const useIndependentChrome = !options.headless; // Use independent Chrome for headed mode
+
+  if (useIndependentChrome) {
+    // Launch Chrome independently with CDP port (stays open after Node exits)
+    const chromeArgs = [
       '--no-first-run',
       '--disable-blink-features=AutomationControlled',
-    ],
-    ...contextOptions,
-  };
+      `--remote-debugging-port=${CDP_PORT}`,
+      `--user-data-dir=${path.resolve(USER_DATA_DIR)}`,
+    ];
 
-  // If wallet extension is needed, add extension loading
-  if (options.wallet) {
-    const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
-    if (!fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
-      console.log(JSON.stringify({ status: 'info', message: 'Rabby wallet extension not found. Run wallet-setup first.' }));
+    if (options.wallet) {
+      const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
+      if (fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
+        chromeArgs.push(`--disable-extensions-except=${rabbyPath}`);
+        chromeArgs.push(`--load-extension=${rabbyPath}`);
+      }
     }
-    launchOptions.headless = false;
-    launchOptions.args.push(`--disable-extensions-except=${rabbyPath}`);
-    launchOptions.args.push(`--load-extension=${rabbyPath}`);
+
+    // Spawn Chrome independently
+    const { spawn } = require('child_process');
+    const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
+    const chromeProcess = spawn(chromePath, chromeArgs, {
+      detached: true,
+      stdio: 'ignore'
+    });
+    chromeProcess.unref();
+
+    // Wait for CDP to be available
+    const http = require('http');
+    let connected = false;
+    for (let i = 0; i < 30; i++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        const alive = await new Promise((resolve) => {
+          const req = http.get(`http://127.0.0.1:${CDP_PORT}/json/version`, (res) => {
+            resolve(res.statusCode === 200);
+          });
+          req.on('error', () => resolve(false));
+          req.setTimeout(1000, () => { req.destroy(); resolve(false); });
+        });
+        if (alive) {
+          connected = true;
+          break;
+        }
+      } catch (e) {}
+    }
+
+    if (!connected) {
+      throw new Error('Failed to connect to Chrome CDP after 15 seconds');
+    }
+
+    // Connect via CDP
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`);
+    const contexts = browser.contexts();
+    context = contexts.length > 0 ? contexts[0] : await browser.newContext(contextOptions);
+    const pages = context.pages();
+    page = pages.length > 0 ? pages[0] : await context.newPage();
+
+    saveCDPInfo(CDP_PORT);
+  } else {
+    // Headless mode: use launchPersistentContext (faster, but no CDP reconnect)
+    const launchOptions = {
+      headless: options.headless,
+      channel: 'chrome',
+      args: [
+        '--no-first-run',
+        '--disable-blink-features=AutomationControlled',
+      ],
+      ...contextOptions,
+    };
+
+    if (options.wallet) {
+      const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
+      if (!fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
+        console.log(JSON.stringify({ status: 'info', message: 'Rabby wallet extension not found. Run wallet-setup first.' }));
+      }
+      launchOptions.headless = false;
+      launchOptions.args.push(`--disable-extensions-except=${rabbyPath}`);
+      launchOptions.args.push(`--load-extension=${rabbyPath}`);
+    }
+
+    persistentContext = await chromium.launchPersistentContext(USER_DATA_DIR, launchOptions);
+    context = persistentContext;
+
+    const pages = context.pages();
+    page = pages.length > 0 ? pages[0] : await context.newPage();
   }
-
-  // Launch persistent context (preserves cookies, localStorage, extensions)
-  persistentContext = await chromium.launchPersistentContext(USER_DATA_DIR, launchOptions);
-  context = persistentContext;
-
-  const pages = context.pages();
-  page = pages.length > 0 ? pages[0] : await context.newPage();
 
   // Capture console logs
   page.on('console', msg => {
@@ -2745,7 +2808,7 @@ async function main() {
     process.exit(1);
   } finally {
     // Only close browser if --keep-open is NOT set and command is not 'start' or 'browser-open'
-    const keepOpenCommands = ['start', 'browser-open', 'wait-for-login'];
+    const keepOpenCommands = ['start', 'browser-open', 'wait-for-login', 'wallet-setup', 'wallet-import', 'wallet-unlock'];
     if (!parsed.options.keepOpen && !keepOpenCommands.includes(parsed.command)) {
       if (persistentContext) {
         await persistentContext.close();
