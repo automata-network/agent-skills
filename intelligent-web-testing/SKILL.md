@@ -118,8 +118,79 @@ For each test:
 2. Capture screenshot of initial state
 3. Perform the action (click, fill, select, etc.)
 4. Wait for UI to update
-5. Capture screenshot of result state
-6. Validate expected outcome
+5. **Detect if login is required** (see Login Detection below)
+6. Capture screenshot of result state
+7. Validate expected outcome
+
+### Login Detection and Handling
+
+Many features require user authentication. The agent should:
+
+1. **Detect login triggers**: Before clicking buttons like "Connect", "Create", "Submit", "Search" (when searching user data), or navigating to internal pages, check if login might be required.
+
+2. **Common login trigger patterns**:
+   - Buttons with text: "Connect", "Connect Wallet", "Create", "Submit", "Post", "Save", "Profile", "Settings", "Dashboard"
+   - Links to: `/dashboard`, `/profile`, `/settings`, `/account`, `/my-*`
+   - Forms that submit user data
+   - Any action that results in a login modal/popup appearing
+
+3. **Login detection workflow**:
+   ```bash
+   SKILL_DIR="<path-to-this-skill>"
+
+   # Before performing account-related actions, check if login is needed
+   node $SKILL_DIR/scripts/pw-helper.js detect-login-required --screenshot before-action.png
+
+   # If login is required, handle it first
+   node $SKILL_DIR/scripts/pw-helper.js wallet-connect  # For Web3 DApps
+   # OR
+   node $SKILL_DIR/scripts/pw-helper.js wait-for-login  # For manual login by tester
+   ```
+
+4. **After action login detection**:
+   - After clicking a button, if a login modal/popup appears, the agent should:
+     a. Detect the modal presence
+     b. Use `wallet-connect` for automated wallet login (if WALLET_PRIVATE_KEY is set)
+     c. OR use `wait-for-login` for manual login (tester completes login in headed browser)
+     d. After login completes, continue with the original test
+
+5. **wait-for-login command**:
+   ```bash
+   # Opens headed browser and waits for tester to complete login manually
+   # Polls every 2 seconds for login completion (up to 5 minutes)
+   node $SKILL_DIR/scripts/pw-helper.js wait-for-login --timeout 300000
+   ```
+
+   The command detects login completion by checking:
+   - Presence of wallet address (0x...)
+   - Presence of user avatar/profile picture
+   - Absence of login modal
+   - Presence of "Disconnect" or "Logout" button
+
+**Example workflow for account-related testing:**
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# 1. Navigate to the app
+node $SKILL_DIR/scripts/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
+
+# 2. Before clicking "Create" button, detect if login needed
+node $SKILL_DIR/scripts/pw-helper.js detect-login-required
+
+# 3. Click the button that may trigger login
+node $SKILL_DIR/scripts/pw-helper.js click "button:has-text('Create')" --screenshot after-create-click.png
+
+# 4. Check if login modal appeared
+node $SKILL_DIR/scripts/pw-helper.js detect-login-required
+
+# 5. If login modal detected, complete login first
+node $SKILL_DIR/scripts/pw-helper.js wait-for-login  # Wait for manual login
+# OR
+node $SKILL_DIR/scripts/pw-helper.js wallet-connect  # Automated wallet login
+
+# 6. Continue with the original test flow after login
+node $SKILL_DIR/scripts/pw-helper.js screenshot after-login.png
+```
 
 Example:
 ```bash
@@ -192,6 +263,8 @@ All artifacts saved to `./test-output/`:
 | `list-elements` | List interactive elements |
 | `wait <ms>` | Wait milliseconds |
 | `wait-for <selector>` | Wait for element |
+| `detect-login-required` | Detect if login/auth is needed |
+| `wait-for-login` | Wait for manual login completion |
 
 **Options:** `--screenshot <name>`, `--wait <ms>`, `--mobile`, `--headed`, `--timeout <ms>`
 

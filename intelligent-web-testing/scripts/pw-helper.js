@@ -39,6 +39,10 @@
  *   wallet-switch-network    - Switch to specified network
  *   wallet-get-address       - Get current wallet address
  *
+ * Login Detection Commands:
+ *   detect-login-required    - Detect if login/auth is required on current page
+ *   wait-for-login           - Wait for manual login completion (polls for login state)
+ *
  * Options:
  *   --screenshot <name>      - Take screenshot after action
  *   --wait <ms>              - Wait after action
@@ -1463,6 +1467,299 @@ const commands = {
 
   // ==================== End Web3 Commands ====================
 
+  // ==================== Login Detection Commands ====================
+
+  async 'detect-login-required'(args, options) {
+    // Detect if login/authentication is required
+    // Checks for login modals, login buttons, and authentication prompts
+    await ensureBrowser(options);
+
+    try {
+      const detection = await page.evaluate(() => {
+        const body = document.body;
+        const bodyText = body.textContent?.toLowerCase() || '';
+        const bodyHtml = body.innerHTML?.toLowerCase() || '';
+
+        // Check for login modal indicators
+        const modalSelectors = [
+          '[role="dialog"]',
+          '.modal',
+          '[class*="Modal"]',
+          '[class*="modal"]',
+          '[class*="popup"]',
+          '[class*="Popup"]',
+          '[class*="overlay"]',
+          '[class*="Overlay"]',
+          '[data-testid*="modal"]',
+          '[data-testid*="dialog"]',
+        ];
+
+        let hasModal = false;
+        let modalContent = '';
+        for (const selector of modalSelectors) {
+          const modal = document.querySelector(selector);
+          if (modal && modal.offsetParent !== null) {
+            hasModal = true;
+            modalContent = modal.textContent?.toLowerCase() || '';
+            break;
+          }
+        }
+
+        // Check for login-related keywords in modal or page
+        const loginKeywords = [
+          'sign in', 'signin', 'log in', 'login', 'connect wallet',
+          'connect your wallet', 'authentication', 'authenticate',
+          'create account', 'sign up', 'signup', 'register',
+          'enter your email', 'enter email', 'email address',
+          'password', 'continue with google', 'continue with github',
+          'continue with twitter', 'continue with email',
+          '登录', '注册', '连接钱包', '输入邮箱',
+        ];
+
+        const textToCheck = hasModal ? modalContent : bodyText;
+        const hasLoginKeywords = loginKeywords.some(keyword => textToCheck.includes(keyword));
+
+        // Check for login buttons
+        const loginButtonSelectors = [
+          'button:has-text("Sign In")',
+          'button:has-text("Sign in")',
+          'button:has-text("Log In")',
+          'button:has-text("Log in")',
+          'button:has-text("Login")',
+          'button:has-text("Connect Wallet")',
+          'button:has-text("Connect wallet")',
+          'button:has-text("Connect")',
+          '[data-testid="login-button"]',
+          '[data-testid="signin-button"]',
+          '[data-testid="connect-wallet"]',
+        ];
+
+        // Check for social login options
+        const socialLoginSelectors = [
+          'button:has-text("Google")',
+          'button:has-text("GitHub")',
+          'button:has-text("Twitter")',
+          'button:has-text("Discord")',
+          'button:has-text("Email")',
+          '[aria-label*="Google"]',
+          '[aria-label*="GitHub"]',
+        ];
+
+        // Check for wallet options
+        const walletSelectors = [
+          'button:has-text("Rabby")',
+          'button:has-text("MetaMask")',
+          'button:has-text("WalletConnect")',
+          'button:has-text("Coinbase")',
+          '[data-wallet-id]',
+          '[data-connector-id]',
+        ];
+
+        // Check for email input
+        const hasEmailInput = !!document.querySelector('input[type="email"], input[placeholder*="email"], input[placeholder*="Email"]');
+
+        // Check for password input
+        const hasPasswordInput = !!document.querySelector('input[type="password"]');
+
+        // Check if user is already logged in
+        const loggedInIndicators = [
+          /0x[a-fA-F0-9]{4}[.…][a-fA-F0-9]{4}/, // Wallet address pattern
+          document.querySelector('[data-testid="account-button"]'),
+          document.querySelector('[data-testid="user-menu"]'),
+          document.querySelector('[data-testid="profile-button"]'),
+          document.querySelector('button:has-text("Disconnect")'),
+          document.querySelector('button:has-text("Logout")'),
+          document.querySelector('button:has-text("Log out")'),
+          document.querySelector('[class*="avatar"]'),
+          document.querySelector('[class*="Avatar"]'),
+        ];
+
+        const isLoggedIn = loggedInIndicators.some(indicator => {
+          if (indicator instanceof RegExp) return indicator.test(bodyText);
+          return !!indicator;
+        });
+
+        // Determine login type
+        let loginType = null;
+        if (hasModal && hasLoginKeywords) {
+          if (bodyHtml.includes('wallet') || bodyHtml.includes('0x')) {
+            loginType = 'wallet';
+          } else if (hasEmailInput || hasPasswordInput) {
+            loginType = 'email';
+          } else {
+            loginType = 'social';
+          }
+        }
+
+        // Get available login options
+        const availableOptions = [];
+        if (bodyHtml.includes('google')) availableOptions.push('google');
+        if (bodyHtml.includes('github')) availableOptions.push('github');
+        if (bodyHtml.includes('twitter') || bodyHtml.includes('x.com')) availableOptions.push('twitter');
+        if (bodyHtml.includes('discord')) availableOptions.push('discord');
+        if (hasEmailInput) availableOptions.push('email');
+        if (bodyHtml.includes('rabby')) availableOptions.push('rabby');
+        if (bodyHtml.includes('metamask')) availableOptions.push('metamask');
+        if (bodyHtml.includes('walletconnect')) availableOptions.push('walletconnect');
+
+        return {
+          loginRequired: hasModal && hasLoginKeywords && !isLoggedIn,
+          hasModal,
+          hasLoginKeywords,
+          isLoggedIn,
+          loginType,
+          availableOptions,
+          hasEmailInput,
+          hasPasswordInput,
+          modalContent: modalContent.substring(0, 200),
+        };
+      });
+
+      // Take screenshot
+      const screenshotPath = path.join(SCREENSHOTS_DIR, 'login-detection.png');
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+
+      console.log(JSON.stringify({
+        success: true,
+        ...detection,
+        screenshot: 'login-detection.png',
+        recommendation: detection.loginRequired
+          ? (detection.loginType === 'wallet'
+            ? 'Use wallet-connect for automated login or wait-for-login for manual'
+            : 'Use wait-for-login for manual login completion')
+          : (detection.isLoggedIn ? 'Already logged in, proceed with testing' : 'No login required'),
+      }));
+
+    } catch (error) {
+      console.log(JSON.stringify({
+        success: false,
+        error: `Failed to detect login: ${error.message}`
+      }));
+    }
+  },
+
+  async 'wait-for-login'(args, options) {
+    // Wait for manual login completion
+    // Opens headed browser and polls for login state change
+    await ensureBrowser(options);
+
+    const maxWaitTime = parseInt(options.timeout) || 300000; // 5 minutes default
+    const pollInterval = 2000;
+    let elapsed = 0;
+
+    try {
+      // Take initial screenshot
+      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wait-login-start.png'), fullPage: true });
+
+      console.log(JSON.stringify({
+        status: 'waiting',
+        message: '🔐 Waiting for manual login...',
+        instructions: [
+          'Please complete login in the browser window',
+          'The test will continue automatically after login is detected',
+          `Timeout: ${maxWaitTime / 1000} seconds`
+        ],
+        screenshot: 'wait-login-start.png'
+      }));
+
+      // Poll for login completion
+      while (elapsed < maxWaitTime) {
+        await page.waitForTimeout(pollInterval);
+        elapsed += pollInterval;
+
+        const loginState = await page.evaluate(() => {
+          const body = document.body.textContent || '';
+          const bodyHtml = document.body.innerHTML?.toLowerCase() || '';
+
+          // Check for logged-in indicators
+          const loggedInIndicators = [
+            /0x[a-fA-F0-9]{4}[.…][a-fA-F0-9]{4}/.test(body), // Wallet address
+            !!document.querySelector('[data-testid="account-button"]'),
+            !!document.querySelector('[data-testid="user-menu"]'),
+            !!document.querySelector('[data-testid="profile-button"]'),
+            !!document.querySelector('button:has-text("Disconnect")'),
+            !!document.querySelector('button:has-text("Logout")'),
+            !!document.querySelector('button:has-text("Log out")'),
+            !!document.querySelector('[class*="avatar"][class*="user"]'),
+            !!document.querySelector('img[alt*="avatar"]'),
+            !!document.querySelector('img[alt*="profile"]'),
+          ];
+
+          // Check if modal is closed
+          const modalGone = !document.querySelector('[role="dialog"]') &&
+                          !document.querySelector('.modal:not(.hidden)') &&
+                          !document.querySelector('[class*="Modal"]:not([class*="hidden"])');
+
+          // Check for login form absence
+          const noLoginForm = !document.querySelector('input[type="password"]');
+
+          // Get visible user info
+          const addressMatch = body.match(/0x[a-fA-F0-9]{4,}[.…][a-fA-F0-9]{4,}/);
+
+          return {
+            isLoggedIn: loggedInIndicators.some(v => v === true),
+            modalGone,
+            noLoginForm,
+            userAddress: addressMatch ? addressMatch[0] : null,
+            hasAvatar: !!document.querySelector('[class*="avatar"], img[alt*="avatar"], img[alt*="profile"]'),
+          };
+        });
+
+        // Take periodic screenshots
+        if (elapsed % 10000 === 0) {
+          await page.screenshot({
+            path: path.join(SCREENSHOTS_DIR, `wait-login-${elapsed/1000}s.png`),
+            fullPage: true
+          });
+        }
+
+        // Check if logged in
+        if (loginState.isLoggedIn || (loginState.modalGone && loginState.noLoginForm && elapsed > 10000)) {
+          // Confirmed logged in
+          await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wait-login-success.png'), fullPage: true });
+
+          console.log(JSON.stringify({
+            success: true,
+            status: 'logged_in',
+            message: '✅ Login completed successfully!',
+            elapsed: `${elapsed / 1000}s`,
+            userAddress: loginState.userAddress,
+            hasAvatar: loginState.hasAvatar,
+            screenshot: 'wait-login-success.png'
+          }));
+          return;
+        }
+
+        // Log progress every 30 seconds
+        if (elapsed % 30000 === 0) {
+          console.log(JSON.stringify({
+            status: 'still_waiting',
+            elapsed: `${elapsed / 1000}s`,
+            remaining: `${(maxWaitTime - elapsed) / 1000}s`
+          }));
+        }
+      }
+
+      // Timeout reached
+      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wait-login-timeout.png'), fullPage: true });
+
+      console.log(JSON.stringify({
+        success: false,
+        status: 'timeout',
+        message: `Login not completed within ${maxWaitTime / 1000} seconds`,
+        screenshot: 'wait-login-timeout.png'
+      }));
+
+    } catch (error) {
+      console.log(JSON.stringify({
+        success: false,
+        error: `Wait for login failed: ${error.message}`
+      }));
+    }
+  },
+
+  // ==================== End Login Detection Commands ====================
+
   async help() {
     console.log(`
 Playwright Helper - CLI for AI Agent (with Web3 Support)
@@ -1494,6 +1791,10 @@ Web3 Wallet Commands:
   wallet-connect            Connect wallet to current DApp
   wallet-switch-network <n> Switch network (ethereum, polygon, arbitrum, etc.)
   wallet-get-address        Get current wallet address
+
+Login Detection Commands:
+  detect-login-required     Detect if login/auth is required (checks for modals, forms)
+  wait-for-login            Wait for manual login completion (polls for login state)
 
 Options:
   --screenshot <name>       Take screenshot after action
