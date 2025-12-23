@@ -194,6 +194,64 @@ Many features require user authentication. The agent should:
    - Absence of login modal
    - Presence of "Disconnect" or "Logout" button
 
+6. **Rainbow/Privy Wallet Connection (Important!)**:
+
+   Many Web3 DApps use Rainbow Kit or Privy for wallet connection. When their modal appears:
+
+   **DO NOT skip the login flow!** The agent MUST complete these steps:
+
+   a. **Detect the wallet selector modal** - Look for Rainbow/Privy modal with wallet options
+   b. **Click "Installed" or "Installed wallet"** - This selects the already-imported Rabby wallet
+   c. **Wait for wallet popup** - Rabby extension will show a connection approval popup
+   d. **Approve the connection** - Click "Connect" or "Approve" in the Rabby popup
+   e. **Handle signature request** - If a sign message popup appears, MUST wait and approve it
+   f. **Verify connection success** - Check for wallet address display on the page
+
+   **Rainbow/Privy detection patterns:**
+   - Modal with text: "Connect a Wallet", "Connect Wallet", "Sign in"
+   - Wallet options list showing: "Rainbow", "MetaMask", "Coinbase", "WalletConnect", "Installed"
+   - Privy modal with email/social login options AND wallet options
+
+   **Complete workflow for Rainbow/Privy:**
+   ```bash
+   SKILL_DIR="<path-to-this-skill>"
+
+   # 1. Click Connect Wallet button on DApp
+   node $SKILL_DIR/scripts/test-helper.js vision-click <x> <y> --wallet --headed --keep-open
+   # Take screenshot to see the modal
+   node $SKILL_DIR/scripts/test-helper.js vision-screenshot wallet-modal.png --wallet --headed --keep-open
+
+   # 2. Look for "Installed" or "Installed wallet" option in the modal and click it
+   # AI analyzes screenshot to find the "Installed" button coordinates
+   node $SKILL_DIR/scripts/test-helper.js vision-click <installed-btn-x> <installed-btn-y> --wallet --headed --keep-open
+
+   # 3. Wait for Rabby popup and take screenshot
+   node $SKILL_DIR/scripts/test-helper.js wait 2000 --wallet --headed --keep-open
+   node $SKILL_DIR/scripts/test-helper.js vision-screenshot rabby-popup.png --wallet --headed --keep-open
+
+   # 4. Find and click "Connect" in Rabby popup (usually a new window/popup)
+   # The Rabby popup shows the DApp requesting connection - click Confirm/Connect
+   node $SKILL_DIR/scripts/test-helper.js vision-click <confirm-x> <confirm-y> --wallet --headed --keep-open
+
+   # 5. IMPORTANT: Wait for signature request if it appears
+   node $SKILL_DIR/scripts/test-helper.js wait 2000 --wallet --headed --keep-open
+   node $SKILL_DIR/scripts/test-helper.js vision-screenshot check-signature.png --wallet --headed --keep-open
+
+   # 6. If signature modal appears, approve it (Sign/Confirm button)
+   # Many DApps require signing a message to verify wallet ownership
+   node $SKILL_DIR/scripts/test-helper.js vision-click <sign-x> <sign-y> --wallet --headed --keep-open
+
+   # 7. Verify wallet connected - should see wallet address on page
+   node $SKILL_DIR/scripts/test-helper.js wait 2000 --wallet --headed --keep-open
+   node $SKILL_DIR/scripts/test-helper.js vision-screenshot connected.png --wallet --headed --keep-open
+   ```
+
+   **Common mistakes to avoid:**
+   - ❌ Closing the modal without selecting a wallet
+   - ❌ Skipping the signature approval step
+   - ❌ Not waiting for Rabby popup to appear
+   - ❌ Clicking wrong wallet option (must click "Installed" to use Rabby)
+
 **Example workflow for account-related testing:**
 ```bash
 SKILL_DIR="<path-to-this-skill>"
