@@ -920,6 +920,15 @@ const commands = {
 
   async 'wallet-connect'(args, options) {
     // Connect wallet to current DApp
+    // Handles: Privy, RainbowKit, and other wallet connect modals
+    //
+    // Two modes:
+    // 1. If WALLET_PRIVATE_KEY is set: Use Rabby Wallet (automated)
+    // 2. If not set: Use Privy social/email login (manual - opens headed browser)
+    //
+    // Flow with Rabby: Click Connect -> Select Rabby -> Confirm -> Sign if needed
+    // Flow with Privy: Click Connect -> Select social/email -> User logs in manually -> Continue
+
     if (!page) {
       console.log(JSON.stringify({
         success: false,
@@ -928,15 +937,26 @@ const commands = {
       return;
     }
 
+    const steps = [];
+    const hasPrivateKey = !!process.env.WALLET_PRIVATE_KEY;
+
     try {
-      // Look for common wallet connect buttons
+      // Step 1: Click the Connect Wallet button
       const connectSelectors = [
         'button:has-text("Connect Wallet")',
+        'button:has-text("Connect wallet")',
         'button:has-text("Connect")',
+        'button:has-text("Sign in")',
+        'button:has-text("Sign In")',
+        'button:has-text("Login")',
+        'button:has-text("Log in")',
+        'button:has-text("登录")',
         'button:has-text("连接钱包")',
         'button:has-text("Launch App")',
         '[data-testid="connect-wallet"]',
         '[data-testid="navbar-connect-wallet"]',
+        '[data-testid="rk-connect-button"]', // RainbowKit
+        '[data-testid="login-button"]',
         '.connect-wallet-btn',
         '.connect-wallet',
         '#connect-wallet',
@@ -944,8 +964,7 @@ const commands = {
         '[class*="Connect"][class*="Wallet"]',
       ];
 
-      let connected = false;
-      let clickedSelector = '';
+      let connectClicked = false;
 
       for (const selector of connectSelectors) {
         try {
@@ -954,8 +973,8 @@ const commands = {
             const isVisible = await btn.isVisible();
             if (isVisible) {
               await btn.click();
-              connected = true;
-              clickedSelector = selector;
+              connectClicked = true;
+              steps.push({ action: 'click_connect', selector, success: true });
               await page.waitForTimeout(1500);
               break;
             }
@@ -965,26 +984,11 @@ const commands = {
         }
       }
 
-      // Take screenshot
-      const screenshotPath = path.join(SCREENSHOTS_DIR, 'wallet-connect.png');
-      await page.screenshot({ path: screenshotPath, fullPage: true });
+      if (!connectClicked) {
+        await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wallet-connect-fail.png'), fullPage: true });
 
-      if (connected) {
-        console.log(JSON.stringify({
-          success: true,
-          message: 'Wallet connect button clicked.',
-          clickedSelector,
-          screenshot: 'wallet-connect.png',
-          nextSteps: [
-            'A wallet selection popup should appear',
-            'Select "Rabby" or it may auto-connect',
-            'Approve the connection in Rabby popup if prompted'
-          ]
-        }));
-      } else {
-        // List all buttons on page for debugging
         const buttons = await page.evaluate(() => {
-          return Array.from(document.querySelectorAll('button')).slice(0, 10).map(b => ({
+          return Array.from(document.querySelectorAll('button')).slice(0, 15).map(b => ({
             text: b.textContent?.trim().substring(0, 50),
             class: b.className?.substring(0, 50)
           }));
@@ -992,16 +996,388 @@ const commands = {
 
         console.log(JSON.stringify({
           success: false,
-          error: 'Could not find wallet connect button automatically.',
-          screenshot: 'wallet-connect.png',
+          error: 'Could not find wallet connect button.',
+          screenshot: 'wallet-connect-fail.png',
           availableButtons: buttons,
           hint: 'Try clicking manually with: click "button:has-text(\'Your Button Text\')"'
         }));
+        return;
       }
+
+      // Take screenshot after clicking connect
+      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wallet-modal.png'), fullPage: true });
+      await page.waitForTimeout(1000);
+
+      // Detect if this is a Privy modal (has social login options)
+      const loginOptions = await page.evaluate(() => {
+        const body = document.body.innerHTML.toLowerCase();
+        const hasPrivy = body.includes('privy') ||
+                         document.querySelector('[data-privy]') !== null ||
+                         document.querySelector('iframe[src*="privy"]') !== null;
+
+        const hasSocialLogin = {
+          google: body.includes('google') || !!document.querySelector('button:has-text("Google"), [aria-label*="Google"]'),
+          github: body.includes('github') || !!document.querySelector('button:has-text("GitHub"), [aria-label*="GitHub"]'),
+          twitter: body.includes('twitter') || body.includes('x.com') || !!document.querySelector('button:has-text("Twitter"), button:has-text("X"), [aria-label*="Twitter"]'),
+          email: body.includes('email') || !!document.querySelector('input[type="email"], input[placeholder*="email"]'),
+          discord: body.includes('discord') || !!document.querySelector('button:has-text("Discord"), [aria-label*="Discord"]'),
+        };
+
+        const hasRabby = body.includes('rabby');
+        const hasMetamask = body.includes('metamask');
+        const hasWalletConnect = body.includes('walletconnect');
+
+        return {
+          isPrivy: hasPrivy,
+          socialLogin: hasSocialLogin,
+          hasSocialOptions: Object.values(hasSocialLogin).some(v => v),
+          hasWalletOptions: hasRabby || hasMetamask || hasWalletConnect,
+          hasRabby,
+        };
+      });
+
+      steps.push({ action: 'detect_login_options', options: loginOptions });
+
+      // Decision: Use Rabby if private key is set and Rabby is available
+      // Otherwise, use social/email login if available
+      if (hasPrivateKey && loginOptions.hasRabby) {
+        // ==================== RABBY WALLET FLOW ====================
+        steps.push({ action: 'using_rabby_wallet', reason: 'WALLET_PRIVATE_KEY is set' });
+
+        const rabbySelectors = [
+          'button:has-text("Rabby")',
+          'button:has-text("Rabby Wallet")',
+          '[data-testid="rk-wallet-option-rabby"]',
+          '[data-wallet-id="rabby"]',
+          '[data-connector-id="rabby"]',
+          'div:has-text("Rabby"):not(:has(div:has-text("Rabby")))',
+          'li:has-text("Rabby")',
+          '[class*="wallet"]:has-text("Rabby")',
+        ];
+
+        let rabbySelected = false;
+
+        for (const selector of rabbySelectors) {
+          try {
+            const rabbyBtn = await page.$(selector);
+            if (rabbyBtn && await rabbyBtn.isVisible()) {
+              await rabbyBtn.click();
+              rabbySelected = true;
+              steps.push({ action: 'select_rabby', selector, success: true });
+              await page.waitForTimeout(2000);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+
+        if (!rabbySelected) {
+          // Fallback: search for Rabby text
+          try {
+            await page.click('text=Rabby');
+            rabbySelected = true;
+            steps.push({ action: 'select_rabby_fallback', success: true });
+            await page.waitForTimeout(2000);
+          } catch (e) {
+            steps.push({ action: 'select_rabby_fallback', success: false, error: e.message });
+          }
+        }
+
+        await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wallet-rabby-selected.png'), fullPage: true });
+
+        // Handle Rabby popup
+        await page.waitForTimeout(2000);
+        const pages = context.pages();
+
+        for (const p of pages) {
+          const url = p.url();
+          if (url.includes('chrome-extension://')) {
+            try {
+              await p.screenshot({ path: path.join(SCREENSHOTS_DIR, 'rabby-popup.png'), fullPage: true });
+
+              const confirmSelectors = [
+                'button:has-text("Connect")',
+                'button:has-text("Confirm")',
+                'button:has-text("Sign")',
+                'button:has-text("确认")',
+                'button:has-text("连接")',
+                'button:has-text("签名")',
+                'button:has-text("Approve")',
+                '.primary-button',
+              ];
+
+              for (const selector of confirmSelectors) {
+                try {
+                  const btn = await p.$(selector);
+                  if (btn && await btn.isVisible()) {
+                    await btn.click();
+                    steps.push({ action: 'click_rabby_confirm', selector, success: true });
+                    await p.waitForTimeout(1500);
+                    break;
+                  }
+                } catch (e) {
+                  continue;
+                }
+              }
+            } catch (e) {
+              steps.push({ action: 'rabby_popup_error', error: e.message });
+            }
+          }
+        }
+
+        // Check for signature request
+        await page.waitForTimeout(2000);
+        const pagesAfterConnect = context.pages();
+
+        for (const p of pagesAfterConnect) {
+          const url = p.url();
+          if (url.includes('chrome-extension://')) {
+            try {
+              const signSelectors = [
+                'button:has-text("Sign")',
+                'button:has-text("签名")',
+                'button:has-text("Confirm")',
+                'button:has-text("确认")',
+                'button:has-text("Approve")',
+              ];
+
+              for (const selector of signSelectors) {
+                try {
+                  const btn = await p.$(selector);
+                  if (btn && await btn.isVisible()) {
+                    await p.screenshot({ path: path.join(SCREENSHOTS_DIR, 'rabby-sign.png'), fullPage: true });
+                    await btn.click();
+                    steps.push({ action: 'click_sign', selector, success: true });
+                    await p.waitForTimeout(1500);
+                    break;
+                  }
+                } catch (e) {
+                  continue;
+                }
+              }
+            } catch (e) {
+              // Ignore
+            }
+          }
+        }
+
+      } else if (loginOptions.hasSocialOptions) {
+        // ==================== PRIVY / SOCIAL LOGIN FLOW ====================
+        // No private key or Rabby not available, use social/email login
+        steps.push({
+          action: 'using_social_login',
+          reason: hasPrivateKey ? 'Rabby not available in modal' : 'WALLET_PRIVATE_KEY not set',
+          availableOptions: loginOptions.socialLogin
+        });
+
+        // Find available social login buttons
+        const socialSelectors = {
+          google: [
+            'button:has-text("Google")',
+            'button:has-text("Continue with Google")',
+            '[aria-label*="Google"]',
+            '[data-testid="social-google"]',
+            'img[alt*="Google"]',
+          ],
+          github: [
+            'button:has-text("GitHub")',
+            'button:has-text("Continue with GitHub")',
+            '[aria-label*="GitHub"]',
+            '[data-testid="social-github"]',
+          ],
+          twitter: [
+            'button:has-text("Twitter")',
+            'button:has-text("X")',
+            'button:has-text("Continue with Twitter")',
+            '[aria-label*="Twitter"]',
+            '[data-testid="social-twitter"]',
+          ],
+          discord: [
+            'button:has-text("Discord")',
+            'button:has-text("Continue with Discord")',
+            '[aria-label*="Discord"]',
+            '[data-testid="social-discord"]',
+          ],
+          email: [
+            'input[type="email"]',
+            'input[placeholder*="email"]',
+            'input[placeholder*="Email"]',
+            'button:has-text("Email")',
+            'button:has-text("Continue with email")',
+          ],
+        };
+
+        // Find which social login options are actually available
+        const availableSocial = [];
+        for (const [provider, selectors] of Object.entries(socialSelectors)) {
+          for (const selector of selectors) {
+            try {
+              const el = await page.$(selector);
+              if (el && await el.isVisible()) {
+                availableSocial.push({ provider, selector });
+                break;
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+
+        if (availableSocial.length === 0) {
+          // No social login AND no private key - exit with error
+          await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'no-login-options.png'), fullPage: true });
+          console.log(JSON.stringify({
+            success: false,
+            error: 'No login options available. WALLET_PRIVATE_KEY not set and no social/email login found.',
+            screenshot: 'no-login-options.png',
+            hint: 'Set WALLET_PRIVATE_KEY environment variable, or ensure the DApp supports social/email login',
+            steps
+          }));
+          return;
+        }
+
+        steps.push({ action: 'found_social_options', options: availableSocial });
+
+        // Show message to user that they need to complete login manually
+        console.log(JSON.stringify({
+          success: true,
+          status: 'waiting_for_manual_login',
+          message: '🔐 Manual login required - Browser window is open',
+          instructions: [
+            'A browser window is open with the login modal',
+            'Please complete the login process manually:',
+            `  Available options: ${availableSocial.map(s => s.provider).join(', ')}`,
+            'After logging in, the test will continue automatically',
+            '',
+            'Waiting for login to complete...'
+          ],
+          availableLoginOptions: availableSocial.map(s => s.provider),
+          screenshot: 'wallet-modal.png',
+          steps
+        }));
+
+        // Wait for login to complete (check for wallet address or logged-in state)
+        // Poll every 2 seconds for up to 5 minutes
+        const maxWaitTime = 5 * 60 * 1000; // 5 minutes
+        const pollInterval = 2000;
+        let elapsed = 0;
+        let loggedIn = false;
+
+        while (elapsed < maxWaitTime && !loggedIn) {
+          await page.waitForTimeout(pollInterval);
+          elapsed += pollInterval;
+
+          // Check if user is logged in
+          loggedIn = await page.evaluate(() => {
+            const body = document.body.textContent || '';
+            const indicators = [
+              // Wallet address pattern
+              /0x[a-fA-F0-9]{4}[.…][a-fA-F0-9]{4}/,
+              // Common logged-in indicators
+              document.querySelector('[data-testid="account-button"]'),
+              document.querySelector('[data-testid="user-menu"]'),
+              document.querySelector('button:has-text("Disconnect")'),
+              document.querySelector('[class*="avatar"]'),
+              document.querySelector('[class*="profile"]'),
+            ];
+
+            // Check if modal is closed (login completed)
+            const modalGone = !document.querySelector('[role="dialog"]') &&
+                            !document.querySelector('.modal') &&
+                            !document.querySelector('[class*="Modal"]');
+
+            return indicators.some(i => {
+              if (i instanceof RegExp) return i.test(body);
+              return !!i;
+            }) || (modalGone && elapsed > 10000);
+          });
+
+          // Take periodic screenshots
+          if (elapsed % 10000 === 0) {
+            await page.screenshot({
+              path: path.join(SCREENSHOTS_DIR, `login-progress-${elapsed/1000}s.png`),
+              fullPage: true
+            });
+          }
+        }
+
+        if (loggedIn) {
+          steps.push({ action: 'social_login_completed', elapsed: `${elapsed/1000}s` });
+        } else {
+          steps.push({ action: 'social_login_timeout', elapsed: `${elapsed/1000}s` });
+          console.log(JSON.stringify({
+            success: false,
+            error: 'Login timeout - user did not complete login within 5 minutes',
+            steps
+          }));
+          return;
+        }
+
+      } else if (hasPrivateKey) {
+        // Has private key but no wallet options in modal
+        await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'no-wallet-options.png'), fullPage: true });
+        console.log(JSON.stringify({
+          success: false,
+          error: 'WALLET_PRIVATE_KEY is set but no wallet connection options (Rabby) found in modal.',
+          screenshot: 'no-wallet-options.png',
+          hint: 'Make sure Rabby Wallet extension is installed and the DApp supports it',
+          steps
+        }));
+        return;
+
+      } else {
+        // No private key AND no social login options
+        await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'no-login-options.png'), fullPage: true });
+        console.log(JSON.stringify({
+          success: false,
+          error: 'No login method available. WALLET_PRIVATE_KEY not set and no social/email login options found.',
+          screenshot: 'no-login-options.png',
+          detectedOptions: loginOptions,
+          hint: 'Set WALLET_PRIVATE_KEY for wallet login, or ensure DApp supports Google/GitHub/Twitter/Email login',
+          steps
+        }));
+        return;
+      }
+
+      // Final verification
+      await page.waitForTimeout(2000);
+      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wallet-connected.png'), fullPage: true });
+
+      const connectionStatus = await page.evaluate(() => {
+        const body = document.body.textContent || '';
+        const addressMatch = body.match(/0x[a-fA-F0-9]{4}[.…][a-fA-F0-9]{4}/);
+        return {
+          hasAddress: !!addressMatch,
+          address: addressMatch ? addressMatch[0] : null,
+          hasDisconnect: !!document.querySelector('button:has-text("Disconnect")'),
+          modalClosed: !document.querySelector('[role="dialog"]'),
+        };
+      });
+
+      steps.push({ action: 'verify_connection', status: connectionStatus });
+
+      console.log(JSON.stringify({
+        success: true,
+        message: connectionStatus.hasAddress ?
+          `Wallet connected successfully! Address: ${connectionStatus.address}` :
+          'Login flow completed (verify connection manually)',
+        connected: connectionStatus.hasAddress || connectionStatus.hasDisconnect,
+        connectionStatus,
+        steps,
+        screenshots: [
+          'wallet-modal.png',
+          'wallet-connected.png'
+        ]
+      }));
+
     } catch (error) {
+      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wallet-connect-error.png'), fullPage: true });
       console.log(JSON.stringify({
         success: false,
-        error: `Failed to connect wallet: ${error.message}`
+        error: `Failed to connect wallet: ${error.message}`,
+        steps,
+        screenshot: 'wallet-connect-error.png'
       }));
     }
   },
