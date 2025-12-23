@@ -90,11 +90,12 @@ When asked to test a web app, follow this workflow:
 
 ### Step 0: Clean Up Previous Test Session
 
-Before starting any new test, clean up artifacts from previous test sessions:
+Before starting any new test, clean up artifacts from previous test sessions.
+
+**Note:** All test data (`test-output/`) is stored in the **project's root directory**, not in the skill directory. Each project has independent test configuration.
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
-AGENT_CWD="<current-working-directory>"
 
 # 1. Close any running test browsers (Chromium processes from previous tests)
 pkill -f "chromium.*--user-data-dir=.*test-output" || true
@@ -103,8 +104,8 @@ pkill -f "chrome.*--user-data-dir=.*test-output" || true
 # 2. Close the persistent browser process if running
 node $SKILL_DIR/scripts/test-helper.js browser-close 2>/dev/null || true
 
-# 3. Remove previous test output folder to start fresh
-rm -rf "$AGENT_CWD/test-output"
+# 3. Remove previous test output folder to start fresh (in project root)
+rm -rf ./test-output
 ```
 
 This ensures:
@@ -112,7 +113,7 @@ This ensures:
 - Previous screenshots and logs don't mix with new test results
 - Clean slate for accurate test reporting
 
-**Note:** The chrome-profile directory is also removed, so wallet will need to be re-imported if testing Web3 DApps.
+**Note:** The `test-output/` directory contains `chrome-profile/` and `extensions/`. Removing it means wallet will need to be re-imported if testing Web3 DApps.
 
 ### Step 1: Detect and Start Project
 
@@ -428,10 +429,17 @@ node $SKILL_DIR/scripts/test-helper.js click "button:has-text('Bridge')" --walle
 
 ### Session Persistence
 
-Browser state (cookies, localStorage, extension data) is persisted in:
+Browser state (cookies, localStorage, extension data) is persisted in the **project directory**:
 ```
-test-output/chrome-profile/
+<project-root>/test-output/chrome-profile/
 ```
+
+Wallet extensions are downloaded to:
+```
+<project-root>/test-output/extensions/
+```
+
+**Each project maintains its own independent wallet and browser state.** This allows different projects to have different wallet configurations without interference.
 
 After importing wallet once, subsequent tests can reuse the wallet:
 ```bash
@@ -439,9 +447,14 @@ After importing wallet once, subsequent tests can reuse the wallet:
 node $SKILL_DIR/scripts/test-helper.js navigate "https://dapp.example.com" --wallet --headless
 ```
 
-To reset wallet state, delete the chrome-profile directory:
+To reset wallet state for a project, delete the chrome-profile directory:
 ```bash
-rm -rf test-output/chrome-profile/
+rm -rf ./test-output/chrome-profile/
+```
+
+To completely reset all test data for a project:
+```bash
+rm -rf ./test-output/
 ```
 
 ### Wallet Commands Reference
@@ -475,10 +488,20 @@ rm -rf test-output/chrome-profile/
 
 ## Test Output
 
-All artifacts saved to `./test-output/`:
+**IMPORTANT: All test data is stored in the user's project directory, NOT in the skill directory.**
+
+All artifacts are saved to `./test-output/` in the **current working directory** (the project being tested):
 - `screenshots/` - Captured screenshots
 - `console-logs.txt` - Browser console output
 - `elements.json` - Interactive elements discovered
+- `chrome-profile/` - Chromium user data (cookies, localStorage, extension data)
+- `extensions/` - Downloaded wallet extensions (e.g., Rabby)
+
+This design ensures:
+- **Each project has independent test configuration** - Different projects can have different wallet setups
+- **No global state pollution** - Test data stays with the project
+- **Easy cleanup** - Just delete `test-output/` in the project root
+- **Portable** - Move project folder and test config moves with it
 
 ## Command Reference
 
