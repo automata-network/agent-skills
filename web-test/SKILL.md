@@ -137,19 +137,15 @@ Generate a structured test plan covering:
 
 **If NOT Web3 DApp → Skip Step 4 and Step 5, go directly to Step 6.**
 
-This step installs wallet extension and imports wallet. Does NOT connect to DApp yet.
-
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# 1. Install Rabby wallet extension (downloads to test-output/extensions/)
+# Install extension and import wallet (auto-fails if WALLET_PRIVATE_KEY not set)
 node $SKILL_DIR/scripts/test-helper.js wallet-setup
-
-# 2. Import wallet with private key
-WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/test-helper.js wallet-init --wallet --headed
+node $SKILL_DIR/scripts/test-helper.js wallet-init --wallet --headed
 ```
 
-After wallet-init succeeds → proceed to Step 5.
+Script auto-fails if `WALLET_PRIVATE_KEY` not set. After success → proceed to Step 5.
 
 ### Step 5: Wallet Connect (if Web3 DApp)
 
