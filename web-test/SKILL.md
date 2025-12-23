@@ -194,10 +194,47 @@ For each test:
 
 ### Step 7: Validate and Report
 
-Analyze results and generate a report:
+Analyze results and generate test report to `./test-output/test-report.md`:
+
+```bash
+# Create test report file
+cat > ./test-output/test-report.md << 'EOF'
+# Test Report
+
+**Date:** $(date)
+**URL:** <tested-url>
+**Is Web3 DApp:** YES/NO
+
+## Summary
+- Total Tests: X
+- Passed: X
+- Failed: X
+
+## Test Results
+
+### 1. [Test Name]
+- **Status:** ✅ PASS / ❌ FAIL
+- **Screenshot:** screenshots/test-name.jpg
+- **Notes:** ...
+
+### 2. [Test Name]
+...
+
+## Failed Tests Details
+(If any failures, describe what went wrong and include screenshot references)
+
+## Recommendations
+(Suggestions for fixes)
+EOF
+```
+
+**Report must include:**
 - Summary of passed/failed tests
+- Each test with status, screenshot reference, and notes
 - Details of failures with screenshots
 - Suggestions for fixes
+
+**Output location:** `./test-output/test-report.md`
 
 ### Step 8: Cleanup After Test Completion
 
