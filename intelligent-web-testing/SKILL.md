@@ -158,7 +158,8 @@ Many features require user authentication. The agent should:
    ```bash
    # Opens headed browser and waits for tester to complete login manually
    # Polls every 2 seconds for login completion (up to 5 minutes)
-   node $SKILL_DIR/scripts/pw-helper.js wait-for-login --timeout 300000
+   # Handles OAuth redirects gracefully (tracks URL changes, catches navigation errors)
+   node $SKILL_DIR/scripts/pw-helper.js wait-for-login --headed --timeout 300000
    ```
 
    The command detects login completion by checking:
@@ -270,10 +271,29 @@ All artifacts saved to `./test-output/`:
 | `wait-for <selector>` | Wait for element |
 | `detect-login-required` | Detect if login/auth is needed |
 | `wait-for-login` | Wait for manual login completion |
+| `browser-open` | Open browser and keep running |
+| `browser-close` | Close browser explicitly |
 
-**Options:** `--screenshot <name>`, `--wait <ms>`, `--mobile`, `--headed`, `--timeout <ms>`
+**Options:** `--screenshot <name>`, `--wait <ms>`, `--mobile`, `--headed`, `--headless`, `--keep-open`, `--timeout <ms>`
 
 For detailed reference including Web3 commands, supported networks, validation criteria, and templates, see `references/REFERENCE.md`.
+
+## Browser Persistence and OAuth
+
+The skill uses a **persistent browser context** that:
+- Preserves cookies and localStorage between test sessions
+- Saves browser data to `./test-output/chrome-profile/`
+- Allows login state to persist after OAuth redirects complete
+
+**OAuth/Social Login Handling:**
+- The `wait-for-login` command handles OAuth redirects gracefully
+- URL changes are tracked during OAuth flow
+- Page navigation errors during redirect are caught and handled
+- The browser stays open during the entire OAuth process
+
+**Important:** OAuth login (Google, GitHub, Twitter, etc.) involves redirects to external domains.
+The browser will navigate away from the app, complete authentication, and return. The script
+tracks these URL changes and waits for the user to complete the flow manually.
 
 ## Notes
 
@@ -282,3 +302,4 @@ For detailed reference including Web3 commands, supported networks, validation c
 - No pre-written test scripts required
 - The pw-helper.js script is NEVER injected into your project
 - Only test artifacts are created in your project's `./test-output/`
+- Browser data (cookies, localStorage) is preserved in `./test-output/chrome-profile/`

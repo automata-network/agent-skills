@@ -66,6 +66,7 @@ const OUTPUT_DIR = './test-output';
 const SCREENSHOTS_DIR = path.join(OUTPUT_DIR, 'screenshots');
 const EXTENSIONS_DIR = path.join(OUTPUT_DIR, 'extensions');
 const STATE_FILE = path.join(OUTPUT_DIR, '.browser-state.json');
+const CDP_FILE = path.join(OUTPUT_DIR, '.browser-cdp.json'); // For persistent browser connection
 
 // Wallet extension configuration
 const RABBY_EXTENSION_ID = 'acmacodkjbdgmoleebolmdjonilkdbch';
@@ -157,6 +158,7 @@ function parseArgs(args) {
       timeout: 10000,
       wallet: false,
       network: 'ethereum',
+      keepOpen: false, // Keep browser open after command
     }
   };
 
@@ -165,11 +167,13 @@ function parseArgs(args) {
     const arg = args[i];
     if (arg.startsWith('--')) {
       const option = arg.slice(2);
-      if (option === 'mobile' || option === 'headed' || option === 'wallet') {
+      if (option === 'mobile' || option === 'headed' || option === 'wallet' || option === 'keep-open') {
         if (option === 'headed') {
           result.options.headless = false;
         } else if (option === 'wallet') {
           result.options.wallet = true;
+        } else if (option === 'keep-open') {
+          result.options.keepOpen = true;
         } else {
           result.options[option] = true;
         }
@@ -192,35 +196,64 @@ let browser = null;
 let context = null;
 let page = null;
 let walletExtensionPage = null;
+let persistentContext = null; // For launchPersistentContext
+
+// Try to connect to existing browser via CDP
+async function tryConnectExistingBrowser() {
+  if (fs.existsSync(CDP_FILE)) {
+    try {
+      const cdpInfo = JSON.parse(fs.readFileSync(CDP_FILE, 'utf-8'));
+      // Check if browser is still alive
+      const http = require('http');
+      const checkAlive = () => new Promise((resolve) => {
+        const req = http.get(`http://127.0.0.1:${cdpInfo.port}/json/version`, (res) => {
+          resolve(res.statusCode === 200);
+        });
+        req.on('error', () => resolve(false));
+        req.setTimeout(1000, () => { req.destroy(); resolve(false); });
+      });
+
+      if (await checkAlive()) {
+        browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpInfo.port}`);
+        const contexts = browser.contexts();
+        if (contexts.length > 0) {
+          context = contexts[0];
+          const pages = context.pages();
+          page = pages.length > 0 ? pages[0] : await context.newPage();
+          return true;
+        }
+      }
+    } catch (e) {
+      // Connection failed, will launch new browser
+    }
+    // Clean up stale CDP file
+    fs.unlinkSync(CDP_FILE);
+  }
+  return false;
+}
+
+// Save browser CDP info for reconnection
+function saveCDPInfo(port) {
+  fs.writeFileSync(CDP_FILE, JSON.stringify({ port, timestamp: Date.now() }));
+}
+
+// Clear CDP info
+function clearCDPInfo() {
+  if (fs.existsSync(CDP_FILE)) {
+    fs.unlinkSync(CDP_FILE);
+  }
+}
 
 async function startBrowser(options) {
   if (browser) return;
 
-  const launchOptions = {
-    headless: options.headless
-  };
-
-  // If wallet extension is needed, we must use non-headless Chrome with extension
-  if (options.wallet) {
-    const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
-
-    // Check if extension is already downloaded
-    if (!fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
-      console.log(JSON.stringify({ status: 'info', message: 'Rabby wallet extension not found. Run wallet-setup first.' }));
-    }
-
-    // Launch with extension - must use headed mode for extensions
-    launchOptions.headless = false;
-    launchOptions.args = [
-      `--disable-extensions-except=${rabbyPath}`,
-      `--load-extension=${rabbyPath}`,
-      '--no-first-run',
-      '--disable-blink-features=AutomationControlled',
-    ];
+  // Try to connect to existing browser first
+  if (await tryConnectExistingBrowser()) {
+    console.log(JSON.stringify({ success: true, message: 'Connected to existing browser' }));
+    return;
   }
 
-  browser = await chromium.launch(launchOptions);
-
+  // Use persistent context for all operations to preserve login state and extensions
   const contextOptions = {
     viewport: options.mobile
       ? { width: 390, height: 844 }
@@ -233,8 +266,34 @@ async function startBrowser(options) {
     contextOptions.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15';
   }
 
-  context = await browser.newContext(contextOptions);
-  page = await context.newPage();
+  // Always use persistent context with Chrome for login persistence
+  const launchOptions = {
+    headless: options.headless,
+    channel: 'chrome', // Use real Chrome for better compatibility
+    args: [
+      '--no-first-run',
+      '--disable-blink-features=AutomationControlled',
+    ],
+    ...contextOptions,
+  };
+
+  // If wallet extension is needed, add extension loading
+  if (options.wallet) {
+    const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
+    if (!fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
+      console.log(JSON.stringify({ status: 'info', message: 'Rabby wallet extension not found. Run wallet-setup first.' }));
+    }
+    launchOptions.headless = false;
+    launchOptions.args.push(`--disable-extensions-except=${rabbyPath}`);
+    launchOptions.args.push(`--load-extension=${rabbyPath}`);
+  }
+
+  // Launch persistent context (preserves cookies, localStorage, extensions)
+  persistentContext = await chromium.launchPersistentContext(USER_DATA_DIR, launchOptions);
+  context = persistentContext;
+
+  const pages = context.pages();
+  page = pages.length > 0 ? pages[0] : await context.newPage();
 
   // Capture console logs
   page.on('console', msg => {
@@ -250,21 +309,26 @@ async function startBrowser(options) {
     fs.appendFileSync(logFile, logLine);
   });
 
-  console.log(JSON.stringify({ success: true, message: 'Browser started' }));
+  console.log(JSON.stringify({ success: true, message: 'Browser started (persistent context)' }));
 }
 
 async function stopBrowser() {
+  if (persistentContext) {
+    await persistentContext.close();
+    persistentContext = null;
+  }
   if (browser) {
     await browser.close();
     browser = null;
-    context = null;
-    page = null;
   }
+  context = null;
+  page = null;
+  clearCDPInfo();
   console.log(JSON.stringify({ success: true, message: 'Browser stopped' }));
 }
 
 async function ensureBrowser(options) {
-  if (!browser) {
+  if (!context && !browser) {
     await startBrowser(options);
   }
 }
@@ -285,6 +349,30 @@ const commands = {
 
   async stop(args, options) {
     await stopBrowser();
+  },
+
+  // Explicit browser control commands
+  async 'browser-open'(args, options) {
+    // Open browser and keep it running for subsequent commands
+    // Use --keep-open with other commands, or browser-close to close
+    options.headless = false; // Always headed for manual interaction
+    await startBrowser(options);
+    console.log(JSON.stringify({
+      success: true,
+      message: 'Browser opened and will stay open.',
+      hint: 'Use other commands with --keep-open to reuse this browser, or browser-close to close it.',
+      userDataDir: USER_DATA_DIR
+    }));
+  },
+
+  async 'browser-close'(args, options) {
+    // Explicitly close the browser
+    await stopBrowser();
+    console.log(JSON.stringify({
+      success: true,
+      message: 'Browser closed.',
+      note: 'Login state and extensions are preserved in the user data directory.'
+    }));
   },
 
   async navigate(args, options) {
@@ -1871,22 +1959,29 @@ const commands = {
         const hasPasswordInput = !!document.querySelector('input[type="password"]');
 
         // Check if user is already logged in
+        // Helper to find button by text content
+        const findButtonByText = (texts) => {
+          const buttons = document.querySelectorAll('button');
+          for (const btn of buttons) {
+            const btnText = btn.textContent?.toLowerCase() || '';
+            for (const text of texts) {
+              if (btnText.includes(text.toLowerCase())) return btn;
+            }
+          }
+          return null;
+        };
+
         const loggedInIndicators = [
-          /0x[a-fA-F0-9]{4}[.…][a-fA-F0-9]{4}/, // Wallet address pattern
-          document.querySelector('[data-testid="account-button"]'),
-          document.querySelector('[data-testid="user-menu"]'),
-          document.querySelector('[data-testid="profile-button"]'),
-          document.querySelector('button:has-text("Disconnect")'),
-          document.querySelector('button:has-text("Logout")'),
-          document.querySelector('button:has-text("Log out")'),
-          document.querySelector('[class*="avatar"]'),
-          document.querySelector('[class*="Avatar"]'),
+          /0x[a-fA-F0-9]{4}[.…][a-fA-F0-9]{4}/.test(bodyText), // Wallet address pattern
+          !!document.querySelector('[data-testid="account-button"]'),
+          !!document.querySelector('[data-testid="user-menu"]'),
+          !!document.querySelector('[data-testid="profile-button"]'),
+          !!findButtonByText(['disconnect', 'logout', 'log out', 'sign out']),
+          !!document.querySelector('[class*="avatar"]'),
+          !!document.querySelector('[class*="Avatar"]'),
         ];
 
-        const isLoggedIn = loggedInIndicators.some(indicator => {
-          if (indicator instanceof RegExp) return indicator.test(bodyText);
-          return !!indicator;
-        });
+        const isLoggedIn = loggedInIndicators.some(v => v === true);
 
         // Determine login type
         let loginType = null;
@@ -1950,22 +2045,29 @@ const commands = {
   async 'wait-for-login'(args, options) {
     // Wait for manual login completion
     // Opens headed browser and polls for login state change
+    // Handles OAuth redirects gracefully by catching page navigation errors
     await ensureBrowser(options);
 
     const maxWaitTime = parseInt(options.timeout) || 300000; // 5 minutes default
     const pollInterval = 2000;
     let elapsed = 0;
+    let lastUrl = '';
 
     try {
       // Take initial screenshot
-      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wait-login-start.png'), fullPage: true });
+      try {
+        await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wait-login-start.png'), fullPage: true });
+      } catch (e) {
+        // Page might be navigating
+      }
 
       console.log(JSON.stringify({
         status: 'waiting',
         message: '🔐 Waiting for manual login...',
         instructions: [
           'Please complete login in the browser window',
-          'The test will continue automatically after login is detected',
+          'OAuth redirects are handled automatically',
+          'The test will continue after login is detected',
           `Timeout: ${maxWaitTime / 1000} seconds`
         ],
         screenshot: 'wait-login-start.png'
@@ -1976,56 +2078,113 @@ const commands = {
         await page.waitForTimeout(pollInterval);
         elapsed += pollInterval;
 
-        const loginState = await page.evaluate(() => {
-          const body = document.body.textContent || '';
-          const bodyHtml = document.body.innerHTML?.toLowerCase() || '';
+        // Track URL changes for OAuth redirects
+        let currentUrl = '';
+        try {
+          currentUrl = page.url();
+          if (currentUrl !== lastUrl) {
+            console.log(JSON.stringify({
+              status: 'url_changed',
+              from: lastUrl.substring(0, 50),
+              to: currentUrl.substring(0, 50)
+            }));
+            lastUrl = currentUrl;
+          }
+        } catch (e) {
+          // Page navigating, continue polling
+          continue;
+        }
 
-          // Check for logged-in indicators
-          const loggedInIndicators = [
-            /0x[a-fA-F0-9]{4}[.…][a-fA-F0-9]{4}/.test(body), // Wallet address
-            !!document.querySelector('[data-testid="account-button"]'),
-            !!document.querySelector('[data-testid="user-menu"]'),
-            !!document.querySelector('[data-testid="profile-button"]'),
-            !!document.querySelector('button:has-text("Disconnect")'),
-            !!document.querySelector('button:has-text("Logout")'),
-            !!document.querySelector('button:has-text("Log out")'),
-            !!document.querySelector('[class*="avatar"][class*="user"]'),
-            !!document.querySelector('img[alt*="avatar"]'),
-            !!document.querySelector('img[alt*="profile"]'),
-          ];
+        // Safely evaluate login state - handle navigation errors
+        let loginState = null;
+        try {
+          loginState = await page.evaluate(() => {
+            // Guard against null body during navigation
+            if (!document.body) {
+              return { navigating: true };
+            }
 
-          // Check if modal is closed
-          const modalGone = !document.querySelector('[role="dialog"]') &&
-                          !document.querySelector('.modal:not(.hidden)') &&
-                          !document.querySelector('[class*="Modal"]:not([class*="hidden"])');
+            const body = document.body.textContent || '';
 
-          // Check for login form absence
-          const noLoginForm = !document.querySelector('input[type="password"]');
+            // Helper to find button by text content
+            const findButtonByText = (texts) => {
+              const buttons = document.querySelectorAll('button');
+              for (const btn of buttons) {
+                const btnText = btn.textContent?.toLowerCase() || '';
+                for (const text of texts) {
+                  if (btnText.includes(text.toLowerCase())) return btn;
+                }
+              }
+              return null;
+            };
 
-          // Get visible user info
-          const addressMatch = body.match(/0x[a-fA-F0-9]{4,}[.…][a-fA-F0-9]{4,}/);
+            // Check for logged-in indicators
+            const loggedInIndicators = [
+              /0x[a-fA-F0-9]{4}[.…][a-fA-F0-9]{4}/.test(body), // Wallet address
+              !!document.querySelector('[data-testid="account-button"]'),
+              !!document.querySelector('[data-testid="user-menu"]'),
+              !!document.querySelector('[data-testid="profile-button"]'),
+              !!findButtonByText(['disconnect', 'logout', 'log out', 'sign out']),
+              !!document.querySelector('[class*="avatar"]'),
+              !!document.querySelector('img[alt*="avatar"]'),
+              !!document.querySelector('img[alt*="profile"]'),
+            ];
 
-          return {
-            isLoggedIn: loggedInIndicators.some(v => v === true),
-            modalGone,
-            noLoginForm,
-            userAddress: addressMatch ? addressMatch[0] : null,
-            hasAvatar: !!document.querySelector('[class*="avatar"], img[alt*="avatar"], img[alt*="profile"]'),
-          };
-        });
+            // Check if modal is closed
+            const modalGone = !document.querySelector('[role="dialog"]') &&
+                            !document.querySelector('.modal:not(.hidden)') &&
+                            !document.querySelector('[class*="Modal"]:not([class*="hidden"])');
 
-        // Take periodic screenshots
-        if (elapsed % 10000 === 0) {
-          await page.screenshot({
-            path: path.join(SCREENSHOTS_DIR, `wait-login-${elapsed/1000}s.png`),
-            fullPage: true
+            // Check for login form absence
+            const noLoginForm = !document.querySelector('input[type="password"]');
+
+            // Get visible user info
+            const addressMatch = body.match(/0x[a-fA-F0-9]{4,}[.…][a-fA-F0-9]{4,}/);
+
+            return {
+              navigating: false,
+              isLoggedIn: loggedInIndicators.some(v => v === true),
+              modalGone,
+              noLoginForm,
+              userAddress: addressMatch ? addressMatch[0] : null,
+              hasAvatar: !!document.querySelector('[class*="avatar"], img[alt*="avatar"], img[alt*="profile"]'),
+            };
           });
+        } catch (e) {
+          // Page is navigating (OAuth redirect), continue polling
+          console.log(JSON.stringify({
+            status: 'page_navigating',
+            elapsed: `${elapsed / 1000}s`,
+            message: 'OAuth redirect in progress...'
+          }));
+          continue;
+        }
+
+        // Skip if page is navigating
+        if (!loginState || loginState.navigating) {
+          continue;
+        }
+
+        // Take periodic screenshots (safely)
+        if (elapsed % 10000 === 0) {
+          try {
+            await page.screenshot({
+              path: path.join(SCREENSHOTS_DIR, `wait-login-${elapsed/1000}s.png`),
+              fullPage: true
+            });
+          } catch (e) {
+            // Page navigating, skip screenshot
+          }
         }
 
         // Check if logged in
         if (loginState.isLoggedIn || (loginState.modalGone && loginState.noLoginForm && elapsed > 10000)) {
-          // Confirmed logged in
-          await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wait-login-success.png'), fullPage: true });
+          // Confirmed logged in - take final screenshot
+          try {
+            await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wait-login-success.png'), fullPage: true });
+          } catch (e) {
+            // Ignore screenshot errors
+          }
 
           console.log(JSON.stringify({
             success: true,
@@ -2034,7 +2193,8 @@ const commands = {
             elapsed: `${elapsed / 1000}s`,
             userAddress: loginState.userAddress,
             hasAvatar: loginState.hasAvatar,
-            screenshot: 'wait-login-success.png'
+            screenshot: 'wait-login-success.png',
+            finalUrl: currentUrl
           }));
           return;
         }
@@ -2044,13 +2204,18 @@ const commands = {
           console.log(JSON.stringify({
             status: 'still_waiting',
             elapsed: `${elapsed / 1000}s`,
-            remaining: `${(maxWaitTime - elapsed) / 1000}s`
+            remaining: `${(maxWaitTime - elapsed) / 1000}s`,
+            currentUrl: currentUrl.substring(0, 50)
           }));
         }
       }
 
       // Timeout reached
-      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wait-login-timeout.png'), fullPage: true });
+      try {
+        await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'wait-login-timeout.png'), fullPage: true });
+      } catch (e) {
+        // Ignore screenshot errors
+      }
 
       console.log(JSON.stringify({
         success: false,
@@ -2106,11 +2271,17 @@ Login Detection Commands:
   detect-login-required     Detect if login/auth is required (checks for modals, forms)
   wait-for-login            Wait for manual login completion (polls for login state)
 
+Browser Lifecycle Commands:
+  browser-open              Open browser and keep it running
+  browser-close             Close the browser explicitly
+
 Options:
   --screenshot <name>       Take screenshot after action
   --wait <ms>               Wait after action
   --mobile                  Use mobile viewport
   --headed                  Run with visible browser
+  --headless                Run headless (default)
+  --keep-open               Keep browser open after command completes
   --timeout <ms>            Action timeout (default: 10000)
   --wallet                  Load with Rabby wallet extension
   --network <name>          Specify network for Web3 operations
@@ -2181,9 +2352,17 @@ async function main() {
     }));
     process.exit(1);
   } finally {
-    // Auto-close browser after command (except for 'start')
-    if (parsed.command !== 'start' && browser) {
-      await browser.close();
+    // Only close browser if --keep-open is NOT set and command is not 'start' or 'browser-open'
+    const keepOpenCommands = ['start', 'browser-open', 'wait-for-login'];
+    if (!parsed.options.keepOpen && !keepOpenCommands.includes(parsed.command)) {
+      if (persistentContext) {
+        await persistentContext.close();
+        persistentContext = null;
+      }
+      if (browser) {
+        await browser.close();
+        browser = null;
+      }
     }
   }
 }
