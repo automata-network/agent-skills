@@ -1795,28 +1795,73 @@ const commands = {
         return;
       }
 
-      // If wallet exists but is locked, unlock it
+      // If wallet exists but is locked
       if (hasUnlockField && !hasNewUserIndicator) {
-        console.log(JSON.stringify({ status: 'info', message: 'Wallet exists but is locked, unlocking...' }));
+        // Check if we have the password from env var
+        if (walletPassword) {
+          console.log(JSON.stringify({ status: 'info', message: 'Wallet exists but is locked, unlocking with WALLET_PASSWORD...' }));
 
-        const passwordInput = await extensionPage.$('input[type="password"]');
-        if (passwordInput) {
-          await passwordInput.fill(walletPassword);
+          const passwordInput = await extensionPage.$('input[type="password"]');
+          if (passwordInput) {
+            await passwordInput.fill(walletPassword);
 
-          // Click unlock button
-          const unlockSelectors = [
-            'button:has-text("Unlock")',
-            'button:has-text("确认")',
-            'button[type="submit"]',
-            '.ant-btn-primary',
+            // Click unlock button
+            const unlockSelectors = [
+              'button:has-text("Unlock")',
+              'button:has-text("确认")',
+              'button[type="submit"]',
+              '.ant-btn-primary',
+            ];
+
+            for (const selector of unlockSelectors) {
+              try {
+                const btn = await extensionPage.$(selector);
+                if (btn && await btn.isVisible()) {
+                  await btn.click();
+                  await extensionPage.waitForTimeout(2000);
+                  break;
+                }
+              } catch (e) {
+                continue;
+              }
+            }
+
+            await extensionPage.screenshot({
+              path: path.join(SCREENSHOTS_DIR, 'wallet-import-unlocked.png'),
+              fullPage: true
+            });
+
+            console.log(JSON.stringify({
+              success: true,
+              message: 'Wallet already imported, unlocked successfully.',
+              skipped: true,
+              unlocked: true,
+              screenshots: ['wallet-import-0-check.png', 'wallet-import-unlocked.png'],
+              security: 'Password read from env var - NEVER logged'
+            }));
+            return;
+          }
+        } else {
+          // No WALLET_PASSWORD env var - need to reset wallet
+          console.log(JSON.stringify({ status: 'info', message: 'Wallet exists but WALLET_PASSWORD not set, resetting wallet...' }));
+
+          // Click "Forget password" link
+          const forgetPasswordSelectors = [
+            'text=Forget password',
+            'text=忘记密码',
+            'a:has-text("Forget")',
+            '[class*="forget"]',
           ];
 
-          for (const selector of unlockSelectors) {
+          let forgetClicked = false;
+          for (const selector of forgetPasswordSelectors) {
             try {
-              const btn = await extensionPage.$(selector);
-              if (btn && await btn.isVisible()) {
-                await btn.click();
-                await extensionPage.waitForTimeout(2000);
+              const link = await extensionPage.$(selector);
+              if (link && await link.isVisible()) {
+                await link.click();
+                forgetClicked = true;
+                console.log(JSON.stringify({ status: 'info', message: 'Clicked forget password' }));
+                await extensionPage.waitForTimeout(1500);
                 break;
               }
             } catch (e) {
@@ -1824,20 +1869,65 @@ const commands = {
             }
           }
 
-          await extensionPage.screenshot({
-            path: path.join(SCREENSHOTS_DIR, 'wallet-import-unlocked.png'),
-            fullPage: true
-          });
+          if (forgetClicked) {
+            await extensionPage.screenshot({
+              path: path.join(SCREENSHOTS_DIR, 'wallet-reset-1-forget.png'),
+              fullPage: true
+            });
 
-          console.log(JSON.stringify({
-            success: true,
-            message: 'Wallet already imported, unlocked successfully.',
-            skipped: true,
-            unlocked: true,
-            screenshots: ['wallet-import-0-check.png', 'wallet-import-unlocked.png'],
-            security: 'Password read from env var - NEVER logged'
-          }));
-          return;
+            // Type "RESET" in the confirmation input
+            const resetInputSelectors = [
+              'input[type="text"]',
+              'input[placeholder*="RESET"]',
+              'input',
+            ];
+
+            for (const selector of resetInputSelectors) {
+              try {
+                const input = await extensionPage.$(selector);
+                if (input && await input.isVisible()) {
+                  await input.fill('RESET');
+                  console.log(JSON.stringify({ status: 'info', message: 'Typed RESET to confirm' }));
+                  await extensionPage.waitForTimeout(500);
+                  break;
+                }
+              } catch (e) {
+                continue;
+              }
+            }
+
+            // Click confirm/reset button
+            const resetConfirmSelectors = [
+              'button:has-text("Confirm")',
+              'button:has-text("Reset")',
+              'button:has-text("确认")',
+              'button[type="submit"]',
+              '.ant-btn-primary',
+              '.ant-btn-danger',
+            ];
+
+            for (const selector of resetConfirmSelectors) {
+              try {
+                const btn = await extensionPage.$(selector);
+                if (btn && await btn.isVisible()) {
+                  await btn.click();
+                  console.log(JSON.stringify({ status: 'info', message: 'Clicked reset confirm button' }));
+                  await extensionPage.waitForTimeout(2000);
+                  break;
+                }
+              } catch (e) {
+                continue;
+              }
+            }
+
+            await extensionPage.screenshot({
+              path: path.join(SCREENSHOTS_DIR, 'wallet-reset-2-confirmed.png'),
+              fullPage: true
+            });
+
+            console.log(JSON.stringify({ status: 'info', message: 'Wallet reset complete, proceeding with import...' }));
+            // Continue to import flow below
+          }
         }
       }
 
