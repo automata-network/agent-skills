@@ -35,8 +35,8 @@ Ask me to test your web app:
 ## Key Principles
 
 **Script Independence:**
-- The `scripts/pw-helper.js` lives in this skill directory and is NEVER copied to the user's project
-- Call it using absolute path: `node <skill-directory>/scripts/pw-helper.js <command> <args>`
+- The `scripts/test-helper.js` lives in this skill directory and is NEVER copied to the user's project
+- Call it using absolute path: `node <skill-directory>/scripts/test-helper.js <command> <args>`
 - Test URLs are passed as command line arguments
 - Do NOT inject any test scripts into the user's project directory
 - Only test artifacts (screenshots, logs) go to `./test-output/` in the current working directory
@@ -64,17 +64,17 @@ Execute tests using Playwright via the helper script:
 SKILL_DIR="<path-to-this-skill>"
 
 # Navigate and screenshot
-node $SKILL_DIR/scripts/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --screenshot home.png
 
 # Interact with elements
-node $SKILL_DIR/scripts/pw-helper.js click "button.submit" --screenshot after-click.png
-node $SKILL_DIR/scripts/pw-helper.js fill "#email" "test@example.com"
-node $SKILL_DIR/scripts/pw-helper.js select "#country" "US"
-node $SKILL_DIR/scripts/pw-helper.js check "#agree-terms"
+node $SKILL_DIR/scripts/test-helper.js click "button.submit" --screenshot after-click.png
+node $SKILL_DIR/scripts/test-helper.js fill "#email" "test@example.com"
+node $SKILL_DIR/scripts/test-helper.js select "#country" "US"
+node $SKILL_DIR/scripts/test-helper.js check "#agree-terms"
 
 # Get page info
-node $SKILL_DIR/scripts/pw-helper.js content
-node $SKILL_DIR/scripts/pw-helper.js list-elements
+node $SKILL_DIR/scripts/test-helper.js content
+node $SKILL_DIR/scripts/test-helper.js list-elements
 ```
 
 ### Phase 4: Result Validation
@@ -139,12 +139,12 @@ Many features require user authentication. The agent should:
    SKILL_DIR="<path-to-this-skill>"
 
    # Before performing account-related actions, check if login is needed
-   node $SKILL_DIR/scripts/pw-helper.js detect-login-required --screenshot before-action.png
+   node $SKILL_DIR/scripts/test-helper.js detect-login-required --screenshot before-action.png
 
    # If login is required, handle it first
-   node $SKILL_DIR/scripts/pw-helper.js wallet-connect  # For Web3 DApps
+   node $SKILL_DIR/scripts/test-helper.js wallet-connect  # For Web3 DApps
    # OR
-   node $SKILL_DIR/scripts/pw-helper.js wait-for-login  # For manual login by tester
+   node $SKILL_DIR/scripts/test-helper.js wait-for-login  # For manual login by tester
    ```
 
 4. **After action login detection**:
@@ -159,7 +159,7 @@ Many features require user authentication. The agent should:
    # Opens headed browser and waits for tester to complete login manually
    # Polls every 2 seconds for login completion (up to 5 minutes)
    # Handles OAuth redirects gracefully (tracks URL changes, catches navigation errors)
-   node $SKILL_DIR/scripts/pw-helper.js wait-for-login --headed --timeout 300000
+   node $SKILL_DIR/scripts/test-helper.js wait-for-login --headed --timeout 300000
    ```
 
    The command detects login completion by checking:
@@ -173,34 +173,34 @@ Many features require user authentication. The agent should:
 SKILL_DIR="<path-to-this-skill>"
 
 # 1. Navigate to the app
-node $SKILL_DIR/scripts/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --screenshot home.png
 
 # 2. Before clicking "Create" button, detect if login needed
-node $SKILL_DIR/scripts/pw-helper.js detect-login-required
+node $SKILL_DIR/scripts/test-helper.js detect-login-required
 
 # 3. Click the button that may trigger login
-node $SKILL_DIR/scripts/pw-helper.js click "button:has-text('Create')" --screenshot after-create-click.png
+node $SKILL_DIR/scripts/test-helper.js click "button:has-text('Create')" --screenshot after-create-click.png
 
 # 4. Check if login modal appeared
-node $SKILL_DIR/scripts/pw-helper.js detect-login-required
+node $SKILL_DIR/scripts/test-helper.js detect-login-required
 
 # 5. If login modal detected, complete login first
-node $SKILL_DIR/scripts/pw-helper.js wait-for-login  # Wait for manual login
+node $SKILL_DIR/scripts/test-helper.js wait-for-login  # Wait for manual login
 # OR
-node $SKILL_DIR/scripts/pw-helper.js wallet-connect  # Automated wallet login
+node $SKILL_DIR/scripts/test-helper.js wallet-connect  # Automated wallet login
 
 # 6. Continue with the original test flow after login
-node $SKILL_DIR/scripts/pw-helper.js screenshot after-login.png
+node $SKILL_DIR/scripts/test-helper.js screenshot after-login.png
 ```
 
 Example:
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-node $SKILL_DIR/scripts/pw-helper.js navigate "http://localhost:3000/login" --screenshot login-before.png
-node $SKILL_DIR/scripts/pw-helper.js fill "#email" "test@example.com"
-node $SKILL_DIR/scripts/pw-helper.js fill "#password" "password123"
-node $SKILL_DIR/scripts/pw-helper.js click "button[type='submit']" --screenshot login-after.png --wait 2000
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000/login" --screenshot login-before.png
+node $SKILL_DIR/scripts/test-helper.js fill "#email" "test@example.com"
+node $SKILL_DIR/scripts/test-helper.js fill "#password" "password123"
+node $SKILL_DIR/scripts/test-helper.js click "button[type='submit']" --screenshot login-after.png --wait 2000
 ```
 
 ### Step 4: Validate and Report
@@ -227,7 +227,7 @@ All wallet commands MUST use the `--wallet` flag to load the extension properly.
 SKILL_DIR="<path-to-this-skill>"
 
 # Download and install Rabby Wallet extension (one-time setup)
-node $SKILL_DIR/scripts/pw-helper.js wallet-setup
+node $SKILL_DIR/scripts/test-helper.js wallet-setup
 ```
 
 This downloads the latest Rabby Wallet to `test-output/extensions/rabby/`.
@@ -242,9 +242,9 @@ export WALLET_PRIVATE_KEY="0x..."
 
 # Import wallet - this opens the extension and fills in the private key
 # Use --wallet flag to load the extension, --headless for background execution
-node $SKILL_DIR/scripts/pw-helper.js wallet-import --wallet --headless
+node $SKILL_DIR/scripts/test-helper.js wallet-import --wallet --headless
 # OR use --headed to see the browser
-node $SKILL_DIR/scripts/pw-helper.js wallet-import --wallet --headed
+node $SKILL_DIR/scripts/test-helper.js wallet-import --wallet --headed
 ```
 
 **Internal Flow:**
@@ -268,10 +268,10 @@ node $SKILL_DIR/scripts/pw-helper.js wallet-import --wallet --headed
 SKILL_DIR="<path-to-this-skill>"
 
 # Navigate to DApp with wallet extension loaded
-node $SKILL_DIR/scripts/pw-helper.js navigate "https://app.example.com" --wallet --headless --screenshot dapp-home.png
+node $SKILL_DIR/scripts/test-helper.js navigate "https://app.example.com" --wallet --headless --screenshot dapp-home.png
 
 # Connect wallet to DApp (clicks "Connect" button in wallet popup)
-node $SKILL_DIR/scripts/pw-helper.js wallet-connect --wallet --headless
+node $SKILL_DIR/scripts/test-helper.js wallet-connect --wallet --headless
 ```
 
 ### Complete Example Workflow
@@ -282,7 +282,7 @@ SKILL_DIR="<path-to-this-skill>"
 # ============================================
 # Step 1: Install Rabby Wallet Extension (one-time)
 # ============================================
-node $SKILL_DIR/scripts/pw-helper.js wallet-setup
+node $SKILL_DIR/scripts/test-helper.js wallet-setup
 
 # ============================================
 # Step 2: Import Wallet (first time or after profile reset)
@@ -290,22 +290,22 @@ node $SKILL_DIR/scripts/pw-helper.js wallet-setup
 export WALLET_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 # Import wallet in headless mode
-node $SKILL_DIR/scripts/pw-helper.js wallet-import --wallet --headless
+node $SKILL_DIR/scripts/test-helper.js wallet-import --wallet --headless
 
 # ============================================
 # Step 3: Test DApp
 # ============================================
 # Navigate to DApp with wallet loaded
-node $SKILL_DIR/scripts/pw-helper.js navigate "https://staging.carrier.so/" --wallet --headless --screenshot dapp-1.png
+node $SKILL_DIR/scripts/test-helper.js navigate "https://staging.carrier.so/" --wallet --headless --screenshot dapp-1.png
 
 # Connect wallet
-node $SKILL_DIR/scripts/pw-helper.js wallet-connect --wallet --headless --screenshot dapp-2-connected.png
+node $SKILL_DIR/scripts/test-helper.js wallet-connect --wallet --headless --screenshot dapp-2-connected.png
 
 # Switch network if needed
-node $SKILL_DIR/scripts/pw-helper.js wallet-switch-network polygon --wallet --headless
+node $SKILL_DIR/scripts/test-helper.js wallet-switch-network polygon --wallet --headless
 
 # Continue with normal testing
-node $SKILL_DIR/scripts/pw-helper.js click "button:has-text('Bridge')" --wallet --headless --screenshot dapp-3.png
+node $SKILL_DIR/scripts/test-helper.js click "button:has-text('Bridge')" --wallet --headless --screenshot dapp-3.png
 ```
 
 ### Session Persistence
@@ -318,7 +318,7 @@ test-output/chrome-profile/
 After importing wallet once, subsequent tests can reuse the wallet:
 ```bash
 # Wallet already imported - just use --wallet flag to load extension
-node $SKILL_DIR/scripts/pw-helper.js navigate "https://dapp.example.com" --wallet --headless
+node $SKILL_DIR/scripts/test-helper.js navigate "https://dapp.example.com" --wallet --headless
 ```
 
 To reset wallet state, delete the chrome-profile directory:
@@ -432,28 +432,28 @@ This approach is more reliable than selector-based testing because:
 SKILL_DIR="<path-to-this-skill>"
 
 # Take screenshot for AI to analyze
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot page-state.png --headed
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot page-state.png --headed
 
 # Click at specific coordinates (determined by AI from screenshot)
-node $SKILL_DIR/scripts/pw-helper.js vision-click 500 300 --headed
+node $SKILL_DIR/scripts/test-helper.js vision-click 500 300 --headed
 
 # Type text at current cursor position (after clicking an input)
-node $SKILL_DIR/scripts/pw-helper.js vision-type "hello@example.com" --headed
+node $SKILL_DIR/scripts/test-helper.js vision-type "hello@example.com" --headed
 
 # Press keyboard keys
-node $SKILL_DIR/scripts/pw-helper.js vision-press-key Enter --headed
+node $SKILL_DIR/scripts/test-helper.js vision-press-key Enter --headed
 
 # Scroll the page
-node $SKILL_DIR/scripts/pw-helper.js vision-scroll down 500 --headed
+node $SKILL_DIR/scripts/test-helper.js vision-scroll down 500 --headed
 
 # Hover to trigger effects
-node $SKILL_DIR/scripts/pw-helper.js vision-hover 500 300 --headed
+node $SKILL_DIR/scripts/test-helper.js vision-hover 500 300 --headed
 
 # Wait for page to stabilize, then screenshot
-node $SKILL_DIR/scripts/pw-helper.js vision-wait-stable --headed
+node $SKILL_DIR/scripts/test-helper.js vision-wait-stable --headed
 
 # Get page info and screenshot
-node $SKILL_DIR/scripts/pw-helper.js vision-get-page-info --headed
+node $SKILL_DIR/scripts/test-helper.js vision-get-page-info --headed
 ```
 
 ### Vision-Based Workflow Example
@@ -462,23 +462,23 @@ node $SKILL_DIR/scripts/pw-helper.js vision-get-page-info --headed
 SKILL_DIR="<path-to-this-skill>"
 
 # 1. Navigate and get initial screenshot
-node $SKILL_DIR/scripts/pw-helper.js navigate "https://example.com" --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js navigate "https://example.com" --headed --keep-open
 
 # 2. Take screenshot for AI to analyze
-node $SKILL_DIR/scripts/pw-helper.js vision-screenshot initial.png --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot initial.png --headed --keep-open
 # AI agent uses Read tool to view ./test-output/screenshots/initial.png
 # AI analyzes: "I see a login button at approximately x=800, y=50"
 
 # 3. Click based on AI's visual analysis
-node $SKILL_DIR/scripts/pw-helper.js vision-click 800 50 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-click 800 50 --headed --keep-open
 # Returns screenshot showing result of click
 
 # 4. If login modal appeared, AI analyzes and determines email input position
-node $SKILL_DIR/scripts/pw-helper.js vision-click 500 200 --headed --keep-open
-node $SKILL_DIR/scripts/pw-helper.js vision-type "user@example.com" --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-click 500 200 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-type "user@example.com" --headed --keep-open
 
 # 5. Click submit button
-node $SKILL_DIR/scripts/pw-helper.js vision-click 500 350 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-click 500 350 --headed --keep-open
 ```
 
 ### Key Differences from Selector-Based Testing
@@ -495,7 +495,7 @@ node $SKILL_DIR/scripts/pw-helper.js vision-click 500 350 --headed --keep-open
 - Tests are dynamically generated based on your project
 - I validate results by reading screenshots
 - No pre-written test scripts required
-- The pw-helper.js script is NEVER injected into your project
+- The test-helper.js script is NEVER injected into your project
 - Only test artifacts are created in your project's `./test-output/`
 - Browser data (cookies, localStorage) is preserved in `./test-output/chrome-profile/`
 - Vision-based commands always return screenshots for AI verification

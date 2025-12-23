@@ -74,28 +74,28 @@ This document contains detailed technical information for the web-test skill.
 SKILL_DIR="/path/to/web-test"
 
 # Step 1: Install Rabby Wallet (one-time)
-node $SKILL_DIR/scripts/pw-helper.js wallet-setup
+node $SKILL_DIR/scripts/test-helper.js wallet-setup
 
 # Step 2: Set private key and import wallet (one-time)
 # This auto-generates WALLET_PASSWORD and stores it in the process env
 export WALLET_PRIVATE_KEY="your_private_key_here"
-node $SKILL_DIR/scripts/pw-helper.js wallet-import
+node $SKILL_DIR/scripts/test-helper.js wallet-import
 
 # Step 3: Unlock wallet if locked (uses WALLET_PASSWORD from env)
-node $SKILL_DIR/scripts/pw-helper.js wallet-unlock
+node $SKILL_DIR/scripts/test-helper.js wallet-unlock
 
 # Step 4: Navigate to DApp with wallet
-node $SKILL_DIR/scripts/pw-helper.js wallet-navigate "https://app.uniswap.org"
+node $SKILL_DIR/scripts/test-helper.js wallet-navigate "https://app.uniswap.org"
 
 # Step 5: Connect wallet
-node $SKILL_DIR/scripts/pw-helper.js wallet-connect
+node $SKILL_DIR/scripts/test-helper.js wallet-connect
 
 # Step 6: Switch network if needed
-node $SKILL_DIR/scripts/pw-helper.js wallet-switch-network polygon
+node $SKILL_DIR/scripts/test-helper.js wallet-switch-network polygon
 
 # Step 7: Interact with DApp
-node $SKILL_DIR/scripts/pw-helper.js click "button.swap"
-node $SKILL_DIR/scripts/pw-helper.js fill "#amount" "100"
+node $SKILL_DIR/scripts/test-helper.js click "button.swap"
+node $SKILL_DIR/scripts/test-helper.js fill "#amount" "100"
 ```
 
 ### Security Principles
@@ -216,10 +216,10 @@ User: "1"
 ```bash
 SKILL_DIR="/path/to/web-test"
 
-node $SKILL_DIR/scripts/pw-helper.js navigate "http://localhost:3000" --screenshot home.png
-node $SKILL_DIR/scripts/pw-helper.js click "nav a[href='/login']" --screenshot nav-to-login.png
-node $SKILL_DIR/scripts/pw-helper.js fill "#email" "test@example.com"
-node $SKILL_DIR/scripts/pw-helper.js click "button[type='submit']" --screenshot after-login.png
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --screenshot home.png
+node $SKILL_DIR/scripts/test-helper.js click "nav a[href='/login']" --screenshot nav-to-login.png
+node $SKILL_DIR/scripts/test-helper.js fill "#email" "test@example.com"
+node $SKILL_DIR/scripts/test-helper.js click "button[type='submit']" --screenshot after-login.png
 ```
 
 ### Step 4: Validate & Report

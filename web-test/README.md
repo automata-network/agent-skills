@@ -18,7 +18,7 @@ This skill uses a **Node.js + Playwright + AI Visual Analysis** architecture:
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      pw-helper.js (Node.js)                         │
+│                      test-helper.js (Node.js)                         │
 │  - CLI interface for Playwright commands                            │
 │  - Browser lifecycle management (start, stop, reconnect)            │
 │  - Interactive element discovery                                    │
@@ -56,7 +56,7 @@ This skill uses a **Node.js + Playwright + AI Visual Analysis** architecture:
    - Considers edge cases, error states, and user flows
 
 3. **Execution Phase**
-   - AI issues commands to `pw-helper.js` via CLI
+   - AI issues commands to `test-helper.js` via CLI
    - Playwright controls the browser to execute actions
    - Screenshots are captured after each significant action
    - Results are returned as JSON for AI processing
@@ -132,38 +132,38 @@ The AI validates against a comprehensive quality checklist:
 
 **Reference**: See [references/CHECKLIST.md](references/CHECKLIST.md) for the complete checklist.
 
-## pw-helper.js Commands
+## test-helper.js Commands
 
 The helper script provides CLI access to Playwright:
 
 ```bash
 # Browser Management
-node pw-helper.js browser-open --headed    # Open visible browser
-node pw-helper.js browser-close            # Close browser
+node test-helper.js browser-open --headed    # Open visible browser
+node test-helper.js browser-close            # Close browser
 
 # Dev Server Management
-node pw-helper.js dev-server-start . 3000  # Start dev server (auto port detection)
-node pw-helper.js dev-server-stop          # Stop dev server
-node pw-helper.js dev-server-status        # Check status
+node test-helper.js dev-server-start . 3000  # Start dev server (auto port detection)
+node test-helper.js dev-server-stop          # Stop dev server
+node test-helper.js dev-server-status        # Check status
 
 # Navigation
-node pw-helper.js navigate "http://localhost:3000" --screenshot home.png
+node test-helper.js navigate "http://localhost:3000" --screenshot home.png
 
 # Interactions
-node pw-helper.js click "button.submit" --screenshot after-click.png
-node pw-helper.js fill "#email" "test@example.com"
-node pw-helper.js select "#country" "US"
-node pw-helper.js check "#agree-terms"
+node test-helper.js click "button.submit" --screenshot after-click.png
+node test-helper.js fill "#email" "test@example.com"
+node test-helper.js select "#country" "US"
+node test-helper.js check "#agree-terms"
 
 # Discovery
-node pw-helper.js list-elements  # Lists all interactive elements
+node test-helper.js list-elements  # Lists all interactive elements
 
 # Validation
-node pw-helper.js text ".success-message"
-node pw-helper.js evaluate "document.title"
+node test-helper.js text ".success-message"
+node test-helper.js evaluate "document.title"
 
 # Parallel Testing (with dependency support)
-node pw-helper.js run-test test-config.json --max-parallel 5
+node test-helper.js run-test test-config.json --max-parallel 5
 ```
 
 ### Parallel Test Configuration
@@ -225,7 +225,7 @@ Before testing DApps, you must set the wallet private key as an environment vari
 export WALLET_PRIVATE_KEY="your_64_hex_characters_private_key"
 
 # Or set inline when running commands
-WALLET_PRIVATE_KEY="0x..." node pw-helper.js wallet-import --wallet
+WALLET_PRIVATE_KEY="0x..." node test-helper.js wallet-import --wallet
 ```
 
 **Security Notes:**
@@ -238,18 +238,18 @@ WALLET_PRIVATE_KEY="0x..." node pw-helper.js wallet-import --wallet
 
 1. **Install the wallet extension** (one-time setup)
    ```bash
-   node pw-helper.js wallet-setup
+   node test-helper.js wallet-setup
    ```
 
 2. **Import your wallet**
    ```bash
-   WALLET_PRIVATE_KEY="0x..." node pw-helper.js wallet-import --wallet
+   WALLET_PRIVATE_KEY="0x..." node test-helper.js wallet-import --wallet
    ```
 
 3. **Connect to a DApp**
    ```bash
-   node pw-helper.js navigate "https://your-dapp.com" --wallet
-   node pw-helper.js wallet-connect
+   node test-helper.js navigate "https://your-dapp.com" --wallet
+   node test-helper.js wallet-connect
    ```
 
 ### Headless Mode
@@ -258,7 +258,7 @@ Wallet testing supports headless mode using Playwright's bundled Chromium:
 
 ```bash
 # Run wallet tests in headless mode (no visible browser window)
-WALLET_PRIVATE_KEY="0x..." node pw-helper.js wallet-import --wallet --headless
+WALLET_PRIVATE_KEY="0x..." node test-helper.js wallet-import --wallet --headless
 ```
 
 ## Login Handling
@@ -290,18 +290,18 @@ When testing apps that require email or social login:
 
 ```bash
 # 1. Open browser in headed mode (visible window)
-node pw-helper.js browser-open --headed
+node test-helper.js browser-open --headed
 
 # 2. Navigate to the login page
-node pw-helper.js navigate "https://your-app.com/login"
+node test-helper.js navigate "https://your-app.com/login"
 
 # 3. Wait for manual login completion
 #    The user should complete the login in the browser window
-node pw-helper.js wait-for-login
+node test-helper.js wait-for-login
 
 # 4. After login is complete, continue with automated testing
-node pw-helper.js navigate "https://your-app.com/dashboard"
-node pw-helper.js screenshot "dashboard.png"
+node test-helper.js navigate "https://your-app.com/dashboard"
+node test-helper.js screenshot "dashboard.png"
 ```
 
 ### Session Persistence

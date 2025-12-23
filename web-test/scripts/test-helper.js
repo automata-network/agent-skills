@@ -10,7 +10,7 @@
  * They are NEVER logged, transmitted to APIs, or stored in files.
  *
  * Usage:
- *   node pw-helper.js <command> [args...] [options]
+ *   node test-helper.js <command> [args...] [options]
  *
  * Commands:
  *   start                    - Start browser session
@@ -699,7 +699,7 @@ async function startBrowser(options) {
       console.log(JSON.stringify({
         success: false,
         error: 'Rabby wallet extension not found. Run wallet-setup first.',
-        hint: 'node pw-helper.js wallet-setup'
+        hint: 'node test-helper.js wallet-setup'
       }));
       process.exit(1);
     }
@@ -1736,7 +1736,7 @@ const commands = {
         instructions: [
           '1. Extension is now ready to use',
           '2. Use --wallet flag with any command to load the extension',
-          '3. Example: node pw-helper.js navigate "https://app.example.com" --wallet --headed',
+          '3. Example: node test-helper.js navigate "https://app.example.com" --wallet --headed',
           '4. Run wallet-import to import your wallet using private key'
         ],
         note: 'Extension will be loaded automatically when using --wallet flag'
@@ -1805,7 +1805,7 @@ const commands = {
         console.log(JSON.stringify({
           success: false,
           error: 'wallet-import requires --wallet flag',
-          hint: 'Run: node pw-helper.js wallet-import --wallet [--headless]'
+          hint: 'Run: node test-helper.js wallet-import --wallet [--headless]'
         }));
         return;
       }
@@ -2206,7 +2206,7 @@ const commands = {
         console.log(JSON.stringify({
           success: false,
           error: 'wallet-unlock requires --wallet flag',
-          hint: 'Run: node pw-helper.js wallet-unlock --wallet [--headless]'
+          hint: 'Run: node test-helper.js wallet-unlock --wallet [--headless]'
         }));
         return;
       }
@@ -2306,7 +2306,7 @@ const commands = {
         console.log(JSON.stringify({
           success: false,
           error: 'wallet-navigate requires --wallet flag to load the wallet extension',
-          hint: 'Run: node pw-helper.js wallet-navigate <url> --wallet [--headless]'
+          hint: 'Run: node test-helper.js wallet-navigate <url> --wallet [--headless]'
         }));
         return;
       }
@@ -3688,31 +3688,31 @@ Options:
   --network <name>          Specify network for Web3 operations
 
 Examples:
-  node pw-helper.js navigate "http://localhost:3000" --screenshot home.png
-  node pw-helper.js click "#submit-btn" --wait 1000 --screenshot after-submit.png
-  node pw-helper.js fill "#email" "test@example.com"
-  node pw-helper.js list-elements
+  node test-helper.js navigate "http://localhost:3000" --screenshot home.png
+  node test-helper.js click "#submit-btn" --wait 1000 --screenshot after-submit.png
+  node test-helper.js fill "#email" "test@example.com"
+  node test-helper.js list-elements
 
 Web3 DApp Testing:
   # 1. Install Rabby Wallet (one-time, opens Chrome Web Store)
-  node pw-helper.js wallet-setup
+  node test-helper.js wallet-setup
   # Click "Add to Chrome" to install, then close browser
 
   # 2. Set private key in terminal (REQUIRED, no .env support!)
   export WALLET_PRIVATE_KEY="your_private_key_here"
 
   # 3. Import wallet into Rabby (one-time)
-  node pw-helper.js wallet-import
+  node test-helper.js wallet-import
   # Follow prompts to import your private key
 
   # 4. Navigate to DApp with Rabby available
-  node pw-helper.js wallet-navigate <url>
+  node test-helper.js wallet-navigate <url>
 
   # 5. Connect wallet to DApp
-  node pw-helper.js wallet-connect
+  node test-helper.js wallet-connect
 
   # 6. Switch network if needed
-  node pw-helper.js wallet-switch-network polygon
+  node test-helper.js wallet-switch-network polygon
 
 SECURITY:
   - Private key MUST be set via: export WALLET_PRIVATE_KEY="..."
