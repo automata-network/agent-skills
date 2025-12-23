@@ -1,70 +1,60 @@
 ---
 name: web-test
-description: AI-driven web app testing - execute tests using Playwright with vision-based interactions. This is the CORE testing skill. Use related skills for setup, research, and cleanup.
+description: AI-driven web app testing - execute tests using Playwright with vision-based interactions. This is the CORE testing skill. Use related skills for cleanup, research, wallet, and reporting.
 license: MIT
 compatibility: Node.js 18+, Playwright (global)
 metadata:
   author: AI Agent
   version: 2.0.0
-allowed-tools: Bash Read Write Glob Grep Task
+allowed-tools: Bash Read Write Glob Grep Task Skill
 ---
 
 # Intelligent Web Testing
 
 Execute AI-driven tests using Playwright with vision-based interactions.
 
-## Related Skills (Use These!)
+## IMPORTANT: Use Related Skills
 
-| Skill | When to Use |
-|-------|-------------|
-| **web-test-cleanup** | BEFORE starting tests (clean slate) and AFTER tests (cleanup) |
-| **web-test-research** | BEFORE testing to understand the project |
-| **web-test-plan** | AFTER research to create test plan |
-| **web-test-wallet-setup** | If Web3 DApp - set up wallet BEFORE connect |
-| **web-test-wallet-connect** | If Web3 DApp - connect wallet BEFORE tests |
-| **web-test-report** | AFTER tests to generate report |
+This skill is part of a modular testing system. **You MUST use the appropriate skill for each task:**
+
+| Task | Skill to Use | Description |
+|------|--------------|-------------|
+| Clean up before/after tests | **web-test-cleanup** | Kill browsers, stop servers, free ports |
+| Understand the project | **web-test-research** | Detect framework, routes, Web3 status |
+| Create test plan | **web-test-plan** | Define test cases and priorities |
+| Set up wallet (Web3) | **web-test-wallet-setup** | Download and initialize Rabby wallet |
+| Connect wallet (Web3) | **web-test-wallet-connect** | Connect wallet to DApp, handle popups |
+| Execute tests | **web-test** (this skill) | Run vision-based browser tests |
+| Generate report | **web-test-report** | Create test report with results |
 
 ## Complete Testing Workflow
 
-```
-1. web-test-cleanup          → Clean previous session
-2. web-test-research         → Understand the project
-3. web-test-plan             → Create test plan
-4. web-test-wallet-setup     → (Web3 only) Set up wallet
-5. web-test-wallet-connect   → (Web3 only) Connect wallet
-6. web-test                  → Execute tests (THIS SKILL)
-7. web-test-report           → Generate report
-8. web-test-cleanup          → Final cleanup (--keep-data)
-```
+**FOLLOW THIS ORDER:**
 
-## Quick Start
-
-Ask me to test your web app:
-- "Test my web app"
-- "Run the test plan"
-- "Execute UI tests"
+```
+Step 1: Use skill "web-test-cleanup"         → Clean previous session
+Step 2: Use skill "web-test-research"        → Understand the project
+Step 3: Use skill "web-test-plan"            → Create test plan
+Step 4: Use skill "web-test-wallet-setup"    → (Web3 only) Set up wallet
+Step 5: Use skill "web-test-wallet-connect"  → (Web3 only) Connect wallet
+Step 6: Use skill "web-test"                 → Execute tests (THIS SKILL)
+Step 7: Use skill "web-test-report"          → Generate report
+Step 8: Use skill "web-test-cleanup"         → Final cleanup (--keep-data)
+```
 
 ## Prerequisites
 
-Before using this skill, ensure:
-1. **web-test-cleanup** has been run (clean slate)
-2. **web-test-research** completed (understand project)
-3. **web-test-plan** created (know what to test)
-4. **If Web3 DApp:** wallet-setup and wallet-connect completed
+Before using this skill:
+1. Run **web-test-cleanup** skill (clean slate)
+2. Run **web-test-research** skill (understand project)
+3. Run **web-test-plan** skill (know what to test)
+4. If Web3 DApp: Run **web-test-wallet-setup** and **web-test-wallet-connect** skills
 
 ```bash
 # Install Playwright globally (one-time setup)
 npm install -g playwright
 npx playwright install chromium
 ```
-
-## Key Principles
-
-**Script Independence:**
-- The `scripts/test-helper.js` lives in this skill directory
-- Call it using absolute path: `node <skill-directory>/scripts/test-helper.js <command>`
-- Test artifacts go to `./test-output/` in the project directory
-- Do NOT inject scripts into the user's project
 
 ## Test Execution
 
@@ -73,7 +63,7 @@ npx playwright install chromium
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Start browser (headless by default)
+# Navigate to page
 node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
 
 # Take initial screenshot
@@ -89,15 +79,14 @@ SKILL_DIR="<path-to-this-skill>"
 
 # Take screenshot for AI analysis
 node $SKILL_DIR/scripts/test-helper.js vision-screenshot page.jpg --headed --keep-open
-# AI analyzes screenshot to find element coordinates
 
-# Click at coordinates
+# Click at coordinates (AI determines from screenshot)
 node $SKILL_DIR/scripts/test-helper.js vision-click 500 300 --headed --keep-open
 
-# Type text
+# Type text at cursor
 node $SKILL_DIR/scripts/test-helper.js vision-type "hello@example.com" --headed --keep-open
 
-# Press keys
+# Press keyboard key
 node $SKILL_DIR/scripts/test-helper.js vision-press-key Enter --headed --keep-open
 
 # Scroll page
@@ -134,8 +123,6 @@ For each test case:
 ### Step 1: Navigate to Target Page
 
 ```bash
-SKILL_DIR="<path-to-this-skill>"
-
 node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000/page" --headed --keep-open
 ```
 
@@ -150,7 +137,6 @@ node $SKILL_DIR/scripts/test-helper.js vision-screenshot test-001-before.jpg --h
 Based on AI analysis of screenshot:
 
 ```bash
-# Click button at identified coordinates
 node $SKILL_DIR/scripts/test-helper.js vision-click 450 320 --headed --keep-open
 ```
 
@@ -162,22 +148,13 @@ node $SKILL_DIR/scripts/test-helper.js wait 1000 --headed --keep-open
 node $SKILL_DIR/scripts/test-helper.js vision-wait-stable --headed --keep-open
 ```
 
-### Step 5: Handle Wallet Popups (Web3 Only)
-
-If testing Web3 DApp and action triggers blockchain interaction:
-
-```bash
-# Auto-approve Rabby popup
-node $SKILL_DIR/scripts/test-helper.js wallet-approve --wallet --headed --keep-open
-```
-
-### Step 6: Capture Result State
+### Step 5: Capture Result State
 
 ```bash
 node $SKILL_DIR/scripts/test-helper.js vision-screenshot test-001-after.jpg --headed --keep-open
 ```
 
-### Step 7: Validate Outcome
+### Step 6: Validate Outcome
 
 AI analyzes screenshot to verify:
 - Expected UI changes occurred
@@ -186,38 +163,27 @@ AI analyzes screenshot to verify:
 
 ## Web3 DApp Testing
 
-**IMPORTANT:** For Web3 DApps, use these flags: `--wallet --headed --keep-open`
+**IMPORTANT:** For Web3 DApp testing, you MUST use the wallet skills:
 
-### Handling Transaction Popups
+1. **Before testing:** Use **web-test-wallet-setup** skill to set up wallet
+2. **Before testing:** Use **web-test-wallet-connect** skill to connect wallet
+3. **During testing:** Use **web-test-wallet-connect** skill's `wallet-approve` command for popups
 
-When DApp actions trigger wallet popups:
+### Handling Wallet Popups During Tests
+
+When a test action triggers a wallet popup (swap, mint, sign, etc.):
 
 ```bash
-SKILL_DIR="<path-to-this-skill>"
+# Use the wallet-connect skill's helper, NOT this skill's test-helper.js
+WALLET_SKILL_DIR="<path-to-web-test-wallet-connect>"
 
-# 1. Click DApp button (e.g., Swap, Mint, Send)
-node $SKILL_DIR/scripts/test-helper.js vision-click <x> <y> --wallet --headed --keep-open
-
-# 2. Auto-approve Rabby popup
-node $SKILL_DIR/scripts/test-helper.js wallet-approve --wallet --headed --keep-open
-
-# 3. Wait for transaction
-node $SKILL_DIR/scripts/test-helper.js wait 3000 --wallet --headed --keep-open
-
-# 4. Verify result
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-tx.jpg --wallet --headed --keep-open
+node $WALLET_SKILL_DIR/scripts/wallet-connect-helper.js wallet-approve --wallet --headed --keep-open
 ```
 
-### Common Web3 Actions
-
-| Action | Triggers Popup |
-|--------|---------------|
-| Connect Wallet | Yes (approval) |
-| Sign Message | Yes (signature) |
-| Approve Token | Yes (transaction) |
-| Swap Tokens | Yes (transaction) |
-| Mint NFT | Yes (transaction) |
-| Send/Transfer | Yes (transaction) |
+**DO NOT use this skill for:**
+- Wallet setup → Use **web-test-wallet-setup**
+- Wallet connection → Use **web-test-wallet-connect**
+- Wallet popup approval → Use **web-test-wallet-connect**
 
 ## Command Reference
 
@@ -233,10 +199,12 @@ node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-tx.jpg --wallet -
 | Command | Description |
 |---------|-------------|
 | `vision-click <x> <y>` | Click at coordinates |
+| `vision-double-click <x> <y>` | Double-click at coordinates |
 | `vision-type <text>` | Type text at cursor |
 | `vision-press-key <key>` | Press keyboard key |
 | `vision-scroll <dir> [px]` | Scroll page |
 | `vision-hover <x> <y>` | Hover at coordinates |
+| `vision-drag <x1> <y1> <x2> <y2>` | Drag from point to point |
 
 ### Selector Interactions
 | Command | Description |
@@ -246,6 +214,7 @@ node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-tx.jpg --wallet -
 | `select <selector> <value>` | Select dropdown |
 | `check/uncheck <selector>` | Toggle checkbox |
 | `hover <selector>` | Hover element |
+| `press <selector> <key>` | Press key on element |
 
 ### Utility Commands
 | Command | Description |
@@ -253,15 +222,23 @@ node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-tx.jpg --wallet -
 | `wait <ms>` | Wait milliseconds |
 | `wait-for <selector>` | Wait for element |
 | `content` | Get page HTML |
+| `text <selector>` | Get element text |
 | `list-elements` | List interactive elements |
 
-### Web3 Commands
+### Browser Lifecycle
 | Command | Description |
 |---------|-------------|
-| `wallet-approve` | Auto-approve Rabby popup |
-| `wallet-navigate <url>` | Navigate with wallet |
-| `wallet-get-address` | Get connected address |
-| `wallet-switch-network <name>` | Switch network |
+| `start` | Start browser session |
+| `stop` | Stop browser session |
+| `browser-open` | Open browser and keep running |
+| `browser-close` | Close browser explicitly |
+
+### Dev Server Commands
+| Command | Description |
+|---------|-------------|
+| `dev-server-start [dir] [port]` | Start dev server |
+| `dev-server-stop` | Stop dev server |
+| `dev-server-status` | Check dev server status |
 
 ## Common Options
 
@@ -270,7 +247,6 @@ node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-tx.jpg --wallet -
 | `--headed` | Show browser window |
 | `--headless` | Hide browser (default) |
 | `--keep-open` | Keep browser open after command |
-| `--wallet` | Enable wallet extension |
 | `--screenshot <name>` | Auto-screenshot after action |
 | `--wait <ms>` | Wait after action |
 | `--mobile` | Use mobile viewport |
@@ -283,8 +259,7 @@ All test artifacts in project directory:
 ```
 <project-root>/test-output/
 ├── screenshots/      # Test screenshots
-├── chrome-profile/   # Browser state, wallet data
-├── extensions/       # Wallet extensions
+├── chrome-profile/   # Browser state
 ├── console-logs.txt  # Browser console
 └── test-report.md    # Generated report
 ```
@@ -300,7 +275,7 @@ When all tests are complete:
 
 - Always use vision-based testing for reliability
 - Keep browser open between tests (`--keep-open`)
-- For Web3, always include `--wallet --headed`
 - Take screenshots before AND after each action
 - AI validates results by analyzing screenshots
+- For Web3 testing, ALWAYS use the wallet skills first
 - See `references/REFERENCE.md` for detailed documentation
