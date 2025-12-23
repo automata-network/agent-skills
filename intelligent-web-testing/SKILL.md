@@ -295,6 +295,84 @@ The skill uses a **persistent browser context** that:
 The browser will navigate away from the app, complete authentication, and return. The script
 tracks these URL changes and waits for the user to complete the flow manually.
 
+## Vision-Based Testing (AI Visual Analysis)
+
+The skill supports vision-based testing where the AI agent:
+1. Takes screenshots of the page
+2. Analyzes the screenshots visually using AI vision capabilities
+3. Determines click coordinates from visual analysis
+4. Interacts using coordinate-based commands
+
+This approach is more reliable than selector-based testing because:
+- No dependency on DOM structure or CSS selectors
+- Works with any UI framework or custom components
+- Handles dynamic content and animations naturally
+- Same approach humans use when testing
+
+### Vision Commands
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# Take screenshot for AI to analyze
+node $SKILL_DIR/scripts/pw-helper.js vision-screenshot page-state.png --headed
+
+# Click at specific coordinates (determined by AI from screenshot)
+node $SKILL_DIR/scripts/pw-helper.js vision-click 500 300 --headed
+
+# Type text at current cursor position (after clicking an input)
+node $SKILL_DIR/scripts/pw-helper.js vision-type "hello@example.com" --headed
+
+# Press keyboard keys
+node $SKILL_DIR/scripts/pw-helper.js vision-press-key Enter --headed
+
+# Scroll the page
+node $SKILL_DIR/scripts/pw-helper.js vision-scroll down 500 --headed
+
+# Hover to trigger effects
+node $SKILL_DIR/scripts/pw-helper.js vision-hover 500 300 --headed
+
+# Wait for page to stabilize, then screenshot
+node $SKILL_DIR/scripts/pw-helper.js vision-wait-stable --headed
+
+# Get page info and screenshot
+node $SKILL_DIR/scripts/pw-helper.js vision-get-page-info --headed
+```
+
+### Vision-Based Workflow Example
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# 1. Navigate and get initial screenshot
+node $SKILL_DIR/scripts/pw-helper.js navigate "https://example.com" --headed --keep-open
+
+# 2. Take screenshot for AI to analyze
+node $SKILL_DIR/scripts/pw-helper.js vision-screenshot initial.png --headed --keep-open
+# AI agent uses Read tool to view ./test-output/screenshots/initial.png
+# AI analyzes: "I see a login button at approximately x=800, y=50"
+
+# 3. Click based on AI's visual analysis
+node $SKILL_DIR/scripts/pw-helper.js vision-click 800 50 --headed --keep-open
+# Returns screenshot showing result of click
+
+# 4. If login modal appeared, AI analyzes and determines email input position
+node $SKILL_DIR/scripts/pw-helper.js vision-click 500 200 --headed --keep-open
+node $SKILL_DIR/scripts/pw-helper.js vision-type "user@example.com" --headed --keep-open
+
+# 5. Click submit button
+node $SKILL_DIR/scripts/pw-helper.js vision-click 500 350 --headed --keep-open
+```
+
+### Key Differences from Selector-Based Testing
+
+| Selector-Based | Vision-Based |
+|----------------|--------------|
+| `click "button:has-text('Login')"` | `vision-click 800 50` |
+| `fill "#email" "test@example.com"` | `vision-click 500 200` then `vision-type "test@example.com"` |
+| Fails if selector changes | Works as long as element is visible |
+| Requires DOM knowledge | Requires visual analysis |
+
 ## Notes
 
 - Tests are dynamically generated based on your project
@@ -303,3 +381,4 @@ tracks these URL changes and waits for the user to complete the flow manually.
 - The pw-helper.js script is NEVER injected into your project
 - Only test artifacts are created in your project's `./test-output/`
 - Browser data (cookies, localStorage) is preserved in `./test-output/chrome-profile/`
+- Vision-based commands always return screenshots for AI verification
