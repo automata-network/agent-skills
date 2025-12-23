@@ -158,7 +158,7 @@ async function startBrowser(options) {
     }
 
     const launchOptions = {
-      headless: false, // Extensions require headed mode
+      headless: options.headless,
       channel: 'chromium',
       args: [
         '--no-first-run',
@@ -166,20 +166,8 @@ async function startBrowser(options) {
         `--disable-extensions-except=${path.resolve(rabbyPath)}`,
         `--load-extension=${path.resolve(rabbyPath)}`,
         `--remote-debugging-port=${CDP_PORT}`,
-        // Critical for extension popups
-        '--disable-popup-blocking',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-hang-monitor',
-        '--disable-ipc-flooding-protection',
-        '--disable-component-update',
-        // Prevent extension context from being garbage collected
-        '--disable-features=ExtensionsToolbarMenu',
-        // Allow popups to stay open
-        '--auto-open-devtools-for-tabs=false',
       ],
-      ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
+      ignoreDefaultArgs: ['--disable-extensions'],
       ...contextOptions,
     };
 

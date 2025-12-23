@@ -1,491 +1,306 @@
 ---
 name: web-test
-description: AI-driven web app testing. Agent reads code, understands functionality, plans tests, executes Playwright commands directly, and validates results autonomously. No pre-written scripts required.
+description: AI-driven web app testing - execute tests using Playwright with vision-based interactions. This is the CORE testing skill. Use related skills for setup, research, and cleanup.
 license: MIT
 compatibility: Node.js 18+, Playwright (global)
 metadata:
   author: AI Agent
-  version: 1.0.0
+  version: 2.0.0
 allowed-tools: Bash Read Write Glob Grep Task
 ---
 
 # Intelligent Web Testing
 
-An AI-driven testing skill where the agent autonomously:
-1. **Reads and understands** project source code
-2. **Plans tests** based on discovered functionality
-3. **Executes tests** using Playwright directly
-4. **Validates results** by analyzing screenshots and outputs
+Execute AI-driven tests using Playwright with vision-based interactions.
 
-## Prerequisites
+## Related Skills (Use These!)
 
-```bash
-# Install Playwright globally
-npm install -g playwright
-npx playwright install chromium
+| Skill | When to Use |
+|-------|-------------|
+| **web-test-cleanup** | BEFORE starting tests (clean slate) and AFTER tests (cleanup) |
+| **web-test-research** | BEFORE testing to understand the project |
+| **web-test-plan** | AFTER research to create test plan |
+| **web-test-wallet-setup** | If Web3 DApp - set up wallet BEFORE connect |
+| **web-test-wallet-connect** | If Web3 DApp - connect wallet BEFORE tests |
+| **web-test-report** | AFTER tests to generate report |
+
+## Complete Testing Workflow
+
+```
+1. web-test-cleanup          → Clean previous session
+2. web-test-research         → Understand the project
+3. web-test-plan             → Create test plan
+4. web-test-wallet-setup     → (Web3 only) Set up wallet
+5. web-test-wallet-connect   → (Web3 only) Connect wallet
+6. web-test                  → Execute tests (THIS SKILL)
+7. web-test-report           → Generate report
+8. web-test-cleanup          → Final cleanup (--keep-data)
 ```
 
 ## Quick Start
 
 Ask me to test your web app:
-- "Test my web app" (I'll auto-detect running localhost services)
-- "Analyze my project and run comprehensive UI tests"
-- "Test all interactive elements and validate they work correctly"
+- "Test my web app"
+- "Run the test plan"
+- "Execute UI tests"
+
+## Prerequisites
+
+Before using this skill, ensure:
+1. **web-test-cleanup** has been run (clean slate)
+2. **web-test-research** completed (understand project)
+3. **web-test-plan** created (know what to test)
+4. **If Web3 DApp:** wallet-setup and wallet-connect completed
+
+```bash
+# Install Playwright globally (one-time setup)
+npm install -g playwright
+npx playwright install chromium
+```
 
 ## Key Principles
 
 **Script Independence:**
-- The `scripts/test-helper.js` lives in this skill directory and is NEVER copied to the user's project
-- Call it using absolute path: `node <skill-directory>/scripts/test-helper.js <command> <args>`
-- Test URLs are passed as command line arguments
-- Do NOT inject any test scripts into the user's project directory
-- Only test artifacts (screenshots, logs) go to `./test-output/` in the current working directory
+- The `scripts/test-helper.js` lives in this skill directory
+- Call it using absolute path: `node <skill-directory>/scripts/test-helper.js <command>`
+- Test artifacts go to `./test-output/` in the project directory
+- Do NOT inject scripts into the user's project
 
-## How It Works
+## Test Execution
 
-### Phase 1: Code Analysis
-Read the project's source code to understand:
-- Project structure and framework (React, Vue, Next.js, etc.)
-- Available pages and routes
-- Interactive components (buttons, forms, modals, etc.)
-- Expected behaviors and user flows
-
-### Phase 2: Test Planning
-Create a test plan covering:
-- All discoverable pages/routes
-- Interactive elements (buttons, links, inputs, dropdowns, etc.)
-- Form submissions and validations
-- Navigation flows and edge cases
-
-### Phase 3: Test Execution
-Execute tests using Playwright via the helper script:
+### Starting a Test Session
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Navigate and screenshot
-node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --screenshot home.png
+# Start browser (headless by default)
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
 
-# Interact with elements
-node $SKILL_DIR/scripts/test-helper.js click "button.submit" --screenshot after-click.png
+# Take initial screenshot
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot initial.jpg --headed --keep-open
+```
+
+### Vision-Based Testing (Recommended)
+
+Use vision commands for reliable cross-framework testing:
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# Take screenshot for AI analysis
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot page.jpg --headed --keep-open
+# AI analyzes screenshot to find element coordinates
+
+# Click at coordinates
+node $SKILL_DIR/scripts/test-helper.js vision-click 500 300 --headed --keep-open
+
+# Type text
+node $SKILL_DIR/scripts/test-helper.js vision-type "hello@example.com" --headed --keep-open
+
+# Press keys
+node $SKILL_DIR/scripts/test-helper.js vision-press-key Enter --headed --keep-open
+
+# Scroll page
+node $SKILL_DIR/scripts/test-helper.js vision-scroll down 500 --headed --keep-open
+
+# Wait for page to stabilize
+node $SKILL_DIR/scripts/test-helper.js vision-wait-stable --headed --keep-open
+```
+
+### Selector-Based Testing (Alternative)
+
+For simple cases with known selectors:
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# Click element
+node $SKILL_DIR/scripts/test-helper.js click "button.submit" --screenshot after-click.jpg
+
+# Fill input
 node $SKILL_DIR/scripts/test-helper.js fill "#email" "test@example.com"
+
+# Select dropdown
 node $SKILL_DIR/scripts/test-helper.js select "#country" "US"
+
+# Check checkbox
 node $SKILL_DIR/scripts/test-helper.js check "#agree-terms"
-
-# Get page info
-node $SKILL_DIR/scripts/test-helper.js content
-node $SKILL_DIR/scripts/test-helper.js list-elements
 ```
 
-### Phase 4: Result Validation
-Validate results by:
-- Analyzing screenshots visually
-- Checking console output for errors
-- Verifying expected UI states
-- Reporting issues with specific details
+## Test Execution Steps
 
-## Instructions
+For each test case:
 
-When asked to test a web app, follow this workflow:
-
-### Step 0: Clean Up Previous Test Session
-
-Before starting any new test, run the cleanup script:
+### Step 1: Navigate to Target Page
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Run cleanup script (kills browsers, dev servers, cleans test-output)
-$SKILL_DIR/scripts/cleanup.sh
-
-# OR keep test data (wallet, extensions) but kill processes:
-$SKILL_DIR/scripts/cleanup.sh --keep-data
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000/page" --headed --keep-open
 ```
 
-**Note:** All test data (`test-output/`) is stored in the **project's root directory**, not in the skill directory. Each project has independent test configuration.
-
-The cleanup script:
-- Closes all test browser processes
-- Kills dev server processes
-- Frees common dev ports (3000, 5173, 8080, 4200)
-- Removes `test-output/` folder (unless `--keep-data` is specified)
-
-### Step 1: Detect and Start Project
-
-1. Read `package.json` to find dev/start command
-2. Check for framework config files to detect port
-3. Install dependencies if needed: `npm install`
-4. Start dev server in background: `npm run dev &`
-5. Wait for server to be ready
-
-### Step 2: Understand the Project
-
-1. Find all source files (`*.tsx`, `*.jsx`, `*.vue`, `*.html`)
-2. Identify the framework and project structure
-3. Discover routes/pages from router config and page directories
-4. Find interactive elements (buttons, forms, modals, etc.)
-5. **⚠️ CRITICAL: Detect if Web3 DApp** - Check for:
-   - "Connect Wallet" button on page
-   - Web3 libraries in code (wagmi, viem, ethers, @rainbow-me, @privy-io)
-   - Wallet-related UI elements
-6. **⚠️ MANDATORY: Research project technologies** - Use web search to:
-   - Understand what the project does (DeFi, NFT, Bridge, etc.)
-   - Learn about libraries/SDKs used (Rainbow Kit, Privy, etc.)
-   - Find documentation on how features work
-   - Understand expected user flows
-
-**DO NOT skip the research step!** Without understanding the technology, you cannot properly test the features.
-
-**If Web3 DApp detected → Step 4 and Step 5 are MANDATORY!**
-
-### Step 3: Create Test Plan
-
-Generate a structured test plan covering:
-- **Is Web3 DApp: YES / NO** ← MUST answer this first!
-- If YES: "Step 4 (Wallet Setup) and Step 5 (Wallet Connect) are REQUIRED"
-- Pages to test
-- Interactive elements
-- User flows
-- Edge cases
-
-### Step 4: Wallet Setup (if Web3 DApp)
-
-**If NOT Web3 DApp → Skip Step 4 and Step 5, go directly to Step 6.**
-
----
-## ⛔ MANDATORY FOR WEB3 DAPP - DO NOT SKIP ⛔
-
-**If this is a Web3 DApp, you MUST execute Step 4 and Step 5.**
-**Without wallet setup and connection, ALL subsequent tests will FAIL.**
-**DO NOT proceed to Step 6 until wallet is connected and verified.**
-
----
+### Step 2: Capture Initial State
 
 ```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# MUST RUN: Install extension and import wallet
-node $SKILL_DIR/scripts/test-helper.js wallet-setup
-node $SKILL_DIR/scripts/test-helper.js wallet-init --wallet --headed
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot test-001-before.jpg --headed --keep-open
 ```
 
-Script auto-fails if `WALLET_PRIVATE_KEY` not set. After success → proceed to Step 5.
+### Step 3: Perform Action
 
-### Step 5: Wallet Connect (if Web3 DApp)
-
-**If NOT Web3 DApp → Skip to Step 6.**
-
----
-## ⛔ MANDATORY - MUST COMPLETE BEFORE STEP 6 ⛔
-
-**Wallet MUST be connected BEFORE any other tests! Without connection, all tests FAIL.**
-
----
+Based on AI analysis of screenshot:
 
 ```bash
-SKILL_DIR="<path-to-this-skill>"
+# Click button at identified coordinates
+node $SKILL_DIR/scripts/test-helper.js vision-click 450 320 --headed --keep-open
+```
 
-# 1. Navigate to DApp with wallet extension
-node $SKILL_DIR/scripts/test-helper.js wallet-navigate "<dapp-url>" --wallet --headed --keep-open
+### Step 4: Wait for UI Update
 
-# 2. Take screenshot, find and click "Connect Wallet" button
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot before-connect.jpg --wallet --headed --keep-open
-# Use vision-click to click the Connect Wallet button
+```bash
+node $SKILL_DIR/scripts/test-helper.js wait 1000 --headed --keep-open
+# OR wait for stability
+node $SKILL_DIR/scripts/test-helper.js vision-wait-stable --headed --keep-open
+```
 
-# 3. In Rainbow/Privy modal, click "Installed" wallet option (use vision-click)
+### Step 5: Handle Wallet Popups (Web3 Only)
 
-# 4. Auto-approve Rabby popup (handles new window automatically)
+If testing Web3 DApp and action triggers blockchain interaction:
+
+```bash
+# Auto-approve Rabby popup
 node $SKILL_DIR/scripts/test-helper.js wallet-approve --wallet --headed --keep-open
-
-# 5. Verify connection
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-connect.jpg --wallet --headed --keep-open
 ```
 
-The `wallet-approve` command automatically:
-- Waits for Rabby popup window to open
-- Clicks Connect/Confirm/Sign button
-- Handles signature requests if needed
-- Takes screenshots at each step
-
-**Verification:**
-- ✅ SUCCESS: Wallet address (0x...) visible → proceed to Step 6
-- ❌ FAILURE: "Connect Wallet" still visible → RETRY (max 3 times)
-- ❌ FAIL: After 3 retries → STOP, do not continue
-
-### Step 6: Execute Tests
-
-For each test:
-1. Navigate to the target page
-2. Capture screenshot of initial state
-3. Perform the action (click, fill, select, etc.)
-4. Wait for UI to update
-5. **If Web3 DApp: Handle wallet popups** (see below)
-6. Capture screenshot of result state
-7. Validate expected outcome
-
-**Web3 DApp: Handling Transaction/Signature Popups**
-
-When testing Web3 DApp features, actions may trigger wallet popups:
-- **Sign message** - Signature request for authentication
-- **Contract call** - Smart contract interaction
-- **Send transaction** - Token transfer, swap, etc.
-
-After clicking any DApp button that triggers blockchain interaction:
+### Step 6: Capture Result State
 
 ```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# 1. Click DApp button (e.g., "Swap", "Mint", "Send", "Approve")
-node $SKILL_DIR/scripts/test-helper.js vision-click <x> <y> --wallet --headed --keep-open
-
-# 2. Auto-approve Rabby popup (handles sign/confirm automatically)
-node $SKILL_DIR/scripts/test-helper.js wallet-approve --wallet --headed --keep-open
-
-# 3. Wait for transaction to complete and verify result
-node $SKILL_DIR/scripts/test-helper.js wait 3000 --wallet --headed --keep-open
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-transaction.jpg --wallet --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot test-001-after.jpg --headed --keep-open
 ```
 
-**Common Web3 actions that trigger popups:**
-- Swap tokens
-- Mint NFT
-- Approve token spending
-- Send/Transfer tokens
-- Stake/Unstake
-- Bridge assets
-- Any "Confirm" or "Submit" button in DeFi apps
+### Step 7: Validate Outcome
 
-### Step 7: Validate and Report
-
-Analyze results and generate test report to `./test-output/test-report.md`:
-
-```bash
-# Create test report file
-cat > ./test-output/test-report.md << 'EOF'
-# Test Report
-
-**Date:** $(date)
-**URL:** <tested-url>
-**Is Web3 DApp:** YES/NO
-
-## Summary
-- Total Tests: X
-- Passed: X
-- Failed: X
-
-## Test Results
-
-### 1. [Test Name]
-- **Status:** ✅ PASS / ❌ FAIL
-- **Screenshot:** screenshots/test-name.jpg
-- **Notes:** ...
-
-### 2. [Test Name]
-...
-
-## Failed Tests Details
-(If any failures, describe what went wrong and include screenshot references)
-
-## Recommendations
-(Suggestions for fixes)
-EOF
-```
-
-**Report must include:**
-- Summary of passed/failed tests
-- Each test with status, screenshot reference, and notes
-- Details of failures with screenshots
-- Suggestions for fixes
-
-**Output location:** `./test-output/test-report.md`
-
-### Step 8: Cleanup After Test Completion
-
-**IMPORTANT:** After ALL tests are completed, you MUST run the cleanup script:
-
-```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# Run cleanup script (keeps test data for review)
-$SKILL_DIR/scripts/cleanup.sh --keep-data
-```
-
-The cleanup script handles:
-- Closing all browser processes (Chromium, Chrome)
-- Stopping dev server processes (npm, vite, next, webpack)
-- Freeing common dev ports (3000, 5173, 8080, 4200, 4321)
-
-**DO NOT skip this step!** Leaving processes running can:
-- Consume system resources unnecessarily
-- Block ports for future test runs
-- Cause confusion with stale browser windows
+AI analyzes screenshot to verify:
+- Expected UI changes occurred
+- No error messages
+- Correct state displayed
 
 ## Web3 DApp Testing
 
-See **Step 4** (Wallet Setup) and **Step 5** (Wallet Connect) above. Both must complete BEFORE Step 6 (Execute Tests).
+**IMPORTANT:** For Web3 DApps, use these flags: `--wallet --headed --keep-open`
 
-### Data Storage
+### Handling Transaction Popups
 
-All test data is stored in the **project directory** (NOT skill directory):
+When DApp actions trigger wallet popups:
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# 1. Click DApp button (e.g., Swap, Mint, Send)
+node $SKILL_DIR/scripts/test-helper.js vision-click <x> <y> --wallet --headed --keep-open
+
+# 2. Auto-approve Rabby popup
+node $SKILL_DIR/scripts/test-helper.js wallet-approve --wallet --headed --keep-open
+
+# 3. Wait for transaction
+node $SKILL_DIR/scripts/test-helper.js wait 3000 --wallet --headed --keep-open
+
+# 4. Verify result
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot after-tx.jpg --wallet --headed --keep-open
 ```
-<project-root>/test-output/
-├── screenshots/      # Test screenshots
-├── chrome-profile/   # Browser state, cookies, wallet data
-├── extensions/       # Downloaded wallet extensions
-└── console-logs.txt  # Browser console output
-```
 
-Each project has independent wallet configuration. To reset: `rm -rf ./test-output/`
+### Common Web3 Actions
 
-## Auto Port Detection
-
-| Framework | Default Port |
-|-----------|--------------|
-| Vite | 5173 |
-| Next.js | 3000 |
-| Create React App | 3000 |
-| Vue CLI | 8080 |
-| Angular | 4200 |
-| Astro | 4321 |
-
-## Test Output
-
-All artifacts are saved to `./test-output/` in the project directory (see "Data Storage" section above).
+| Action | Triggers Popup |
+|--------|---------------|
+| Connect Wallet | Yes (approval) |
+| Sign Message | Yes (signature) |
+| Approve Token | Yes (transaction) |
+| Swap Tokens | Yes (transaction) |
+| Mint NFT | Yes (transaction) |
+| Send/Transfer | Yes (transaction) |
 
 ## Command Reference
 
+### Navigation & Screenshots
 | Command | Description |
 |---------|-------------|
 | `navigate <url>` | Navigate to URL |
+| `vision-screenshot [name]` | Take screenshot for AI |
+| `screenshot [name]` | Take simple screenshot |
+| `vision-wait-stable` | Wait for page stability |
+
+### Vision Interactions
+| Command | Description |
+|---------|-------------|
+| `vision-click <x> <y>` | Click at coordinates |
+| `vision-type <text>` | Type text at cursor |
+| `vision-press-key <key>` | Press keyboard key |
+| `vision-scroll <dir> [px]` | Scroll page |
+| `vision-hover <x> <y>` | Hover at coordinates |
+
+### Selector Interactions
+| Command | Description |
+|---------|-------------|
 | `click <selector>` | Click element |
-| `fill <selector> <value>` | Fill input field |
-| `select <selector> <value>` | Select dropdown option |
-| `check/uncheck <selector>` | Check/uncheck checkbox |
-| `hover <selector>` | Hover over element |
-| `press <selector> <key>` | Press key on element |
-| `screenshot [name]` | Take screenshot |
-| `content` | Get page HTML |
-| `list-elements` | List interactive elements |
+| `fill <selector> <value>` | Fill input |
+| `select <selector> <value>` | Select dropdown |
+| `check/uncheck <selector>` | Toggle checkbox |
+| `hover <selector>` | Hover element |
+
+### Utility Commands
+| Command | Description |
+|---------|-------------|
 | `wait <ms>` | Wait milliseconds |
 | `wait-for <selector>` | Wait for element |
-| `detect-login-required` | Detect if login/auth is needed |
-| `wait-for-login` | Wait for manual login completion |
-| `browser-open` | Open browser and keep running |
-| `browser-close` | Close browser explicitly |
+| `content` | Get page HTML |
+| `list-elements` | List interactive elements |
 
-**Options:** `--screenshot <name>`, `--wait <ms>`, `--mobile`, `--headed`, `--headless`, `--keep-open`, `--timeout <ms>`
+### Web3 Commands
+| Command | Description |
+|---------|-------------|
+| `wallet-approve` | Auto-approve Rabby popup |
+| `wallet-navigate <url>` | Navigate with wallet |
+| `wallet-get-address` | Get connected address |
+| `wallet-switch-network <name>` | Switch network |
 
-## Headless vs Headed Mode
+## Common Options
 
-**Default: Headless mode** - All commands run in headless mode by default, enabling CI/container compatibility.
+| Option | Description |
+|--------|-------------|
+| `--headed` | Show browser window |
+| `--headless` | Hide browser (default) |
+| `--keep-open` | Keep browser open after command |
+| `--wallet` | Enable wallet extension |
+| `--screenshot <name>` | Auto-screenshot after action |
+| `--wait <ms>` | Wait after action |
+| `--mobile` | Use mobile viewport |
+| `--timeout <ms>` | Command timeout |
 
-**Automatic headed mode**: The `wait-for-login` command automatically switches to headed mode since manual login requires a visible browser window.
+## Data Storage
 
-**CI/Container behavior**: If `wait-for-login` fails to open a browser window (no display available), the test will fail immediately with error `HEADED_MODE_FAILED`. In CI environments, use automated login methods (`wallet-connect`) instead of manual login.
+All test artifacts in project directory:
 
-For detailed reference including Web3 commands, supported networks, validation criteria, and templates, see `references/REFERENCE.md`.
-
-## Browser Persistence and OAuth
-
-The skill uses a **persistent browser context** that:
-- Preserves cookies and localStorage between test sessions
-- Saves browser data to `./test-output/chrome-profile/`
-- Allows login state to persist after OAuth redirects complete
-
-**OAuth/Social Login Handling:**
-- The `wait-for-login` command handles OAuth redirects gracefully
-- URL changes are tracked during OAuth flow
-- Page navigation errors during redirect are caught and handled
-- The browser stays open during the entire OAuth process
-
-**Important:** OAuth login (Google, GitHub, Twitter, etc.) involves redirects to external domains.
-The browser will navigate away from the app, complete authentication, and return. The script
-tracks these URL changes and waits for the user to complete the flow manually.
-
-## Vision-Based Testing (AI Visual Analysis)
-
-The skill supports vision-based testing where the AI agent:
-1. Takes screenshots of the page
-2. Analyzes the screenshots visually using AI vision capabilities
-3. Determines click coordinates from visual analysis
-4. Interacts using coordinate-based commands
-
-This approach is more reliable than selector-based testing because:
-- No dependency on DOM structure or CSS selectors
-- Works with any UI framework or custom components
-- Handles dynamic content and animations naturally
-- Same approach humans use when testing
-
-### Vision Commands
-
-```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# Take screenshot for AI to analyze
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot page-state.png --headed
-
-# Click at specific coordinates (determined by AI from screenshot)
-node $SKILL_DIR/scripts/test-helper.js vision-click 500 300 --headed
-
-# Type text at current cursor position (after clicking an input)
-node $SKILL_DIR/scripts/test-helper.js vision-type "hello@example.com" --headed
-
-# Press keyboard keys
-node $SKILL_DIR/scripts/test-helper.js vision-press-key Enter --headed
-
-# Scroll the page
-node $SKILL_DIR/scripts/test-helper.js vision-scroll down 500 --headed
-
-# Hover to trigger effects
-node $SKILL_DIR/scripts/test-helper.js vision-hover 500 300 --headed
-
-# Wait for page to stabilize, then screenshot
-node $SKILL_DIR/scripts/test-helper.js vision-wait-stable --headed
-
-# Get page info and screenshot
-node $SKILL_DIR/scripts/test-helper.js vision-get-page-info --headed
+```
+<project-root>/test-output/
+├── screenshots/      # Test screenshots
+├── chrome-profile/   # Browser state, wallet data
+├── extensions/       # Wallet extensions
+├── console-logs.txt  # Browser console
+└── test-report.md    # Generated report
 ```
 
-### Vision-Based Workflow Example
+## After Testing
 
-```bash
-SKILL_DIR="<path-to-this-skill>"
+When all tests are complete:
 
-# 1. Navigate and get initial screenshot
-node $SKILL_DIR/scripts/test-helper.js navigate "https://example.com" --headed --keep-open
-
-# 2. Take screenshot for AI to analyze
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot initial.png --headed --keep-open
-# AI agent uses Read tool to view ./test-output/screenshots/initial.png
-# AI analyzes: "I see a login button at approximately x=800, y=50"
-
-# 3. Click based on AI's visual analysis
-node $SKILL_DIR/scripts/test-helper.js vision-click 800 50 --headed --keep-open
-# Returns screenshot showing result of click
-
-# 4. If login modal appeared, AI analyzes and determines email input position
-node $SKILL_DIR/scripts/test-helper.js vision-click 500 200 --headed --keep-open
-node $SKILL_DIR/scripts/test-helper.js vision-type "user@example.com" --headed --keep-open
-
-# 5. Click submit button
-node $SKILL_DIR/scripts/test-helper.js vision-click 500 350 --headed --keep-open
-```
-
-### Key Differences from Selector-Based Testing
-
-| Selector-Based | Vision-Based |
-|----------------|--------------|
-| `click "button:has-text('Login')"` | `vision-click 800 50` |
-| `fill "#email" "test@example.com"` | `vision-click 500 200` then `vision-type "test@example.com"` |
-| Fails if selector changes | Works as long as element is visible |
-| Requires DOM knowledge | Requires visual analysis |
+1. **Generate Report:** Use **web-test-report** skill
+2. **Cleanup:** Use **web-test-cleanup** skill with `--keep-data`
 
 ## Notes
 
-- Tests are dynamically generated based on your project
-- I validate results by reading screenshots
-- No pre-written test scripts required
-- The test-helper.js script is NEVER injected into your project
-- Only test artifacts are created in your project's `./test-output/`
-- Browser data (cookies, localStorage) is preserved in `./test-output/chrome-profile/`
-- Vision-based commands always return screenshots for AI verification
+- Always use vision-based testing for reliability
+- Keep browser open between tests (`--keep-open`)
+- For Web3, always include `--wallet --headed`
+- Take screenshots before AND after each action
+- AI validates results by analyzing screenshots
+- See `references/REFERENCE.md` for detailed documentation
