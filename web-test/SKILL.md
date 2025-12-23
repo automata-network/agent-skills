@@ -133,240 +133,57 @@ Generate a structured test plan covering:
 - User flows
 - Edge cases
 
-### Step 4: Execute Tests
+### Step 4: Web3 Wallet Setup (if needed)
+
+**Skip this step if the website is NOT a Web3 DApp.**
+
+How to detect Web3 DApp:
+- Has "Connect Wallet" button
+- Uses Rainbow Kit, Privy, or similar wallet connection
+- Requires wallet for core functionality
+
+**If Web3 DApp → Execute wallet setup BEFORE Step 5:**
+
+```bash
+SKILL_DIR="<path-to-this-skill>"
+
+# Setup and import wallet (run FIRST, before any DApp interaction)
+WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-connect-flow.js "<dapp-url>" --headed
+```
+
+**After script completes, connect wallet:**
+1. Take screenshot: `vision-screenshot`
+2. Click "Connect Wallet" button: `vision-click`
+3. In Rainbow/Privy modal, click "Installed" wallet option
+4. Approve in Rabby popup
+5. Approve signature if required
+6. **VERIFY**: Screenshot must show wallet address (0x...) in header
+
+**Verification:**
+- ✅ SUCCESS: Wallet address visible, "Connect" button gone → proceed to Step 5
+- ❌ FAILURE: "Connect Wallet" still visible → RETRY (max 3 times)
+- ❌ FAIL TEST: Connection fails after 3 retries
+
+**If NOT Web3 DApp → Skip to Step 5.**
+
+### Step 5: Execute Tests
 
 For each test:
 1. Navigate to the target page
 2. Capture screenshot of initial state
 3. Perform the action (click, fill, select, etc.)
 4. Wait for UI to update
-5. **Detect if login is required** (see Login Detection below)
-6. Capture screenshot of result state
-7. Validate expected outcome
+5. Capture screenshot of result state
+6. Validate expected outcome
 
-### Login Detection and Handling
-
-## CRITICAL: MANDATORY WALLET CONNECTION FOR WEB3 DAPPS
-
-**For DApps using Rainbow Kit or Privy login, wallet connection is MANDATORY before any other tests.**
-
-The agent MUST:
-1. **Complete wallet connection BEFORE any other tests**
-2. **Verify connection success** by checking screenshots
-3. **Retry on failure** (up to 3 attempts)
-4. **FAIL the entire test** if connection fails after retries
-
-### Wallet Connection Verification
-
-After attempting wallet connection, verify success by checking:
-
-1. **Visual indicators in screenshot:**
-   - Wallet address displayed (e.g., `0x1234...5678`) in header/navbar
-   - "Connect Wallet" button is GONE or changed to address/avatar
-   - "Disconnect" or "Logout" button is visible
-
-2. **Verification workflow:**
-   ```bash
-   SKILL_DIR="<path-to-this-skill>"
-
-   # Take screenshot after connection attempt
-   node $SKILL_DIR/scripts/test-helper.js vision-screenshot verify-connection.jpg --wallet --headed --keep-open
-
-   # AI agent MUST analyze the screenshot:
-   # - If wallet address visible → CONNECTION SUCCESS
-   # - If "Connect Wallet" button still visible → CONNECTION FAILED, RETRY
-   ```
-
-3. **Connection success indicators:**
-   - `0x` address pattern visible in top-right area
-   - Main CTA button changed from "Connect Wallet" to something else
-   - User avatar or profile icon appeared
-
-4. **Connection failure indicators:**
-   - "Connect Wallet" or "Sign In" button still prominently displayed
-   - Rainbow/Privy modal still visible
-   - No wallet address visible
-
-### Retry Logic (MANDATORY)
-
-```
-FOR attempt = 1 to 3:
-    1. Click "Connect Wallet" button
-    2. Select "Installed" wallet in Rainbow/Privy modal
-    3. Approve connection in Rabby popup
-    4. Approve signature if required
-    5. Take screenshot and verify connection
-
-    IF connection verified:
-        CONTINUE with tests
-    ELSE:
-        IF attempt < 3:
-            RETRY from step 1
-        ELSE:
-            FAIL entire test with error: "Wallet connection failed after 3 attempts"
-```
-
-### Quick Start: Use wallet-connect-flow.js
-
-For automated wallet setup and connection:
-
-```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# Complete flow: setup → import → navigate → connection ready
-WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-connect-flow.js "https://your-dapp.com" --headed
-
-# Skip setup/import if already done:
-WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-connect-flow.js "https://your-dapp.com" --skip-setup --skip-import --headed
-```
-
----
-
-Many features require user authentication. The agent should:
-
-1. **Detect login triggers**: Before clicking buttons like "Connect", "Create", "Submit", "Search" (when searching user data), or navigating to internal pages, check if login might be required.
-
-2. **Common login trigger patterns**:
-   - Buttons with text: "Connect", "Connect Wallet", "Create", "Submit", "Post", "Save", "Profile", "Settings", "Dashboard"
-   - Links to: `/dashboard`, `/profile`, `/settings`, `/account`, `/my-*`
-   - Forms that submit user data
-   - Any action that results in a login modal/popup appearing
-
-3. **Login detection workflow**:
-   ```bash
-   SKILL_DIR="<path-to-this-skill>"
-
-   # Before performing account-related actions, check if login is needed
-   node $SKILL_DIR/scripts/test-helper.js detect-login-required --screenshot before-action.png
-
-   # If login is required, handle it first
-   node $SKILL_DIR/scripts/test-helper.js wallet-connect  # For Web3 DApps
-   # OR
-   node $SKILL_DIR/scripts/test-helper.js wait-for-login  # For manual login by tester
-   ```
-
-4. **After action login detection**:
-   - After clicking a button, if a login modal/popup appears, the agent should:
-     a. Detect the modal presence
-     b. Use `wallet-connect` for automated wallet login (if WALLET_PRIVATE_KEY is set)
-     c. OR use `wait-for-login` for manual login (tester completes login in headed browser)
-     d. After login completes, continue with the original test
-
-5. **wait-for-login command**:
-   ```bash
-   # Opens headed browser and waits for tester to complete login manually
-   # Polls every 2 seconds for login completion (up to 5 minutes)
-   # Handles OAuth redirects gracefully (tracks URL changes, catches navigation errors)
-   node $SKILL_DIR/scripts/test-helper.js wait-for-login --headed --timeout 300000
-   ```
-
-   The command detects login completion by checking:
-   - Presence of wallet address (0x...)
-   - Presence of user avatar/profile picture
-   - Absence of login modal
-   - Presence of "Disconnect" or "Logout" button
-
-6. **Rainbow/Privy Wallet Connection (Important!)**:
-
-   Many Web3 DApps use Rainbow Kit or Privy for wallet connection. When their modal appears:
-
-   **DO NOT skip the login flow!** The agent MUST complete these steps:
-
-   a. **Detect the wallet selector modal** - Look for Rainbow/Privy modal with wallet options
-   b. **Click "Installed" or "Installed wallet"** - This selects the already-imported Rabby wallet
-   c. **Wait for wallet popup** - Rabby extension will show a connection approval popup
-   d. **Approve the connection** - Click "Connect" or "Approve" in the Rabby popup
-   e. **Handle signature request** - If a sign message popup appears, MUST wait and approve it
-   f. **Verify connection success** - Check for wallet address display on the page
-
-   **Rainbow/Privy detection patterns:**
-   - Modal with text: "Connect a Wallet", "Connect Wallet", "Sign in"
-   - Wallet options list showing: "Rainbow", "MetaMask", "Coinbase", "WalletConnect", "Installed"
-   - Privy modal with email/social login options AND wallet options
-
-   **Complete workflow for Rainbow/Privy:**
-   ```bash
-   SKILL_DIR="<path-to-this-skill>"
-
-   # 1. Click Connect Wallet button on DApp
-   node $SKILL_DIR/scripts/test-helper.js vision-click <x> <y> --wallet --headed --keep-open
-   # Take screenshot to see the modal
-   node $SKILL_DIR/scripts/test-helper.js vision-screenshot wallet-modal.png --wallet --headed --keep-open
-
-   # 2. Look for "Installed" or "Installed wallet" option in the modal and click it
-   # AI analyzes screenshot to find the "Installed" button coordinates
-   node $SKILL_DIR/scripts/test-helper.js vision-click <installed-btn-x> <installed-btn-y> --wallet --headed --keep-open
-
-   # 3. Wait for Rabby popup and take screenshot
-   node $SKILL_DIR/scripts/test-helper.js wait 2000 --wallet --headed --keep-open
-   node $SKILL_DIR/scripts/test-helper.js vision-screenshot rabby-popup.png --wallet --headed --keep-open
-
-   # 4. Find and click "Connect" in Rabby popup (usually a new window/popup)
-   # The Rabby popup shows the DApp requesting connection - click Confirm/Connect
-   node $SKILL_DIR/scripts/test-helper.js vision-click <confirm-x> <confirm-y> --wallet --headed --keep-open
-
-   # 5. IMPORTANT: Wait for signature request if it appears
-   node $SKILL_DIR/scripts/test-helper.js wait 2000 --wallet --headed --keep-open
-   node $SKILL_DIR/scripts/test-helper.js vision-screenshot check-signature.png --wallet --headed --keep-open
-
-   # 6. If signature modal appears, approve it (Sign/Confirm button)
-   # Many DApps require signing a message to verify wallet ownership
-   node $SKILL_DIR/scripts/test-helper.js vision-click <sign-x> <sign-y> --wallet --headed --keep-open
-
-   # 7. Verify wallet connected - should see wallet address on page
-   node $SKILL_DIR/scripts/test-helper.js wait 2000 --wallet --headed --keep-open
-   node $SKILL_DIR/scripts/test-helper.js vision-screenshot connected.png --wallet --headed --keep-open
-   ```
-
-   **Common mistakes to avoid:**
-   - ❌ Closing the modal without selecting a wallet
-   - ❌ Skipping the signature approval step
-   - ❌ Not waiting for Rabby popup to appear
-   - ❌ Clicking wrong wallet option (must click "Installed" to use Rabby)
-
-**Example workflow for account-related testing:**
-```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# 1. Navigate to the app
-node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --screenshot home.png
-
-# 2. Before clicking "Create" button, detect if login needed
-node $SKILL_DIR/scripts/test-helper.js detect-login-required
-
-# 3. Click the button that may trigger login
-node $SKILL_DIR/scripts/test-helper.js click "button:has-text('Create')" --screenshot after-create-click.png
-
-# 4. Check if login modal appeared
-node $SKILL_DIR/scripts/test-helper.js detect-login-required
-
-# 5. If login modal detected, complete login first
-node $SKILL_DIR/scripts/test-helper.js wait-for-login  # Wait for manual login
-# OR
-node $SKILL_DIR/scripts/test-helper.js wallet-connect  # Automated wallet login
-
-# 6. Continue with the original test flow after login
-node $SKILL_DIR/scripts/test-helper.js screenshot after-login.png
-```
-
-Example:
-```bash
-SKILL_DIR="<path-to-this-skill>"
-
-node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000/login" --screenshot login-before.png
-node $SKILL_DIR/scripts/test-helper.js fill "#email" "test@example.com"
-node $SKILL_DIR/scripts/test-helper.js fill "#password" "password123"
-node $SKILL_DIR/scripts/test-helper.js click "button[type='submit']" --screenshot login-after.png --wait 2000
-```
-
-### Step 5: Validate and Report
+### Step 6: Validate and Report
 
 Analyze results and generate a report:
 - Summary of passed/failed tests
 - Details of failures with screenshots
 - Suggestions for fixes
 
-### Step 6: Cleanup After Test Completion
+### Step 7: Cleanup After Test Completion
 
 **IMPORTANT:** After ALL tests are completed, you MUST run the cleanup script:
 
@@ -389,149 +206,20 @@ The cleanup script handles:
 
 ## Web3 DApp Testing
 
-For Web3 DApps requiring wallet connection, a complete wallet setup flow must be performed.
+See **Step 3.5** above for wallet setup flow. The `wallet-connect-flow.js` script must run BEFORE any other tests.
 
-### Important: Extension Requirements
+### Data Storage
 
-**Extensions ONLY work in Playwright's bundled Chromium**, NOT in Chrome or Edge (they removed extension CLI flags).
-All wallet commands MUST use the `--wallet` flag to load the extension properly.
-
-### Wallet Setup Flow (3 Steps)
-
-#### Step 1: Download Rabby Wallet Extension
-
-```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# Download and install Rabby Wallet extension (one-time setup)
-node $SKILL_DIR/scripts/test-helper.js wallet-setup
+All test data is stored in the **project directory** (NOT skill directory):
+```
+<project-root>/test-output/
+├── screenshots/      # Test screenshots
+├── chrome-profile/   # Browser state, cookies, wallet data
+├── extensions/       # Downloaded wallet extensions
+└── console-logs.txt  # Browser console output
 ```
 
-This downloads the latest Rabby Wallet to `test-output/extensions/rabby/`.
-
-#### Step 2: Import Wallet with Private Key
-
-```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# Set private key in environment (REQUIRED - never logged or transmitted)
-export WALLET_PRIVATE_KEY="0x..."
-
-# Import wallet - this opens the extension and fills in the private key
-# Use --wallet flag to load the extension, --headless for background execution
-node $SKILL_DIR/scripts/test-helper.js wallet-import --wallet --headless
-# OR use --headed to see the browser
-node $SKILL_DIR/scripts/test-helper.js wallet-import --wallet --headed
-```
-
-**Internal Flow:**
-1. Opens Chromium with `--load-extension` flag pointing to Rabby
-2. Waits for extension service worker to load
-3. Extracts dynamic extension ID from service worker URL
-4. Navigates directly to: `chrome-extension://{extensionId}/index.html#/new-user/import/private-key`
-5. Fills private key from `WALLET_PRIVATE_KEY` env var
-6. Clicks confirm button
-7. Sets up wallet password (auto-generated, stored in `WALLET_PASSWORD` env var)
-8. Takes screenshots at each step for debugging
-
-**Extension URLs (dynamic ID):**
-- Import page: `chrome-extension://{id}/index.html#/new-user/import/private-key`
-- Profile page: `chrome-extension://{id}/desktop.html#/desktop/profile`
-- Popup: `chrome-extension://{id}/popup.html`
-
-#### Step 3: Navigate to DApp and Connect Wallet
-
-```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# Navigate to DApp with wallet extension loaded
-node $SKILL_DIR/scripts/test-helper.js navigate "https://app.example.com" --wallet --headless --screenshot dapp-home.png
-
-# Connect wallet to DApp (clicks "Connect" button in wallet popup)
-node $SKILL_DIR/scripts/test-helper.js wallet-connect --wallet --headless
-```
-
-### Complete Example Workflow
-
-```bash
-SKILL_DIR="<path-to-this-skill>"
-
-# ============================================
-# Step 1: Install Rabby Wallet Extension (one-time)
-# ============================================
-node $SKILL_DIR/scripts/test-helper.js wallet-setup
-
-# ============================================
-# Step 2: Import Wallet (first time or after profile reset)
-# ============================================
-export WALLET_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-
-# Import wallet in headless mode
-node $SKILL_DIR/scripts/test-helper.js wallet-import --wallet --headless
-
-# ============================================
-# Step 3: Test DApp
-# ============================================
-# Navigate to DApp with wallet loaded
-node $SKILL_DIR/scripts/test-helper.js navigate "https://staging.carrier.so/" --wallet --headless --screenshot dapp-1.png
-
-# Connect wallet
-node $SKILL_DIR/scripts/test-helper.js wallet-connect --wallet --headless --screenshot dapp-2-connected.png
-
-# Switch network if needed
-node $SKILL_DIR/scripts/test-helper.js wallet-switch-network polygon --wallet --headless
-
-# Continue with normal testing
-node $SKILL_DIR/scripts/test-helper.js click "button:has-text('Bridge')" --wallet --headless --screenshot dapp-3.png
-```
-
-### Session Persistence
-
-Browser state (cookies, localStorage, extension data) is persisted in the **project directory**:
-```
-<project-root>/test-output/chrome-profile/
-```
-
-Wallet extensions are downloaded to:
-```
-<project-root>/test-output/extensions/
-```
-
-**Each project maintains its own independent wallet and browser state.** This allows different projects to have different wallet configurations without interference.
-
-After importing wallet once, subsequent tests can reuse the wallet:
-```bash
-# Wallet already imported - just use --wallet flag to load extension
-node $SKILL_DIR/scripts/test-helper.js navigate "https://dapp.example.com" --wallet --headless
-```
-
-To reset wallet state for a project, delete the chrome-profile directory:
-```bash
-rm -rf ./test-output/chrome-profile/
-```
-
-To completely reset all test data for a project:
-```bash
-rm -rf ./test-output/
-```
-
-### Wallet Commands Reference
-
-| Command | Description |
-|---------|-------------|
-| `wallet-setup` | Open Chrome Web Store to install Rabby Wallet extension |
-| `wallet-import` | Import wallet using WALLET_PRIVATE_KEY env var |
-| `wallet-unlock` | Unlock wallet using WALLET_PASSWORD env var |
-| `wallet-navigate <url>` | Navigate to DApp with Rabby Wallet loaded |
-| `wallet-connect` | Connect wallet to current DApp |
-| `wallet-switch-network <name>` | Switch to specified network |
-| `wallet-get-address` | Get current wallet address |
-
-**Security:**
-- `WALLET_PRIVATE_KEY`: Your wallet private key (required, never logged or transmitted)
-- `WALLET_PASSWORD`: Auto-generated during wallet-import (16-char random password)
-- Both values are stored in environment variables ONLY, never logged, transmitted to APIs, or stored in files
-- All sensitive operations happen locally in the browser
+Each project has independent wallet configuration. To reset: `rm -rf ./test-output/`
 
 ## Auto Port Detection
 
@@ -546,20 +234,7 @@ rm -rf ./test-output/
 
 ## Test Output
 
-**IMPORTANT: All test data is stored in the user's project directory, NOT in the skill directory.**
-
-All artifacts are saved to `./test-output/` in the **current working directory** (the project being tested):
-- `screenshots/` - Captured screenshots
-- `console-logs.txt` - Browser console output
-- `elements.json` - Interactive elements discovered
-- `chrome-profile/` - Chromium user data (cookies, localStorage, extension data)
-- `extensions/` - Downloaded wallet extensions (e.g., Rabby)
-
-This design ensures:
-- **Each project has independent test configuration** - Different projects can have different wallet setups
-- **No global state pollution** - Test data stays with the project
-- **Easy cleanup** - Just delete `test-output/` in the project root
-- **Portable** - Move project folder and test config moves with it
+All artifacts are saved to `./test-output/` in the project directory (see "Data Storage" section above).
 
 ## Command Reference
 
