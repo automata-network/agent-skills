@@ -4,9 +4,146 @@ A collection of AI agent skills following the [agentskills.io](https://agentskil
 
 ## Available Skills
 
-| Skill                           | Description                                                             |
-| ------------------------------- | ----------------------------------------------------------------------- |
-| [web-test](./web-test/SKILL.md) | Comprehensive web app testing with Playwright ensuring 100% UI coverage |
+| Skill | Description |
+|-------|-------------|
+| [web-test](./web-test/SKILL.md) | Core web app testing with Playwright - execute tests using vision-based interactions |
+| [web-test-cleanup](./web-test-cleanup/SKILL.md) | Clean up test sessions - kill browsers, stop dev servers, free ports |
+| [web-test-research](./web-test-research/SKILL.md) | Analyze and research a web project - detect framework, discover routes, detect Web3 |
+| [web-test-plan](./web-test-plan/SKILL.md) | Create structured test plans based on project research |
+| [web-test-wallet-setup](./web-test-wallet-setup/SKILL.md) | Set up Rabby wallet extension for Web3 DApp testing |
+| [web-test-wallet-connect](./web-test-wallet-connect/SKILL.md) | Connect wallet to Web3 DApp - handle popup approvals |
+| [web-test-report](./web-test-report/SKILL.md) | Generate test reports after completing tests |
+
+## Testing Workflow
+
+The web-test skills are designed to work together in a modular workflow:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        Complete Testing Workflow                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  1. web-test-cleanup          Clean previous test session                │
+│         ↓                                                                │
+│  2. web-test-research         Analyze project structure                  │
+│         ↓                     Detect framework, routes, Web3             │
+│  3. web-test-plan             Create test plan                           │
+│         ↓                                                                │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │  If Web3 DApp:                                                   │    │
+│  │  4. web-test-wallet-setup     Download & initialize wallet       │    │
+│  │  5. web-test-wallet-connect   Connect wallet to DApp             │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│         ↓                                                                │
+│  6. web-test                  Execute tests                              │
+│         ↓                                                                │
+│  7. web-test-report           Generate test report                       │
+│         ↓                                                                │
+│  8. web-test-cleanup          Final cleanup (--keep-data)                │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+## Skill Responsibilities
+
+### web-test (Core)
+The main testing skill that executes vision-based browser tests.
+
+**Responsibilities:**
+- Start/stop browser sessions
+- Navigate to URLs
+- Execute vision-based interactions (click, type, scroll)
+- Take screenshots for AI analysis
+- Handle login detection
+
+**Commands:** `navigate`, `vision-click`, `vision-screenshot`, `vision-type`, `wait`, etc.
+
+---
+
+### web-test-cleanup
+Clean up test sessions before and after testing.
+
+**Responsibilities:**
+- Kill browser processes (Chromium, Chrome)
+- Stop dev server processes
+- Free blocked ports (3000, 5173, 8080, etc.)
+- Remove test-output folder (optional)
+
+**When to Use:**
+- **Before tests:** Run without `--keep-data` for a clean slate
+- **After tests:** Run with `--keep-data` to preserve artifacts
+
+---
+
+### web-test-research
+Analyze a web project before testing.
+
+**Responsibilities:**
+- Detect framework (React, Vue, Next.js, etc.)
+- Discover routes and pages
+- Find interactive elements
+- **Detect if Web3 DApp** (critical for wallet setup)
+- Research project technologies via web search
+
+**Output:** Project research report with recommendations
+
+---
+
+### web-test-plan
+Create structured test plans.
+
+**Responsibilities:**
+- Define test cases with priorities
+- Set execution order
+- Identify Web3-specific tests
+- Document preconditions and expected results
+
+**Output:** `./test-output/test-plan.md`
+
+---
+
+### web-test-wallet-setup
+Set up Rabby wallet for Web3 DApp testing.
+
+**Responsibilities:**
+- Download Rabby wallet extension from GitHub
+- Import wallet using private key from environment
+- Initialize and unlock wallet
+- Verify wallet is ready
+
+**Prerequisites:**
+- `WALLET_PRIVATE_KEY` environment variable set
+- Project confirmed as Web3 DApp
+
+---
+
+### web-test-wallet-connect
+Connect wallet to Web3 DApp.
+
+**Responsibilities:**
+- Navigate to DApp with wallet extension
+- Detect and click Connect Wallet button
+- Handle wallet selection modal
+- **Auto-approve Rabby popup** (connect, sign, transaction)
+- Verify wallet connection
+
+**Key Features:**
+- Pre-emptive popup listener (catches fast popups)
+- Multi-step approval handling
+- Retry logic for button clicks
+
+---
+
+### web-test-report
+Generate test reports after testing.
+
+**Responsibilities:**
+- Summarize test results (pass/fail/skip)
+- Document failures with screenshots
+- List issues found
+- Provide recommendations
+
+**Output:** `./test-output/test-report.md`
 
 ## How web-test Works
 
@@ -38,10 +175,6 @@ The web-test skill uses a vision-based approach to automate browser testing:
 - **Headed Mode**: For manual intervention (login, debugging)
 - **Wallet Mode**: Loads Rabby wallet extension for Web3 DApp testing
 
-**Vision Commands:**
-
-The vision command series (`vision-screenshot`, `vision-click`, `vision-type`, etc.) enables coordinate-based interactions, allowing the AI to interact with any UI element based on visual analysis.
-
 ## Manual Configuration
 
 ### Setting WALLET_PRIVATE_KEY
@@ -69,18 +202,6 @@ When a website requires email or social account login, manual intervention is ne
 3. **Wait for Login**: Use `wait-for-login` command which waits up to 5 minutes for manual login
 4. **Manual Action**: User completes login in the browser window (enter credentials, OAuth flow, etc.)
 5. **Resume**: System detects login completion and continues automated testing
-
-**Example Flow:**
-
-```bash
-# AI detects login is required
-node test-helper.js detect-login-required
-
-# If email/social login detected, AI calls:
-node test-helper.js wait-for-login
-# User manually logs in within 5 minutes
-# Testing continues after login detected
-```
 
 ## Installation
 
@@ -123,56 +244,59 @@ The skills in this repository work with:
 agent-skills/
 ├── README.md
 ├── LICENSE
-├── web-test/                       # Web testing skill
-│   ├── SKILL.md                    # Skill definition (required)
+│
+├── web-test/                       # Core testing skill
+│   ├── SKILL.md                    # Skill definition
 │   ├── references/                 # Supporting documentation
-│   └── scripts/                    # Implementation scripts
+│   └── scripts/
 │       ├── test-helper.js          # Main CLI entry point
 │       ├── lib/                    # Core libraries
-│       │   ├── config.js           # Configuration and constants
-│       │   ├── utils.js            # Utility functions
-│       │   ├── scheduler.js        # Parallel test scheduler
-│       │   └── browser.js          # Browser management
 │       └── commands/               # Command modules
-│           ├── basic.js            # Basic browser commands
+│           ├── basic.js            # Browser commands
 │           ├── dev-server.js       # Dev server commands
-│           ├── wallet.js           # Web3 wallet commands
-│           ├── login.js            # Login detection commands
+│           ├── login.js            # Login detection
 │           └── vision.js           # Vision/AI commands
-└── <other-skill>/                  # Add more skills as subfolders
-    └── SKILL.md
+│
+├── web-test-cleanup/               # Cleanup skill
+│   ├── SKILL.md
+│   └── scripts/
+│       └── cleanup.sh              # Cleanup script
+│
+├── web-test-research/              # Project research skill
+│   └── SKILL.md                    # No scripts needed
+│
+├── web-test-plan/                  # Test planning skill
+│   └── SKILL.md                    # No scripts needed
+│
+├── web-test-wallet-setup/          # Wallet setup skill
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── wallet-setup-helper.js  # CLI entry point
+│       ├── lib/                    # Shared libraries
+│       └── commands/
+│           └── wallet-setup.js     # Setup commands
+│
+├── web-test-wallet-connect/        # Wallet connect skill
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── wallet-connect-helper.js # CLI entry point
+│       ├── wallet-connect-flow.js   # Full connection flow
+│       ├── lib/                     # Shared libraries
+│       └── commands/
+│           └── wallet-connect.js    # Connect commands
+│
+└── web-test-report/                # Report generation skill
+    └── SKILL.md                    # No scripts needed
 ```
 
-**Each subfolder represents a separate skill.** To add a new skill, create a new folder with a `SKILL.md` file following the [agentskills.io](https://agentskills.io/) specification.
+## Script Entry Points
 
-### web-test/scripts File Reference
-
-#### Core Libraries (lib/)
-
-| File | Description |
-|------|-------------|
-| `config.js` | Configuration constants: output directories, CDP port (9222), blockchain networks, screenshot settings |
-| `utils.js` | Utility functions: file operations, port management, framework detection (Vite/Next/CRA), dev server commands |
-| `scheduler.js` | Parallel test scheduler with dependency graph, cycle detection, and configurable concurrency |
-| `browser.js` | Browser lifecycle management, Rabby wallet extension loading, CDP connection, persistent context |
-
-#### Command Modules (commands/)
-
-| File | Description |
-|------|-------------|
-| `basic.js` | Browser control (start/stop), navigation, element interaction (click/fill/select), screenshots, element listing |
-| `dev-server.js` | Development server lifecycle: start, stop, status check with framework auto-detection |
-| `wallet.js` | Web3 wallet operations: setup Rabby, import private key, unlock, connect to DApp, switch network |
-| `login.js` | Login detection: identify login type (wallet/email/social), wait for manual login with 5-minute timeout |
-| `vision.js` | Vision commands for AI: coordinate-based click/type/scroll, screenshot with viewport info, page analysis |
-
-### Skill Format
-
-Each skill folder should contain:
-
-- `SKILL.md` - Main skill definition with metadata and instructions (required)
-- `references/` - Supporting documentation and checklists (optional)
-- `scripts/` - Implementation scripts and tools (optional)
+| Skill | Entry Point | Description |
+|-------|-------------|-------------|
+| web-test | `scripts/test-helper.js` | Core browser commands |
+| web-test-cleanup | `scripts/cleanup.sh` | Kill processes, free ports |
+| web-test-wallet-setup | `scripts/wallet-setup-helper.js` | Download & init wallet |
+| web-test-wallet-connect | `scripts/wallet-connect-helper.js` | Connect wallet to DApp |
 
 ## Learn More
 
