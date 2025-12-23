@@ -1748,7 +1748,103 @@ const commands = {
 
       const extensionPage = await context.newPage();
 
-      // Navigate directly to Rabby's private key import page
+      // First check if wallet already exists by opening popup
+      const popupUrl = getRabbyPopupUrl();
+      console.log(JSON.stringify({ status: 'info', message: 'Checking if wallet already exists...' }));
+      await extensionPage.goto(popupUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await extensionPage.waitForTimeout(2000);
+
+      // Take screenshot of current state
+      await extensionPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'wallet-import-0-check.png'),
+        fullPage: true
+      });
+
+      // Check wallet state by looking for specific elements
+      const pageContent = await extensionPage.content();
+      const hasUnlockField = await extensionPage.$('input[type="password"]');
+      const hasNewUserIndicator = pageContent.includes('new-user') ||
+                                  pageContent.includes('Get Started') ||
+                                  pageContent.includes('Create') ||
+                                  pageContent.includes('Import');
+
+      // Check if wallet is already unlocked (has address display or main UI)
+      const hasAddressDisplay = await extensionPage.$('[class*="address"]') ||
+                                await extensionPage.$('[class*="balance"]') ||
+                                await extensionPage.$('[class*="asset"]');
+
+      // If wallet exists and is unlocked, skip import
+      if (hasAddressDisplay && !hasUnlockField) {
+        console.log(JSON.stringify({
+          status: 'info',
+          message: 'Wallet already exists and is unlocked, skipping import'
+        }));
+
+        await extensionPage.screenshot({
+          path: path.join(SCREENSHOTS_DIR, 'wallet-import-skipped.png'),
+          fullPage: true
+        });
+
+        console.log(JSON.stringify({
+          success: true,
+          message: 'Wallet already imported and unlocked.',
+          skipped: true,
+          screenshots: ['wallet-import-0-check.png', 'wallet-import-skipped.png'],
+          security: 'No action needed - wallet already exists'
+        }));
+        return;
+      }
+
+      // If wallet exists but is locked, unlock it
+      if (hasUnlockField && !hasNewUserIndicator) {
+        console.log(JSON.stringify({ status: 'info', message: 'Wallet exists but is locked, unlocking...' }));
+
+        const passwordInput = await extensionPage.$('input[type="password"]');
+        if (passwordInput) {
+          await passwordInput.fill(walletPassword);
+
+          // Click unlock button
+          const unlockSelectors = [
+            'button:has-text("Unlock")',
+            'button:has-text("确认")',
+            'button[type="submit"]',
+            '.ant-btn-primary',
+          ];
+
+          for (const selector of unlockSelectors) {
+            try {
+              const btn = await extensionPage.$(selector);
+              if (btn && await btn.isVisible()) {
+                await btn.click();
+                await extensionPage.waitForTimeout(2000);
+                break;
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+
+          await extensionPage.screenshot({
+            path: path.join(SCREENSHOTS_DIR, 'wallet-import-unlocked.png'),
+            fullPage: true
+          });
+
+          console.log(JSON.stringify({
+            success: true,
+            message: 'Wallet already imported, unlocked successfully.',
+            skipped: true,
+            unlocked: true,
+            screenshots: ['wallet-import-0-check.png', 'wallet-import-unlocked.png'],
+            security: 'Password read from env var - NEVER logged'
+          }));
+          return;
+        }
+      }
+
+      // No existing wallet, proceed with import
+      console.log(JSON.stringify({ status: 'info', message: 'No existing wallet found, proceeding with import...' }));
+
+      // Navigate to Rabby's private key import page
       const importUrl = getRabbyImportPrivateKeyUrl();
       console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby Wallet import page...' }));
       await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
