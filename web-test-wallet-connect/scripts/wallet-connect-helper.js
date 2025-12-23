@@ -27,11 +27,14 @@ Wallet Connect Helper - Connect Rabby wallet to DApps
 
 Commands:
   wallet-navigate <url>     Navigate to DApp with wallet extension loaded
+  wallet-listen             Start listening for popup (call before clicking Connect)
   wallet-approve            Approve wallet popup (connect/sign/confirm)
   wallet-switch-network <n> Switch network (ethereum, polygon, arbitrum, etc.)
   wallet-get-address        Get current wallet address
   vision-screenshot [name]  Take screenshot for AI analysis
   vision-click <x> <y>      Click at coordinates
+  vision-type <text>        Type text at cursor
+  wait <ms>                 Wait milliseconds
 
 Options:
   --wallet                  Required - loads wallet extension
@@ -49,11 +52,13 @@ Usage:
   # 3. Click Connect Wallet button (AI determines coordinates)
   node wallet-connect-helper.js vision-click 500 50 --wallet --headed --keep-open
 
-  # 4. Approve Rabby popup
+  # 4. Approve Rabby popup (auto-detects and clicks approve button)
   node wallet-connect-helper.js wallet-approve --wallet --headed --keep-open
 
   # 5. Verify connection
   node wallet-connect-helper.js vision-screenshot after-connect.jpg --wallet --headed --keep-open
+
+Note: wallet-navigate and vision-click automatically start popup listeners.
 `);
   }
 };
