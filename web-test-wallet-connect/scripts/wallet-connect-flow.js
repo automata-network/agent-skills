@@ -269,6 +269,98 @@ function detectWalletConnectionNeeded() {
   return { needed: true, connected: false };
 }
 
+// Step 5: Try to click Connect Wallet button using selectors (more reliable than vision-click)
+function tryClickConnectButton() {
+  console.log("[STEP 5] Trying to click Connect Wallet button using selectors...");
+
+  // Common selectors for Connect Wallet buttons (ordered by specificity)
+  const connectButtonSelectors = [
+    // Text-based selectors (most reliable)
+    'button:has-text("Connect Wallet")',
+    'button:has-text("Connect wallet")',
+    'button:has-text("Connect")',
+    'button:has-text("Sign In")',
+    'button:has-text("Sign in")',
+    'button:has-text("Login")',
+    // CSS selectors for common patterns
+    '[data-testid*="connect"]',
+    '[data-testid*="wallet"]',
+    '[class*="connect"][class*="wallet"]',
+    '[class*="connect-wallet"]',
+    '[class*="connectWallet"]',
+    '[class*="ConnectWallet"]',
+    // Rainbow Kit specific
+    '[data-testid="rk-connect-button"]',
+    // Privy specific
+    '[class*="privy"]',
+    // Generic button patterns
+    'button[class*="connect"]',
+    'button[class*="Connect"]',
+  ];
+
+  for (const selector of connectButtonSelectors) {
+    console.log(`[STEP 5] Trying selector: ${selector}`);
+    const result = runCommand("click", [selector], { timeout: 5000 });
+
+    if (result.success) {
+      console.log(`[STEP 5] Successfully clicked using selector: ${selector}`);
+      runCommand("wait", ["2000"]);
+      takeScreenshot("after-connect-click.jpg");
+      return { success: true, selector };
+    }
+  }
+
+  console.log("[STEP 5] No selector worked, will need manual/vision click");
+  return { success: false };
+}
+
+// Step 6: Try to select wallet in modal (Rainbow Kit, Privy, etc.)
+function trySelectWalletInModal() {
+  console.log("[STEP 6] Trying to select wallet in modal...");
+
+  // Wait for modal to appear
+  runCommand("wait", ["1500"]);
+  takeScreenshot("wallet-modal.jpg");
+
+  // Common selectors for wallet selection in modals
+  const walletSelectors = [
+    // Injected/Browser wallet options
+    'button:has-text("Injected")',
+    'button:has-text("Browser Wallet")',
+    'button:has-text("Browser")',
+    'button:has-text("Rabby")',
+    'button:has-text("MetaMask")',
+    // "Installed" wallet indicator
+    '[class*="installed"]',
+    'button:has-text("Installed")',
+    // Rainbow Kit specific
+    '[data-testid*="injected"]',
+    '[data-testid*="rabby"]',
+    '[data-testid*="metamask"]',
+    // Generic wallet list items
+    '[class*="wallet-option"]',
+    '[class*="walletOption"]',
+    '[class*="WalletOption"]',
+    // Privy specific
+    '[class*="privy"] button',
+  ];
+
+  for (const selector of walletSelectors) {
+    console.log(`[STEP 6] Trying wallet selector: ${selector}`);
+    const result = runCommand("click", [selector], { timeout: 5000 });
+
+    if (result.success) {
+      console.log(`[STEP 6] Successfully selected wallet using: ${selector}`);
+      runCommand("wait", ["2000"]);
+      takeScreenshot("after-wallet-select.jpg");
+      return { success: true, selector };
+    }
+  }
+
+  console.log("[STEP 6] No wallet selector worked");
+  return { success: false };
+}
+
 // Step 5: Verify wallet connection success
 function verifyWalletConnection() {
   console.log("[VERIFY] Checking wallet connection status...");
@@ -367,9 +459,34 @@ async function connectWalletWithRetry() {
         return { success: true, attempt };
       }
 
-      // Output instructions for AI agent to complete connection
+      // Step 5: Try to click Connect Wallet button using selectors
+      const connectResult = tryClickConnectButton();
+
+      if (connectResult.success) {
+        // Step 6: Try to select wallet in modal
+        const walletResult = trySelectWalletInModal();
+
+        if (walletResult.success) {
+          // Step 7: Try to approve in Rabby popup
+          console.log("[STEP 7] Attempting wallet approval...");
+          const approveResult = runCommand("wallet-approve", [], { timeout: 30000 });
+
+          if (approveResult.success) {
+            // Verify connection
+            runCommand("wait", ["3000"]);
+            const verifyResult = verifyWalletConnection();
+
+            if (verifyResult.success) {
+              console.log("\n[SUCCESS] Wallet connected successfully!");
+              return { success: true, attempt };
+            }
+          }
+        }
+      }
+
+      // If automatic connection failed, provide instructions for manual connection
       console.log(
-        "\n[ACTION REQUIRED] AI agent must now complete wallet connection:"
+        "\n[ACTION REQUIRED] Automatic connection failed. AI agent must complete wallet connection:"
       );
       console.log('1. Find and click "Connect Wallet" or "Sign In" button');
       console.log(
@@ -378,10 +495,10 @@ async function connectWalletWithRetry() {
       console.log("3. Approve connection in Rabby wallet popup");
       console.log("4. If signature is required, approve it");
       console.log(
-        "\nUse vision-screenshot and vision-click commands to interact."
+        "\nUse click command with text selector first, fallback to vision-click if needed."
       );
       console.log(
-        "Screenshot saved to: ./test-output/screenshots/connection-check.jpg\n"
+        "Screenshot saved to: ./test-output/screenshots/\n"
       );
 
       // Return with instructions - AI agent will take over
@@ -390,10 +507,10 @@ async function connectWalletWithRetry() {
         needsManualConnection: true,
         attempt,
         instructions: [
-          "Use vision-screenshot to see current page state",
-          "Use vision-click to click Connect Wallet button",
-          "Use vision-click to select wallet in Rainbow/Privy modal",
-          "Use vision-click to approve in Rabby popup",
+          'Try: click \'button:has-text("Connect Wallet")\'',
+          'Try: click \'button:has-text("Connect")\'',
+          "If selectors fail, use vision-screenshot and vision-click",
+          "Use wallet-approve for Rabby popup",
           "Run: node wallet-connect-flow.js --skip-setup --skip-import <url> to verify",
         ],
       };
