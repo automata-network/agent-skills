@@ -35,19 +35,16 @@ $SKILL_DIR/scripts/cleanup.sh --keep-data
 ## What Gets Cleaned Up
 
 ### Dev Server Stopped
-- Reads `test-output/.dev-server.json` to find and stop the dev server process
-- Kills any processes occupying common dev ports (3000, 5173, 8080, 4200, 4321)
+- Reads `test-output/.dev-server.json` to find and stop the dev server process started by web-test
+- Only kills the specific process we started, NOT other processes on common ports
 
 ### Processes Killed
 - Test browser processes (Chrome/Chromium using test-output profile)
 - Browsers using remote-debugging-port 9222
 
 ### Ports Freed
-- 3000 (Next.js, CRA)
-- 5173 (Vite)
-- 8080 (Vue CLI, Webpack)
-- 4200 (Angular)
-- 4321 (Astro)
+- The port used by our dev server (as recorded in `.dev-server.json`)
+- Does NOT kill other processes on common ports to avoid affecting unrelated services
 
 ### State Files Cleaned
 - `.browser-cdp.json` - Browser CDP connection info
@@ -104,18 +101,14 @@ This:
 If the cleanup script is not available, you can run these commands manually:
 
 ```bash
-# Stop dev server using saved PID
+# Stop dev server using saved PID (only kills our process)
 DEV_PID=$(node -e "console.log(require('./test-output/.dev-server.json').pid)" 2>/dev/null)
 kill -9 $DEV_PID 2>/dev/null
 
-# Kill browser processes
+# Kill browser processes (only test browsers)
 pkill -f "Google Chrome.*test-output"
 pkill -f "chromium.*test-output"
 pkill -f "remote-debugging-port=9222"
-
-# Free specific port
-lsof -ti:3000 | xargs kill -9
-lsof -ti:5173 | xargs kill -9
 
 # Remove state files
 rm -f ./test-output/.dev-server.json

@@ -21,20 +21,25 @@ done
 
 echo "=== Web Test Cleanup ==="
 
-# 1. Stop dev server if running
+# 1. Stop dev server if running (only the one we started)
 echo "[1/4] Stopping dev server..."
 DEV_SERVER_FILE="./test-output/.dev-server.json"
 if [ -f "$DEV_SERVER_FILE" ]; then
   DEV_PID=$(node -e "try { console.log(require('$DEV_SERVER_FILE').pid) } catch(e) {}" 2>/dev/null)
   if [ -n "$DEV_PID" ]; then
-    echo "  Found dev server (PID: $DEV_PID), stopping..."
-    # Try to kill process group first, then the process itself
-    kill -TERM -$DEV_PID 2>/dev/null || kill -TERM $DEV_PID 2>/dev/null || true
-    sleep 1
-    # Force kill if still running
-    kill -9 -$DEV_PID 2>/dev/null || kill -9 $DEV_PID 2>/dev/null || true
+    # Check if process is still running
+    if kill -0 $DEV_PID 2>/dev/null; then
+      echo "  Found dev server (PID: $DEV_PID), stopping..."
+      # Try to kill process group first, then the process itself
+      kill -TERM -$DEV_PID 2>/dev/null || kill -TERM $DEV_PID 2>/dev/null || true
+      sleep 1
+      # Force kill if still running
+      kill -9 -$DEV_PID 2>/dev/null || kill -9 $DEV_PID 2>/dev/null || true
+      echo "  Dev server stopped"
+    else
+      echo "  Dev server process (PID: $DEV_PID) no longer running"
+    fi
     rm -f "$DEV_SERVER_FILE"
-    echo "  Dev server stopped"
   else
     echo "  Dev server file exists but no valid PID found"
     rm -f "$DEV_SERVER_FILE"
@@ -42,16 +47,6 @@ if [ -f "$DEV_SERVER_FILE" ]; then
 else
   echo "  No dev server state file found"
 fi
-
-# Also kill common dev server processes on common ports
-echo "  Checking common dev server ports..."
-for PORT in 3000 5173 8080 4200 4321; do
-  PID=$(lsof -ti:$PORT 2>/dev/null)
-  if [ -n "$PID" ]; then
-    echo "  Killing process on port $PORT (PID: $PID)"
-    kill -9 $PID 2>/dev/null || true
-  fi
-done
 
 # 2. Close persistent browser via Playwright CDP
 echo "[2/4] Closing test browser..."
