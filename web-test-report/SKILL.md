@@ -1,275 +1,300 @@
 ---
 name: web-test-report
-description: Generate test report after completing tests - summarize results, document failures, include screenshots, provide recommendations. Use AFTER completing all tests.
+description: Generate test report with clear visual indicators - ✅ for pass, ❌ for fail. Summarize results, document failures, provide recommendations.
 license: MIT
 compatibility: Node.js 18+
 metadata:
   author: AI Agent
-  version: 1.0.0
+  version: 2.0.0
 allowed-tools: Bash Read Write Glob
 ---
 
 # Test Report Generation
 
-Generate a comprehensive test report after completing all tests.
+Generate a clear, visually scannable test report.
 
-## When to Use This Skill
+## Visual Indicators (MUST USE)
 
-- **AFTER all tests are completed** - Document results
-- **When tests have failures** - Detail what went wrong
-- **Before cleanup** - Capture results before removing data
+| Status | Symbol | Usage |
+|--------|--------|-------|
+| Pass | ✅ | Test passed successfully |
+| Fail | ❌ | Test failed |
+| Skip | ⏭️ | Test skipped |
+| Warning | ⚠️ | Test passed with issues |
+| Blocked | 🚫 | Test blocked by dependency |
 
-## Prerequisites
-
-1. All tests have been executed
-2. Screenshots are available in `./test-output/screenshots/`
-3. Test results are known (pass/fail for each test)
-
-## Quick Start
-
-```bash
-# Generate report file
-cat > ./test-output/test-report.md << 'EOF'
-# Test Report
-[Your report content]
-EOF
-```
+**DO NOT use plain text like "PASS" or "FAIL" - always use symbols!**
 
 ## Report Structure
 
-### Section 1: Header
+### Section 1: Header & Summary
 
 ```markdown
 # Test Report
 
-**Date:** YYYY-MM-DD HH:MM
-**Project:** [Project Name]
-**URL:** [Tested URL]
-**Is Web3 DApp:** YES / NO
-**Tester:** AI Agent (Claude)
+📅 **Date:** 2024-01-15 14:30
+🌐 **Project:** [Project Name]
+🔗 **URL:** http://localhost:3000
+🔗 **Is Web3:** Yes / No
+
+---
+
+## Summary
+
+| | Count |
+|---|---:|
+| ✅ Passed | 8 |
+| ❌ Failed | 2 |
+| ⏭️ Skipped | 1 |
+| **Total** | **11** |
+
+**Pass Rate: 80%**
+
+**Overall: ❌ FAILED** (or ✅ PASSED if all pass)
 ```
 
-### Section 2: Executive Summary
+### Section 2: Results Table
 
-```markdown
-## Executive Summary
-
-| Metric | Value |
-|--------|-------|
-| Total Tests | X |
-| Passed | X |
-| Failed | X |
-| Pass Rate | X% |
-
-**Overall Status:** ✅ PASS / ❌ FAIL / ⚠️ PARTIAL
-```
-
-### Section 3: Test Results
+**Use a clear table with status symbols:**
 
 ```markdown
 ## Test Results
 
-### ✅ Passed Tests
-
-#### TC-001: Homepage Load
-- **Status:** ✅ PASS
-- **Duration:** Xs
-- **Screenshot:** [screenshots/tc001-homepage.jpg](screenshots/tc001-homepage.jpg)
-- **Notes:** Page loaded successfully with all elements visible
-
-#### TC-002: Navigation
-- **Status:** ✅ PASS
-- **Duration:** Xs
-- **Screenshot:** [screenshots/tc002-navigation.jpg](screenshots/tc002-navigation.jpg)
-- **Notes:** All navigation links work correctly
-
-### ❌ Failed Tests
-
-#### TC-003: Form Submission
-- **Status:** ❌ FAIL
-- **Duration:** Xs
-- **Screenshot:** [screenshots/tc003-form-error.jpg](screenshots/tc003-form-error.jpg)
-- **Expected:** Form submits successfully
-- **Actual:** Error message "Invalid email format"
-- **Error Details:** Validation failed despite valid input
-- **Recommendation:** Check email validation regex
-
-### ⚠️ Skipped Tests
-
-#### TC-010: Premium Feature
-- **Status:** ⚠️ SKIPPED
-- **Reason:** Requires premium account access
+| Status | ID | Test Name | Notes |
+|:------:|:---|:----------|:------|
+| ✅ | TC-001 | Homepage Load | Loaded in 1.2s |
+| ✅ | TC-002 | Navigation | All links work |
+| ✅ | TC-003 | Login Form | Successfully logged in |
+| ❌ | TC-004 | Submit Order | Button not clickable |
+| ❌ | TC-005 | Payment | Timeout waiting for response |
+| ⏭️ | TC-006 | Admin Panel | Requires admin access |
+| ✅ | TC-007 | Logout | Session cleared |
 ```
 
-### Section 4: Web3 Test Results (if applicable)
+### Section 3: Failed Tests Detail
+
+**For each failed test, provide details:**
 
 ```markdown
-## Web3 Test Results
+## ❌ Failed Tests
+
+### TC-004: Submit Order
+
+| | |
+|---|---|
+| **Status** | ❌ FAILED |
+| **Screenshot** | [tc004-error.jpg](screenshots/tc004-error.jpg) |
+
+**Expected:** Order submits successfully
+**Actual:** Submit button disabled, cannot click
+
+**Steps to Reproduce:**
+1. Add item to cart
+2. Go to checkout
+3. Fill in details
+4. Click "Submit Order" ← Button is disabled
+
+---
+
+### TC-005: Payment
+
+| | |
+|---|---|
+| **Status** | ❌ FAILED |
+| **Screenshot** | [tc005-timeout.jpg](screenshots/tc005-timeout.jpg) |
+
+**Expected:** Payment processes within 30s
+**Actual:** Timeout after 30s, no response
+
+**Error:** `TimeoutError: waiting for selector ".payment-success"`
+```
+
+### Section 4: Web3 Results (if applicable)
+
+```markdown
+## 🔗 Web3 Test Results
 
 ### Wallet Connection
-- **Status:** ✅ PASS / ❌ FAIL
-- **Wallet:** Rabby
-- **Network:** Ethereum Mainnet
-- **Address:** 0x1234...abcd
+| | |
+|---|---|
+| **Status** | ✅ Connected |
+| **Wallet** | Rabby |
+| **Address** | 0x1234...abcd |
+| **Network** | Ethereum |
 
-### Transaction Tests
+### Transactions
 
-#### TX-001: Token Swap
-- **Status:** ✅ PASS
-- **Transaction Type:** Swap
-- **Screenshot:** [screenshots/tx001-swap.jpg](screenshots/tx001-swap.jpg)
-- **Notes:** Swap executed successfully
-
-#### TX-002: NFT Mint
-- **Status:** ❌ FAIL
-- **Transaction Type:** Mint
-- **Screenshot:** [screenshots/tx002-mint-error.jpg](screenshots/tx002-mint-error.jpg)
-- **Error:** Transaction reverted - insufficient funds
+| Status | Test | Tx Type | Popups | Notes |
+|:------:|:-----|:--------|:------:|:------|
+| ✅ | SWAP-001 | Swap ETH→USDC | 1 | Success |
+| ✅ | SWAP-002 | Swap USDC→ETH | 2 | Approve + Swap |
+| ❌ | SWAP-003 | Large Swap | 0 | Insufficient balance error not shown |
 ```
 
-### Section 5: Screenshots Index
+### Section 5: Issues Found
 
 ```markdown
-## Screenshots
+## 🐛 Issues Found
 
-| Test | Screenshot | Description |
-|------|------------|-------------|
-| TC-001 | [tc001-homepage.jpg](screenshots/tc001-homepage.jpg) | Homepage initial load |
-| TC-002 | [tc002-navigation.jpg](screenshots/tc002-navigation.jpg) | After navigation |
-| TC-003 | [tc003-form-error.jpg](screenshots/tc003-form-error.jpg) | Form validation error |
+### Issue #1: Submit Button Disabled
+| | |
+|---|---|
+| **Severity** | 🔴 High |
+| **Test** | TC-004 |
+| **Screenshot** | [tc004-error.jpg](screenshots/tc004-error.jpg) |
+
+**Description:** Submit order button remains disabled after filling all required fields
+
+**Reproduce:**
+1. Add item to cart
+2. Complete checkout form
+3. Observe submit button state
+
+---
+
+### Issue #2: Payment Timeout
+| | |
+|---|---|
+| **Severity** | 🔴 High |
+| **Test** | TC-005 |
+
+**Description:** Payment API does not respond within timeout
 ```
 
-### Section 6: Issues Found
+### Section 6: Recommendations
 
 ```markdown
-## Issues Found
+## 📋 Recommendations
 
-### Issue #1: Form Validation Bug
-- **Severity:** Medium
-- **Test:** TC-003
-- **Description:** Email validation rejects valid email addresses
-- **Steps to Reproduce:**
-  1. Navigate to /contact
-  2. Enter email: test@example.com
-  3. Click Submit
-- **Expected:** Form submits
-- **Actual:** Error "Invalid email format"
-- **Screenshot:** [screenshots/tc003-form-error.jpg](screenshots/tc003-form-error.jpg)
+### 🔴 High Priority
+1. Fix submit button disabled state logic
+2. Add timeout handling for payment API
 
-### Issue #2: [Issue Title]
-...
+### 🟡 Medium Priority
+1. Add loading indicators for async operations
+2. Improve error messages
+
+### 🟢 Low Priority
+1. Add keyboard shortcuts
+2. Optimize image loading
 ```
 
-### Section 7: Recommendations
+## Example Complete Report
 
 ```markdown
-## Recommendations
+# Test Report
 
-### High Priority
-1. Fix email validation regex in contact form
-2. Add error handling for network failures
+📅 **Date:** 2024-01-15 14:30
+🌐 **Project:** MyShop
+🔗 **URL:** http://localhost:3000
+🔗 **Is Web3:** No
 
-### Medium Priority
-1. Improve loading states for async operations
-2. Add confirmation dialogs for destructive actions
+---
 
-### Low Priority
-1. Consider adding keyboard navigation support
-2. Optimize image loading for better performance
-```
+## Summary
 
-### Section 8: Environment
+| | Count |
+|---|---:|
+| ✅ Passed | 5 |
+| ❌ Failed | 2 |
+| ⏭️ Skipped | 0 |
+| **Total** | **7** |
 
-```markdown
-## Test Environment
+**Pass Rate: 71%**
 
-- **Browser:** Chromium (Playwright)
-- **Viewport:** 1280x720
-- **Mode:** Headed
-- **Wallet Extension:** Rabby (if Web3)
-- **Network:** [Network name] (if Web3)
+**Overall: ❌ FAILED**
+
+---
+
+## Test Results
+
+| Status | ID | Test Name | Notes |
+|:------:|:---|:----------|:------|
+| ✅ | TC-001 | Homepage Load | 1.2s |
+| ✅ | TC-002 | Product List | 15 products shown |
+| ✅ | TC-003 | Add to Cart | Item added |
+| ✅ | TC-004 | View Cart | Correct items |
+| ❌ | TC-005 | Checkout | Form validation error |
+| ❌ | TC-006 | Payment | Timeout |
+| ✅ | TC-007 | Contact Form | Sent successfully |
+
+---
+
+## ❌ Failed Tests
+
+### TC-005: Checkout
+| | |
+|---|---|
+| **Status** | ❌ FAILED |
+| **Screenshot** | [screenshots/tc005.jpg](screenshots/tc005.jpg) |
+
+**Expected:** Proceed to payment
+**Actual:** "Invalid phone number" error for valid input
+
+---
+
+### TC-006: Payment
+| | |
+|---|---|
+| **Status** | ❌ FAILED |
+| **Screenshot** | [screenshots/tc006.jpg](screenshots/tc006.jpg) |
+
+**Expected:** Payment completes
+**Actual:** Timeout after 30s
+
+---
+
+## 🐛 Issues Found
+
+### Issue #1: Phone Validation Bug
+| | |
+|---|---|
+| **Severity** | 🔴 High |
+| **Test** | TC-005 |
+
+Valid phone numbers rejected by validation.
+
+### Issue #2: Payment API Timeout
+| | |
+|---|---|
+| **Severity** | 🔴 High |
+| **Test** | TC-006 |
+
+Payment API not responding.
+
+---
+
+## 📋 Recommendations
+
+### 🔴 High Priority
+1. Fix phone number validation regex
+2. Check payment API endpoint health
+
+---
+
+## 📸 Screenshots
+
+| Test | File |
+|------|------|
+| TC-001 | [tc001-homepage.jpg](screenshots/tc001-homepage.jpg) |
+| TC-005 | [tc005-checkout-error.jpg](screenshots/tc005-checkout-error.jpg) |
+| TC-006 | [tc006-payment-timeout.jpg](screenshots/tc006-payment-timeout.jpg) |
 ```
 
 ## Instructions
 
-### Step 1: Collect Test Results
-
-Review all test outcomes:
-- Which tests passed
-- Which tests failed (with error details)
-- Which tests were skipped
-
-### Step 2: Gather Screenshots
-
-List available screenshots:
-```bash
-ls -la ./test-output/screenshots/
-```
-
-### Step 3: Write Report
-
-Create the report file:
-
-```bash
-cat > ./test-output/test-report.md << 'EOF'
-# Test Report
-
-**Date:** $(date "+%Y-%m-%d %H:%M")
-**Project:** [Project Name]
-**URL:** [URL]
-**Is Web3 DApp:** YES/NO
-
-## Executive Summary
-
-| Metric | Value |
-|--------|-------|
-| Total Tests | X |
-| Passed | X |
-| Failed | X |
-| Pass Rate | X% |
-
-## Test Results
-
-[Detailed results here]
-
-## Issues Found
-
-[Issues here]
-
-## Recommendations
-
-[Recommendations here]
-EOF
-```
-
-### Step 4: Verify Report
-
-Check that report is complete:
-- All tests documented
-- Screenshots referenced correctly
-- Issues clearly described
-- Recommendations provided
+1. **Collect results** - List all test outcomes
+2. **Use symbols** - ✅ ❌ ⏭️ for every test status
+3. **Create table** - Summary table with counts
+4. **Detail failures** - Each failed test with screenshots and steps
+5. **List issues** - With severity indicators
+6. **Add recommendations** - Prioritized action items
 
 ## Output
 
-Report saved to: `./test-output/test-report.md`
+Save to: `./test-output/test-report.md`
 
 ## Related Skills
 
-- **web-test** - Run tests before generating report
-- **web-test-cleanup** - Clean up after report is saved
-
-## Next Steps
-
-After generating report:
-1. Review the report for completeness
-2. Run **web-test-cleanup** with `--keep-data` to preserve report
-3. Share report with stakeholders
-
-## Notes
-
-- Generate report BEFORE cleanup to ensure screenshots are available
-- Use relative paths for screenshot references
-- Include all tests, even skipped ones
-- Be specific about failure reasons and reproduction steps
-- Recommendations should be actionable
+- **web-test** - Run tests first
+- **web-test-cleanup** - Clean up after report (use --keep-data)
