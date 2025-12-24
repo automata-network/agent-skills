@@ -21,7 +21,7 @@ Set up Rabby wallet extension for Web3 DApp testing.
 
 ## Prerequisites
 
-1. **WALLET_PRIVATE_KEY environment variable** must be set
+1. **`tests/.test-env`** file with `WALLET_PRIVATE_KEY` already exists
 2. Project research completed (web-test-research)
 3. Confirmed this is a Web3 DApp
 
@@ -30,97 +30,32 @@ Set up Rabby wallet extension for Web3 DApp testing.
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Step 1: Check if WALLET_PRIVATE_KEY is set in environment
-echo $WALLET_PRIVATE_KEY | head -c 10
-
-# Step 2: Download wallet extension (no key needed)
+# Step 1: Download wallet extension
 node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
 
-# Step 3: Initialize wallet - pass $WALLET_PRIVATE_KEY to child process
-WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+# Step 2: Initialize wallet (reads WALLET_PRIVATE_KEY from .test-env, writes WALLET_PASSWORD)
+node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```
 
-**Note:** Use `$WALLET_PRIVATE_KEY` (with $) to pass the environment variable to the child process.
+## How It Works
 
-## Environment Setup
-
-### Setting the Private Key
-
-**CRITICAL:** The private key must be passed to child processes.
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│  ⚠️  IMPORTANT: Pass Environment Variable to Child Process     │
-│                                                                │
-│  Step 1: Check if WALLET_PRIVATE_KEY exists in environment    │
-│                                                                │
-│     echo $WALLET_PRIVATE_KEY | head -c 10                      │
-│                                                                │
-│  Step 2: If exists, pass it to child process using $VAR       │
-│                                                                │
-│     WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node ...          │
-│                                                                │
-│  Step 3: If NOT exists, ask user to set it first              │
-│                                                                │
-│     "Please set WALLET_PRIVATE_KEY before running tests"       │
-└────────────────────────────────────────────────────────────────┘
-```
-
-**How to check and use:**
-```bash
-# Step 1: Check if variable exists in environment
-echo $WALLET_PRIVATE_KEY | head -c 10
-
-# Step 2: If it shows the key prefix, pass it to child process
-WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
-```
-
-**If variable is not set:**
-```
-Ask user: "WALLET_PRIVATE_KEY is not set in your environment.
-Please run this command in your terminal and restart Claude Code:
-
-export WALLET_PRIVATE_KEY=\"0xYourPrivateKey\"
-"
-```
-
-**Security Notes:**
-- NEVER commit private keys to version control
-- Use a TEST wallet with minimal funds
-- Private key is ONLY read from environment variable
-- The script will fail if private key is not set
+- **Reads** `WALLET_PRIVATE_KEY` from `tests/.test-env`
+- **Writes** `WALLET_PASSWORD` to `tests/.test-env` (auto-generated if not set)
+- Private key is only used locally in Playwright browser, never exposed to AI APIs
 
 ## Instructions
 
-### Step 1: Check Environment Variable
-
-**First, check if WALLET_PRIVATE_KEY is set:**
-
-```bash
-echo $WALLET_PRIVATE_KEY | head -c 10
-```
-
-- If output shows `0x...` prefix → Variable is set, continue to Step 2
-- If output is empty → Ask user to set it:
-
-```
-"WALLET_PRIVATE_KEY is not set. Please run this in your terminal and restart Claude Code:
-
-export WALLET_PRIVATE_KEY=\"0xYourPrivateKey\"
-"
-```
-
-### Step 2: Download Wallet Extension
+### Step 1: Download Wallet Extension
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Download and install Rabby wallet extension (no private key needed for this step)
+# Download and install Rabby wallet extension
 node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
 ```
 
 **What this does:**
-- Downloads Rabby wallet CRX file from GitHub
+- Downloads Rabby wallet from GitHub releases
 - Extracts to `./test-output/extensions/rabby/`
 - Prepares extension for browser loading
 
@@ -133,21 +68,20 @@ node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
 }
 ```
 
-### Step 3: Initialize Wallet
+### Step 2: Initialize Wallet
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Initialize wallet - pass $WALLET_PRIVATE_KEY to child process
-# ⚠️ Use $WALLET_PRIVATE_KEY (with $) to reference the environment variable!
-WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+# Initialize wallet (reads from .test-env automatically)
+node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```
 
 **What this does:**
+- Reads `WALLET_PRIVATE_KEY` from `tests/.test-env`
 - Launches browser with wallet extension
-- Navigates to Rabby setup page
-- Imports wallet using private key from environment
-- Sets up wallet password
+- Imports wallet using private key
+- Generates and saves `WALLET_PASSWORD` to `.test-env`
 - Verifies wallet is ready
 
 **Expected Output:**
@@ -161,27 +95,9 @@ WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node $SKILL_DIR/scripts/wallet-setup-he
 
 ## Troubleshooting
 
-### "WALLET_PRIVATE_KEY not set"
+### "WALLET_PRIVATE_KEY not found in .test-env file"
 
-**Cause:** The environment variable is not set, or not passed to the child process.
-
-**Solution:**
-
-1. First check if the variable exists:
-```bash
-echo $WALLET_PRIVATE_KEY | head -c 10
-```
-
-2. If empty, ask user to set it in their terminal and restart Claude Code:
-```bash
-export WALLET_PRIVATE_KEY="0xYourKey"
-```
-
-3. If set, pass it to child process using `$WALLET_PRIVATE_KEY`:
-```bash
-# ✅ CORRECT - use $WALLET_PRIVATE_KEY to reference the variable
-WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
-```
+The `.test-env` file does not exist or does not contain the private key. Ensure `tests/.test-env` exists with `WALLET_PRIVATE_KEY` before running this skill.
 
 ### "Extension download failed"
 
@@ -195,7 +111,7 @@ Check network connection. The script downloads from GitHub releases.
 
 ### "Wallet already initialized"
 
-If wallet was previously set up, it will be unlocked automatically.
+If wallet was previously set up, it will be unlocked automatically using the password from `.test-env`.
 
 To reset:
 ```bash
@@ -206,14 +122,15 @@ node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 
 ## Data Storage
 
-Wallet data is stored in the project directory:
-
 ```
-<project-root>/test-output/
-├── extensions/
-│   └── rabby/           # Wallet extension files
-├── chrome-profile/      # Browser profile with wallet state
-└── screenshots/         # Setup screenshots for debugging
+<project-root>/
+├── tests/
+│   └── .test-env        # Reads WALLET_PRIVATE_KEY, writes WALLET_PASSWORD
+└── test-output/
+    ├── extensions/
+    │   └── rabby/       # Wallet extension files
+    ├── chrome-profile/  # Browser profile with wallet state
+    └── screenshots/     # Setup screenshots for debugging
 ```
 
 ## Related Skills

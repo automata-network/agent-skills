@@ -35,15 +35,16 @@ Usage:
   # 1. Download and install Rabby extension
   node wallet-setup-helper.js wallet-setup
 
-  # 2. Set private key (REQUIRED)
-  export WALLET_PRIVATE_KEY="your_private_key_here"
-
-  # 3. Initialize wallet
+  # 2. Initialize wallet (reads WALLET_PRIVATE_KEY from tests/.test-env)
   node wallet-setup-helper.js wallet-init --wallet --headed
 
-SECURITY:
-  - Private key MUST be set via: export WALLET_PRIVATE_KEY="..."
-  - Key is NEVER logged, transmitted, or stored
+Prerequisites:
+  - tests/.test-env file must exist with WALLET_PRIVATE_KEY
+
+Security:
+  - Private key is read from tests/.test-env file only
+  - Key is NEVER logged or transmitted to AI APIs
+  - WALLET_PASSWORD is auto-generated and saved to .test-env
 `);
   }
 };

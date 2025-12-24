@@ -13,34 +13,9 @@ allowed-tools: Bash Read Write Glob Grep Task Skill
 
 Execute tests from persistent test cases in `./tests/` directory.
 
-## ⚠️ CRITICAL RULES - READ FIRST
+## CRITICAL RULES - READ FIRST
 
-### Rule 1: Check WALLET_PRIVATE_KEY Before Web3 Testing
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│  IF config.yaml contains web3.enabled: true                   │
-│                                                                │
-│  THEN FIRST CHECK environment variable:                        │
-│                                                                │
-│     echo $WALLET_PRIVATE_KEY | head -c 10                      │
-│                                                                │
-│  ├─ If output shows "0x..." → Continue to wallet setup         │
-│  │                                                             │
-│  └─ If output is EMPTY → STOP and tell user:                   │
-│                                                                │
-│     "WALLET_PRIVATE_KEY is not set.                            │
-│      Please run this in your terminal and restart Claude Code: │
-│                                                                │
-│      export WALLET_PRIVATE_KEY=\"0xYourPrivateKey\"            │
-│     "                                                          │
-│                                                                │
-│  ❌ DO NOT proceed with wallet setup if key is not set         │
-│  ❌ DO NOT skip this check for Web3 DApps                      │
-└────────────────────────────────────────────────────────────────┘
-```
-
-### Rule 2: Web3 Wallet Setup is MANDATORY
+### Rule 1: Web3 Wallet Setup is MANDATORY
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -49,7 +24,7 @@ Execute tests from persistent test cases in `./tests/` directory.
 │    web3:                                                       │
 │      enabled: true                                             │
 │                                                                │
-│  THEN YOU MUST RUN (after Rule 1 check passes):                │
+│  THEN YOU MUST RUN:                                            │
 │                                                                │
 │    1. skill web-test-wallet-setup    ← REQUIRED!               │
 │    2. skill web-test-wallet-connect  ← REQUIRED!               │
@@ -67,18 +42,17 @@ Execute tests from persistent test cases in `./tests/` directory.
 - Tests will FAIL if wallet is not set up first
 - Wallet popups cannot be handled without proper setup
 
-### Rule 3: Follow Execution Order
+### Rule 2: Follow Execution Order
 
 Always execute in this exact order:
 1. Check for test cases
 2. `web-test-cleanup` - Clean previous session
 3. Read config.yaml
-4. Check WALLET_PRIVATE_KEY - **(if web3.enabled: true)**
-5. `web-test-wallet-setup` - **(if web3.enabled: true)**
-6. `web-test-wallet-connect` - **(if web3.enabled: true)**
-7. Execute test cases
-8. `web-test-report` - Generate report
-9. `web-test-cleanup --keep-data` - Final cleanup
+4. `web-test-wallet-setup` - **(if web3.enabled: true)**
+5. `web-test-wallet-connect` - **(if web3.enabled: true)**
+6. Execute test cases
+7. `web-test-report` - Generate report
+8. `web-test-cleanup --keep-data` - Final cleanup
 
 ---
 
@@ -117,24 +91,19 @@ Run the tests for this project
 │          ↓                                                      │
 │          Is Web3 DApp? (web3.enabled: true)                     │
 │          ├─ YES ↓                                               │
-│          │  Step 4: Check WALLET_PRIVATE_KEY                    │
-│          │          echo $WALLET_PRIVATE_KEY | head -c 10       │
-│          │          ├─ EMPTY → STOP, tell user to set it        │
-│          │          └─ OK → Continue                            │
+│          │  Step 4: Use skill web-test-wallet-setup             │
 │          │          ↓                                           │
-│          │  Step 5: Use skill web-test-wallet-setup             │
-│          │          ↓                                           │
-│          │  Step 6: Use skill web-test-wallet-connect           │
-│          └─ NO  → Skip Steps 4-6                                │
+│          │  Step 5: Use skill web-test-wallet-connect           │
+│          └─ NO  → Skip Steps 4-5                                │
 │          ↓                                                      │
-│  Step 7: Execute test cases                                     │
+│  Step 6: Execute test cases                                     │
 │          For each test in execution_order:                      │
 │          - Run test steps                                       │
 │          - Record pass/fail                                     │
 │          ↓                                                      │
-│  Step 8: Use skill web-test-report                              │
+│  Step 7: Use skill web-test-report                              │
 │          ↓                                                      │
-│  Step 9: Use skill web-test-cleanup --keep-data                 │
+│  Step 8: Use skill web-test-cleanup --keep-data                 │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -187,29 +156,7 @@ Read `./tests/test-cases.yaml`:
 cat ./tests/test-cases.yaml
 ```
 
-### Step 4: Check WALLET_PRIVATE_KEY (if Web3)
-
-**Skip this step if `web3.enabled: false` or not set.**
-
-If `web3.enabled: true` in config, check environment variable:
-
-```bash
-# Check if environment variable is set
-echo $WALLET_PRIVATE_KEY | head -c 10
-```
-
-- If output shows `0x...` → Continue to Step 5
-- If output is EMPTY → **STOP** and tell user:
-
-```
-"WALLET_PRIVATE_KEY is not set in your environment.
-Please run this in your terminal and restart Claude Code:
-
-export WALLET_PRIVATE_KEY=\"0xYourPrivateKey\"
-"
-```
-
-### Step 5: Wallet Setup (if Web3)
+### Step 4: Wallet Setup (if Web3)
 
 **Skip this step if `web3.enabled: false` or not set.**
 
@@ -217,7 +164,7 @@ export WALLET_PRIVATE_KEY=\"0xYourPrivateKey\"
 Use skill web-test-wallet-setup
 ```
 
-### Step 6: Wallet Connect (if Web3)
+### Step 5: Wallet Connect (if Web3)
 
 **Skip this step if `web3.enabled: false` or not set.**
 
@@ -225,7 +172,7 @@ Use skill web-test-wallet-setup
 Use skill web-test-wallet-connect
 ```
 
-### Step 7: Execute Test Cases
+### Step 6: Execute Test Cases
 
 For each test ID in `execution_order`:
 
@@ -246,13 +193,13 @@ For each test ID in `execution_order`:
 | `wait` | `node $SKILL_DIR/scripts/test-helper.js wait [ms] --headed --keep-open` |
 | `wallet-approve` | Use `wallet-approve` from web-test-wallet-connect skill |
 
-### Step 8: Generate Report
+### Step 7: Generate Report
 
 ```
 Use skill web-test-report
 ```
 
-### Step 9: Final Cleanup
+### Step 8: Final Cleanup
 
 ```
 Use skill web-test-cleanup --keep-data

@@ -40,17 +40,19 @@ These skills work with any AI coding agent that supports the SKILL.md format:
 
 ### Web3 DApp Testing (Optional)
 
-For testing Web3 DApps, set the wallet private key as an environment variable:
+For testing Web3 DApps, create a `.test-env` file in `tests/` directory:
 
 ```bash
-export WALLET_PRIVATE_KEY="your_private_key_here"
+mkdir -p tests
+echo 'WALLET_PRIVATE_KEY="your_private_key_here"' > tests/.test-env
 ```
 
 **Security Notes:**
-- Private key is **only read from environment variables** (not .env files)
-- `.env` files are intentionally not supported to prevent accidental commits
+- Private key is **only read from `tests/.test-env`** file (not environment variables)
+- This file is NOT exposed to AI agent APIs
+- Add `.test-env` to `.gitignore` to prevent accidental commits
 - Use a **test wallet with test funds only**
-- Optionally set `WALLET_PASSWORD` for wallet unlock (auto-generated if not set)
+- `WALLET_PASSWORD` is auto-generated and saved to `.test-env` if not set
 
 ## 4. How to Run
 

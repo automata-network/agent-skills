@@ -74,11 +74,11 @@ These commands are used by the wallet skills internally:
 
 ### Security Principles
 
+- Private key is stored in `tests/.test-env` file (persistent directory)
 - Private key is handled by `web-test-wallet-setup` skill only
 - Private key is **NEVER** uploaded to AI APIs or logged
 - Private key is only used locally in Playwright browser context
 - All wallet operations happen in local browser instance
-- No .env file support (intentionally disabled for security)
 
 ## Framework Detection
 

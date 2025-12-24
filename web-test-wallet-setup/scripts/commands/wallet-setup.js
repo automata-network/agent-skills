@@ -9,6 +9,102 @@ const { execSync } = require('child_process');
 const crypto = require('crypto');
 
 const { EXTENSIONS_DIR, SCREENSHOTS_DIR } = require('../lib/config');
+
+// .test-env file path - stored in tests/ directory (persistent, not cleaned before tests)
+const TEST_ENV_FILE = path.join(process.cwd(), 'tests', '.test-env');
+
+/**
+ * Read sensitive values from .test-env file
+ * This file should NOT be committed to git or exposed to external APIs
+ * @returns {Object} Object with WALLET_PRIVATE_KEY and WALLET_PASSWORD
+ */
+function readTestEnv() {
+  const result = {
+    WALLET_PRIVATE_KEY: null,
+    WALLET_PASSWORD: null,
+  };
+
+  if (!fs.existsSync(TEST_ENV_FILE)) {
+    return result;
+  }
+
+  try {
+    const content = fs.readFileSync(TEST_ENV_FILE, 'utf8');
+    const lines = content.split('\n');
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex === -1) continue;
+
+      const key = trimmed.substring(0, eqIndex).trim();
+      let value = trimmed.substring(eqIndex + 1).trim();
+
+      // Remove quotes if present
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+
+      if (key === 'WALLET_PRIVATE_KEY' || key === 'WALLET_PASSWORD') {
+        result[key] = value;
+      }
+    }
+  } catch (e) {
+    console.log(JSON.stringify({
+      status: 'warning',
+      message: `Failed to read .test-env: ${e.message}`
+    }));
+  }
+
+  return result;
+}
+
+/**
+ * Write or update a value in .test-env file
+ * @param {string} key - The key to write
+ * @param {string} value - The value to write
+ */
+function writeTestEnv(key, value) {
+  let content = '';
+  const entries = {};
+
+  // Read existing content
+  if (fs.existsSync(TEST_ENV_FILE)) {
+    content = fs.readFileSync(TEST_ENV_FILE, 'utf8');
+    const lines = content.split('\n');
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex === -1) continue;
+
+      const k = trimmed.substring(0, eqIndex).trim();
+      let v = trimmed.substring(eqIndex + 1).trim();
+
+      if ((v.startsWith('"') && v.endsWith('"')) ||
+          (v.startsWith("'") && v.endsWith("'"))) {
+        v = v.slice(1, -1);
+      }
+
+      entries[k] = v;
+    }
+  }
+
+  // Update the value
+  entries[key] = value;
+
+  // Write back
+  const newContent = Object.entries(entries)
+    .map(([k, v]) => `${k}="${v}"`)
+    .join('\n') + '\n';
+
+  fs.writeFileSync(TEST_ENV_FILE, newContent, 'utf8');
+}
 const {
   startBrowser,
   getContext,
@@ -585,14 +681,18 @@ const commands = {
   },
 
   async 'wallet-init'(args, options) {
-    const privateKey = process.env.WALLET_PRIVATE_KEY;
+    // Read sensitive values from .test-env file (NOT from environment variables)
+    // This ensures secrets are not exposed to AI agent APIs or external processes
+    const testEnv = readTestEnv();
+    const privateKey = testEnv.WALLET_PRIVATE_KEY;
 
     if (!privateKey) {
       console.log(JSON.stringify({
         success: false,
-        error: 'WALLET_PRIVATE_KEY environment variable is NOT set',
-        fix: 'Set it in your terminal before running this command:',
-        command: 'export WALLET_PRIVATE_KEY="your_private_key_here"'
+        error: 'WALLET_PRIVATE_KEY not found in .test-env file',
+        fix: 'Create or update the .test-env file in test-output directory:',
+        file: TEST_ENV_FILE,
+        example: 'WALLET_PRIVATE_KEY="0xYourPrivateKeyHere"'
       }));
       process.exit(1);
     }
@@ -605,16 +705,17 @@ const commands = {
       return;
     }
 
-    let walletPassword = process.env.WALLET_PASSWORD;
+    let walletPassword = testEnv.WALLET_PASSWORD;
     let passwordGenerated = false;
 
     if (!walletPassword) {
       walletPassword = generatePassword();
-      process.env.WALLET_PASSWORD = walletPassword;
+      // Save generated password to .test-env file for persistence across sessions
+      writeTestEnv('WALLET_PASSWORD', walletPassword);
       passwordGenerated = true;
       console.log(JSON.stringify({
         status: 'info',
-        message: 'Generated new wallet password (saved to WALLET_PASSWORD env var)'
+        message: 'Generated new wallet password (saved to .test-env file)'
       }));
     }
 
@@ -678,7 +779,7 @@ const commands = {
         case WalletState.LOCKED:
           steps.push('detected_locked');
 
-          if (!process.env.WALLET_PASSWORD || passwordGenerated) {
+          if (!testEnv.WALLET_PASSWORD || passwordGenerated) {
             console.log(JSON.stringify({
               status: 'info',
               message: 'No existing password, will reset wallet...'
@@ -790,4 +891,10 @@ const commands = {
   },
 };
 
+// Export commands and utility functions
 module.exports = commands;
+
+// Also export test-env utilities for other skills that may need WALLET_PASSWORD
+module.exports.readTestEnv = readTestEnv;
+module.exports.writeTestEnv = writeTestEnv;
+module.exports.TEST_ENV_FILE = TEST_ENV_FILE;
