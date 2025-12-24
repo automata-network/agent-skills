@@ -4,7 +4,7 @@
  *
  * Commands:
  *   wallet-setup   - Download and install MetaMask wallet extension
- *   wallet-init    - Initialize wallet with mnemonic
+ *   wallet-init    - Initialize wallet and import private key account
  *
  * Usage:
  *   node wallet-setup-helper.js wallet-setup
@@ -23,7 +23,7 @@ Wallet Setup Helper - Setup and initialize MetaMask wallet
 
 Commands:
   wallet-setup              Download and install MetaMask extension
-  wallet-init               Initialize wallet with mnemonic (import/unlock)
+  wallet-init               Initialize wallet and import private key account
 
 Options:
   --wallet                  Required for wallet-init
@@ -35,16 +35,22 @@ Usage:
   # 1. Download and install MetaMask extension
   node wallet-setup-helper.js wallet-setup
 
-  # 2. Initialize wallet (reads WALLET_MNEMONIC from tests/.test-env)
+  # 2. Initialize wallet (reads WALLET_PRIVATE_KEY from tests/.test-env)
   node wallet-setup-helper.js wallet-init --wallet --headed
 
 Prerequisites:
-  - tests/.test-env file must exist with WALLET_MNEMONIC (12 or 24 words)
+  - tests/.test-env file must exist with WALLET_PRIVATE_KEY
+
+Flow:
+  1. Generate random 12-word mnemonic (saved to WALLET_MNEMONIC)
+  2. Create MetaMask wallet using the mnemonic
+  3. Import WALLET_PRIVATE_KEY as additional account
+  4. Switch to the imported account (active for testing)
 
 Security:
-  - Mnemonic is read from tests/.test-env file only
-  - Mnemonic is NEVER logged or transmitted to AI APIs
-  - WALLET_PASSWORD is auto-generated and saved to .test-env
+  - Private key is read from tests/.test-env file only
+  - Keys are NEVER logged or transmitted to AI APIs
+  - WALLET_MNEMONIC and WALLET_PASSWORD are auto-generated
 `);
   }
 };

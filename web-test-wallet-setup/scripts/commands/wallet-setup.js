@@ -7,8 +7,12 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 const crypto = require("crypto");
+const bip39 = require("bip39");
 
 const { EXTENSIONS_DIR, SCREENSHOTS_DIR } = require("../lib/config");
+
+// Local MetaMask zip path in assets directory
+const METAMASK_LOCAL_ZIP = path.join(__dirname, "../../assets/metamask-chrome-13.13.1.zip");
 
 // .test-env file path - stored in tests/ directory (persistent, not cleaned before tests)
 const TEST_ENV_FILE = path.join(process.cwd(), "tests", ".test-env");
@@ -144,6 +148,15 @@ function generatePassword() {
 }
 
 /**
+ * Generate a random 12-word mnemonic using BIP39
+ * @returns {string} 12-word mnemonic phrase
+ */
+function generateMnemonic() {
+  // 128 bits of entropy = 12 words
+  return bip39.generateMnemonic(128);
+}
+
+/**
  * Detect the current MetaMask state
  * Updated for MetaMask v13 new UI
  */
@@ -166,7 +179,7 @@ async function detectMetaMaskState(page) {
 
   // Check for locked state (password input with unlock)
   const hasPasswordInput = await page
-    .$('input[type="password"]')
+    .$('#password, [data-testid="unlock-password"]')
     .catch(() => null);
   const hasUnlockButton =
     content.includes("Unlock") || content.includes("unlock");
@@ -186,6 +199,66 @@ async function detectMetaMaskState(page) {
   }
 
   return WalletState.UNKNOWN;
+}
+
+/**
+ * Helper to click if element is visible
+ */
+async function clickIfVisible(page, selector, description) {
+  try {
+    const el = await page.$(selector);
+    if (el && await el.isVisible()) {
+      await el.click();
+      console.log(JSON.stringify({ status: "info", message: `Clicked: ${description}` }));
+      return true;
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  return false;
+}
+
+/**
+ * Handle MetaMask special pages (consent, wallet ready, etc.)
+ * These pages appear during and after onboarding
+ */
+async function handleSpecialPages(page) {
+  const content = await page.content();
+  let handled = false;
+
+  // Handle "Help improve MetaMask" consent page
+  if (content.includes('Help improve MetaMask') || content.includes('Gather basic usage data')) {
+    if (await clickIfVisible(page, 'button:has-text("Continue")', 'Continue (consent)')) {
+      await page.waitForTimeout(2000);
+      handled = true;
+    }
+  }
+
+  // Handle "Your wallet is ready!" page
+  if (content.includes('Your wallet is ready') || content.includes('Open wallet')) {
+    if (await clickIfVisible(page, 'button:has-text("Open wallet")', 'Open wallet')) {
+      await page.waitForTimeout(2000);
+      handled = true;
+    }
+  }
+
+  // Handle onboarding complete button (Done)
+  if (await clickIfVisible(page, '[data-testid="onboarding-complete-done"]', 'Done (onboarding complete)')) {
+    await page.waitForTimeout(2000);
+    handled = true;
+  }
+
+  // Handle pin extension page
+  if (await clickIfVisible(page, '[data-testid="pin-extension-next"]', 'Pin extension next')) {
+    await page.waitForTimeout(1000);
+    handled = true;
+  }
+  if (await clickIfVisible(page, '[data-testid="pin-extension-done"]', 'Pin extension done')) {
+    await page.waitForTimeout(1000);
+    handled = true;
+  }
+
+  return handled;
 }
 
 /**
@@ -524,14 +597,19 @@ async function handleOnboarding(page, mnemonic, password) {
   for (const selector of completionSelectors) {
     try {
       const btn = await page.$(selector);
-      if (btn && (await btn.isVisible())) {
-        await btn.click();
-        console.log(
-          JSON.stringify({ status: "info", message: `Clicked ${selector}` })
-        );
-        await page.waitForTimeout(2000);
+      if (btn && await btn.isVisible()) {
+        // Check if button is enabled before clicking
+        const isEnabled = await btn.isEnabled().catch(() => false);
+        if (isEnabled) {
+          await btn.click({ timeout: 5000 });
+          console.log(
+            JSON.stringify({ status: "info", message: `Clicked ${selector}` })
+          );
+          await page.waitForTimeout(2000);
+        }
       }
     } catch (e) {
+      // Skip if click fails
       continue;
     }
   }
@@ -545,13 +623,33 @@ async function handleOnboarding(page, mnemonic, password) {
   for (const selector of closeSelectors) {
     try {
       const btn = await page.$(selector);
-      if (btn && (await btn.isVisible())) {
-        await btn.click();
-        await page.waitForTimeout(500);
+      if (btn && await btn.isVisible()) {
+        const isEnabled = await btn.isEnabled().catch(() => false);
+        if (isEnabled) {
+          await btn.click({ timeout: 5000 });
+          await page.waitForTimeout(500);
+        }
       }
     } catch (e) {
       continue;
     }
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, "metamask-after-dialogs.jpg"),
+    type: "jpeg",
+    quality: 60,
+  });
+
+  // Handle special pages that appear after onboarding (consent, wallet ready, etc.)
+  console.log(
+    JSON.stringify({ status: "info", message: "Handling post-onboarding pages..." })
+  );
+
+  for (let i = 0; i < 10; i++) {
+    const handled = await handleSpecialPages(page);
+    if (!handled) break;
+    await page.waitForTimeout(1000);
   }
 
   await page.screenshot({
@@ -570,26 +668,344 @@ async function handleOnboarding(page, mnemonic, password) {
 
 /**
  * Unlock MetaMask with password
+ * Works with MetaMask v13 UI
  */
 async function unlockMetaMask(page, password) {
   console.log(
     JSON.stringify({ status: "info", message: "Unlocking MetaMask..." })
   );
 
-  const passwordInput = await page.$('input[data-testid="unlock-password"]');
-  if (passwordInput) {
-    await passwordInput.fill(password);
+  // Try multiple selectors for password input
+  const passwordInput = await page.$('#password, [data-testid="unlock-password"]');
+  if (passwordInput && await passwordInput.isVisible()) {
+    await passwordInput.click();
+    await page.waitForTimeout(200);
+    await page.keyboard.type(password, { delay: 10 });
+    await page.waitForTimeout(500);
   }
 
   const unlockBtn = await page.$('[data-testid="unlock-submit"]');
-  if (unlockBtn) {
+  if (unlockBtn && await unlockBtn.isVisible()) {
     await unlockBtn.click();
-    await page.waitForTimeout(2000);
+    console.log(JSON.stringify({ status: "info", message: "Clicked unlock button" }));
+    await page.waitForTimeout(3000);
   }
+
+  // Handle any special pages that might appear after unlock
+  await handleSpecialPages(page);
 
   // Verify unlocked
   const state = await detectMetaMaskState(page);
   return state === WalletState.UNLOCKED;
+}
+
+/**
+ * Check if wallet is locked and unlock if needed
+ * Returns true if unlock was performed
+ */
+async function checkAndUnlockIfNeeded(page, password) {
+  // Try multiple selectors for password input
+  const passwordSelectors = [
+    '#password',
+    '[data-testid="unlock-password"]',
+    'input[type="password"]',
+    'input[placeholder*="password"]',
+  ];
+
+  let passwordInput = null;
+  for (const selector of passwordSelectors) {
+    const input = await page.$(selector);
+    if (input && await input.isVisible().catch(() => false)) {
+      passwordInput = input;
+      break;
+    }
+  }
+
+  if (passwordInput) {
+    console.log(JSON.stringify({ status: "info", message: "Wallet is locked, unlocking..." }));
+    await passwordInput.click();
+    await page.waitForTimeout(200);
+    await page.keyboard.type(password, { delay: 10 });
+    await page.waitForTimeout(500);
+
+    // Try to click unlock button
+    const unlockSelectors = [
+      '[data-testid="unlock-submit"]',
+      'button:has-text("Unlock")',
+      'button[type="submit"]',
+    ];
+
+    for (const selector of unlockSelectors) {
+      if (await clickIfVisible(page, selector, 'Unlock')) {
+        await page.waitForTimeout(3000);
+        break;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Import a private key as an additional account in MetaMask
+ * Updated for MetaMask v13 UI - uses "Add wallet" -> "Import an account" flow
+ * @param {Page} page - Playwright page object
+ * @param {string} privateKey - Private key (with or without 0x prefix)
+ * @param {string} extensionId - MetaMask extension ID
+ * @param {string} password - Wallet password (needed if wallet is locked)
+ */
+async function importPrivateKeyAccount(page, privateKey, extensionId, password) {
+  console.log(
+    JSON.stringify({
+      status: "info",
+      message: "Importing private key account (v13 UI)...",
+    })
+  );
+
+  // Navigate to home page first
+  const homeUrl = `chrome-extension://${extensionId}/home.html`;
+  await page.goto(homeUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: 30000,
+  });
+  await page.waitForTimeout(3000);
+
+  // Handle any special pages and unlock if needed
+  await handleSpecialPages(page);
+  await checkAndUnlockIfNeeded(page, password);
+  await handleSpecialPages(page);
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, "metamask-before-import.jpg"),
+    type: "jpeg",
+    quality: 60,
+  });
+
+  // Navigate to account list page
+  const accountListUrl = `chrome-extension://${extensionId}/home.html#account-list`;
+  await page.goto(accountListUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: 30000,
+  });
+  await page.waitForTimeout(3000);
+
+  // Handle special pages and unlock again after navigation
+  await handleSpecialPages(page);
+  await checkAndUnlockIfNeeded(page, password);
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, "metamask-account-list.jpg"),
+    type: "jpeg",
+    quality: 60,
+  });
+
+  // Step 1: Click "Add wallet" button at bottom of account list (MetaMask v13)
+  console.log(JSON.stringify({ status: "info", message: "Looking for Add wallet button..." }));
+
+  let addWalletClicked = false;
+  const addWalletBtn = await page.$('button:has-text("Add wallet")');
+  if (addWalletBtn && await addWalletBtn.isVisible()) {
+    await addWalletBtn.click();
+    console.log(JSON.stringify({ status: "info", message: "Clicked Add wallet button" }));
+    addWalletClicked = true;
+    await page.waitForTimeout(2000);
+  }
+
+  if (!addWalletClicked) {
+    // Fallback: try old UI selectors
+    const fallbackSelectors = [
+      'button:has-text("Add account or hardware wallet")',
+      '[data-testid="multichain-account-menu-popover-action-button"]',
+    ];
+    for (const selector of fallbackSelectors) {
+      const btn = await page.$(selector);
+      if (btn && await btn.isVisible()) {
+        await btn.click();
+        console.log(JSON.stringify({ status: "info", message: `Clicked fallback: ${selector}` }));
+        addWalletClicked = true;
+        await page.waitForTimeout(2000);
+        break;
+      }
+    }
+  }
+
+  if (!addWalletClicked) {
+    throw new Error("Could not find Add wallet button");
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, "metamask-add-wallet-menu.jpg"),
+    type: "jpeg",
+    quality: 60,
+  });
+
+  // Step 2: Click "Import an account" in the popup menu (MetaMask v13)
+  // Note: The text is "Import an account" not "Import account"
+  console.log(JSON.stringify({ status: "info", message: "Looking for Import an account option..." }));
+
+  let importClicked = false;
+
+  // Try v13 UI first: "Import an account"
+  const importAnAccountBtn = await page.$('button:has-text("Import an account")');
+  if (importAnAccountBtn && await importAnAccountBtn.isVisible()) {
+    await importAnAccountBtn.click();
+    console.log(JSON.stringify({ status: "info", message: "Clicked Import an account" }));
+    importClicked = true;
+    await page.waitForTimeout(2000);
+  }
+
+  if (!importClicked) {
+    // Try text selector - this works reliably in v13
+    const textSelector = await page.$('text=Import an account');
+    if (textSelector && await textSelector.isVisible()) {
+      await textSelector.click();
+      console.log(JSON.stringify({ status: "info", message: "Clicked Import an account (text)" }));
+      importClicked = true;
+      await page.waitForTimeout(2000);
+    }
+  }
+
+  if (!importClicked) {
+    // Try finding any element containing the text
+    const elements = await page.$$('button, div[role="button"], span');
+    for (const el of elements) {
+      const text = await el.textContent().catch(() => '');
+      if (text.includes('Import an account')) {
+        await el.click();
+        console.log(JSON.stringify({ status: "info", message: "Clicked Import an account (by text content)" }));
+        importClicked = true;
+        await page.waitForTimeout(2000);
+        break;
+      }
+    }
+  }
+
+  if (!importClicked) {
+    // Fallback: try old UI "Import account"
+    const fallbackSelectors = [
+      'button:has-text("Import account")',
+      '[data-testid="multichain-account-menu-popover-add-imported-account"]',
+    ];
+    for (const selector of fallbackSelectors) {
+      const btn = await page.$(selector);
+      if (btn && await btn.isVisible()) {
+        await btn.click();
+        console.log(JSON.stringify({ status: "info", message: `Clicked fallback: ${selector}` }));
+        importClicked = true;
+        await page.waitForTimeout(2000);
+        break;
+      }
+    }
+  }
+
+  if (!importClicked) {
+    throw new Error("Could not find Import account option");
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, "metamask-import-private-key.jpg"),
+    type: "jpeg",
+    quality: 60,
+  });
+
+  // Step 3: Enter private key
+  // Remove 0x prefix if present for consistency
+  const cleanKey = privateKey.startsWith("0x")
+    ? privateKey.slice(2)
+    : privateKey;
+
+  console.log(JSON.stringify({ status: "info", message: "Looking for private key input..." }));
+
+  // MetaMask v13 uses #private-key-box
+  const pkInputSelectors = [
+    "#private-key-box",
+    'input[type="password"]',
+    'input[placeholder*="rivate"]',
+    'input[id*="private"]',
+  ];
+
+  let pkEntered = false;
+  for (const selector of pkInputSelectors) {
+    const input = await page.$(selector);
+    if (input && await input.isVisible()) {
+      await input.click();
+      await page.waitForTimeout(200);
+      await page.keyboard.type(cleanKey, { delay: 10 });
+      console.log(JSON.stringify({ status: "info", message: `Private key entered via ${selector}` }));
+      pkEntered = true;
+      await page.waitForTimeout(1000);
+      break;
+    }
+  }
+
+  if (!pkEntered) {
+    throw new Error("Could not find private key input");
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, "metamask-pk-entered.jpg"),
+    type: "jpeg",
+    quality: 60,
+  });
+
+  // Step 4: Click Import button
+  console.log(JSON.stringify({ status: "info", message: "Clicking Import button..." }));
+
+  const importBtnSelectors = [
+    '[data-testid="import-account-confirm-button"]',
+    'button:has-text("Import")',
+    'button[type="submit"]',
+  ];
+
+  let importSuccess = false;
+  for (const selector of importBtnSelectors) {
+    const btn = await page.$(selector);
+    if (btn && await btn.isVisible()) {
+      await btn.click();
+      console.log(JSON.stringify({ status: "info", message: `Clicked import button: ${selector}` }));
+      importSuccess = true;
+      await page.waitForTimeout(3000);
+      break;
+    }
+  }
+
+  if (!importSuccess) {
+    throw new Error("Could not find Import button");
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, "metamask-import-complete.jpg"),
+    type: "jpeg",
+    quality: 60,
+  });
+
+  // Verify import by checking for imported account
+  await page.goto(accountListUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForTimeout(2000);
+  await checkAndUnlockIfNeeded(page, password);
+
+  const content = await page.content();
+  const hasImportedAccount = content.includes('Imported') || content.includes('Account 2');
+
+  if (hasImportedAccount) {
+    console.log(JSON.stringify({
+      status: "info",
+      message: "Private key account imported and verified successfully",
+    }));
+  } else {
+    console.log(JSON.stringify({
+      status: "warning",
+      message: "Import completed but could not verify imported account",
+    }));
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, "metamask-final-verification.jpg"),
+    type: "jpeg",
+    quality: 60,
+  });
+
+  return true;
 }
 
 // MetaMask version to download
@@ -626,25 +1042,20 @@ const commands = {
         );
       }
 
-      const version = METAMASK_VERSION;
-      const versionNum = version.replace("v", "");
-      const downloadUrl = `https://github.com/MetaMask/metamask-extension/releases/download/${version}/metamask-chrome-${versionNum}.zip`;
+      // Use local zip file instead of downloading
+      if (!fs.existsSync(METAMASK_LOCAL_ZIP)) {
+        throw new Error(`MetaMask zip not found at: ${METAMASK_LOCAL_ZIP}. Please place metamask-chrome-13.13.1.zip in assets/ directory.`);
+      }
 
       console.log(
         JSON.stringify({
           status: "info",
-          message: `Downloading MetaMask ${version}...`,
-          url: downloadUrl,
+          message: `Using local MetaMask zip: ${METAMASK_LOCAL_ZIP}`,
         })
       );
 
-      try {
-        execSync(`curl -L -o "${metamaskZipPath}" "${downloadUrl}"`, {
-          stdio: "pipe",
-        });
-      } catch (e) {
-        throw new Error(`Failed to download extension: ${e.message}`);
-      }
+      // Copy local zip to extensions directory
+      fs.copyFileSync(METAMASK_LOCAL_ZIP, metamaskZipPath);
 
       if (fs.existsSync(metamaskPath)) {
         fs.rmSync(metamaskPath, { recursive: true, force: true });
@@ -694,39 +1105,64 @@ const commands = {
 
   async "wallet-init"(args, options) {
     const testEnv = readTestEnv();
-    const mnemonic = testEnv.WALLET_MNEMONIC;
 
-    if (!mnemonic) {
+    // WALLET_PRIVATE_KEY is required
+    const privateKey = testEnv.WALLET_PRIVATE_KEY;
+    if (!privateKey) {
       console.log(
         JSON.stringify({
           success: false,
-          error: "WALLET_MNEMONIC not found in .test-env file",
+          error: "WALLET_PRIVATE_KEY not found in .test-env file",
           fix: "Create or update the .test-env file in tests/ directory:",
           file: TEST_ENV_FILE,
-          example: 'WALLET_MNEMONIC="word1 word2 word3 ... word12"',
+          example: 'WALLET_PRIVATE_KEY="0xYourPrivateKeyHere"',
         })
       );
       process.exit(1);
     }
 
-    const words = mnemonic.trim().split(/\s+/);
-    if (![12, 15, 18, 21, 24].includes(words.length)) {
+    // Validate private key format
+    if (!/^(0x)?[a-fA-F0-9]{64}$/.test(privateKey)) {
       console.log(
         JSON.stringify({
           success: false,
-          error: `Invalid mnemonic format. Must be 12, 15, 18, 21, or 24 words. Got ${words.length} words.`,
+          error:
+            "Invalid private key format. Must be 64 hex characters (with optional 0x prefix)",
         })
       );
       return;
     }
 
-    let walletPassword = testEnv.WALLET_PASSWORD;
-    let passwordGenerated = false;
+    // Generate mnemonic if not exists
+    let mnemonic = testEnv.WALLET_MNEMONIC;
+    if (!mnemonic) {
+      mnemonic = generateMnemonic();
+      writeTestEnv("WALLET_MNEMONIC", mnemonic);
+      console.log(
+        JSON.stringify({
+          status: "info",
+          message: "Generated new 12-word mnemonic (saved to .test-env file)",
+        })
+      );
+    } else {
+      // Validate existing mnemonic
+      const words = mnemonic.trim().split(/\s+/);
+      if (![12, 15, 18, 21, 24].includes(words.length)) {
+        console.log(
+          JSON.stringify({
+            success: false,
+            error: `Invalid mnemonic format. Must be 12, 15, 18, 21, or 24 words. Got ${words.length} words.`,
+          })
+        );
+        return;
+      }
+    }
 
+    // Generate password if not exists
+    let walletPassword = testEnv.WALLET_PASSWORD;
     if (!walletPassword) {
       walletPassword = generatePassword();
       writeTestEnv("WALLET_PASSWORD", walletPassword);
-      passwordGenerated = true;
       console.log(
         JSON.stringify({
           status: "info",
@@ -854,16 +1290,37 @@ const commands = {
         quality: 60,
       });
 
+      // If wallet initialization was successful, import the private key account
       if (initSuccess) {
-        console.log(
-          JSON.stringify({
-            success: true,
-            message: "MetaMask initialization completed successfully",
-            initialState: state,
-            steps: steps,
-            nextStep: "Use web-test-wallet-connect to connect wallet to DApp",
-          })
-        );
+        steps.push("importing_private_key");
+        try {
+          await importPrivateKeyAccount(extensionPage, privateKey, extensionId, walletPassword);
+          steps.push("private_key_imported");
+          console.log(
+            JSON.stringify({
+              success: true,
+              message: "MetaMask wallet setup completed successfully",
+              initialState: state,
+              steps: steps,
+              accounts: [
+                "Account 1 (from mnemonic)",
+                "Account 2 (imported from private key - active)",
+              ],
+              nextStep: "Use web-test-wallet-connect to connect wallet to DApp",
+            })
+          );
+        } catch (importError) {
+          steps.push("private_key_import_failed");
+          console.log(
+            JSON.stringify({
+              success: false,
+              error: `Private key import failed: ${importError.message}`,
+              initialState: state,
+              steps: steps,
+              hint: "Wallet was created but private key import failed. Check screenshots.",
+            })
+          );
+        }
       } else {
         console.log(
           JSON.stringify({
