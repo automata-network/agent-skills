@@ -30,27 +30,46 @@ Set up Rabby wallet extension for Web3 DApp testing.
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Set private key (REQUIRED)
-export WALLET_PRIVATE_KEY="0x..."
-
-# Run wallet setup
-node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
-node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+# Pass private key INLINE with each command (REQUIRED)
+WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
+WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```
+
+**Note:** You MUST pass `WALLET_PRIVATE_KEY` inline with each command. Using `export` separately will NOT work because each command runs in a new shell.
 
 ## Environment Setup
 
 ### Setting the Private Key
 
-**CRITICAL:** The private key must be set as an environment variable. Never hardcode it.
+**CRITICAL:** The private key must be passed to each command.
 
-```bash
-# Option 1: Export in terminal
-export WALLET_PRIVATE_KEY="0xYourPrivateKeyHere"
-
-# Option 2: Set inline with command
-WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
 ```
+┌────────────────────────────────────────────────────────────────┐
+│  ⚠️  IMPORTANT: How to Pass Private Key                       │
+│                                                                │
+│  Claude Code runs each command in a NEW shell process.        │
+│  Environment variables DO NOT persist between commands!       │
+│                                                                │
+│  ❌ WRONG (variable lost between commands):                   │
+│     export WALLET_PRIVATE_KEY="0x..."                         │
+│     node wallet-setup-helper.js wallet-setup  ← KEY IS LOST!  │
+│                                                                │
+│  ✅ CORRECT (pass inline with EACH command):                  │
+│     WALLET_PRIVATE_KEY="0x..." node wallet-setup-helper.js    │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Always use inline environment variable:**
+```bash
+# Pass WALLET_PRIVATE_KEY inline with the command
+WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
+WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+```
+
+**How to get the private key:**
+1. Ask user: "Please provide your test wallet private key"
+2. User provides: `0xabc123...`
+3. Use inline: `WALLET_PRIVATE_KEY="0xabc123..." node ...`
 
 **Security Notes:**
 - NEVER commit private keys to version control
@@ -60,26 +79,22 @@ WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet
 
 ## Instructions
 
-### Step 1: Verify Environment
+### Step 1: Get Private Key from User
 
-Check that private key is set:
+**Ask the user for their test wallet private key:**
 
-```bash
-# This should NOT be empty
-echo $WALLET_PRIVATE_KEY | head -c 10
+```
+"Please provide your test wallet private key (starts with 0x)"
 ```
 
-If empty, set it:
-```bash
-export WALLET_PRIVATE_KEY="0x..."
-```
+Once user provides the key (e.g., `0xabc123...`), use it inline with commands in the following steps.
 
 ### Step 2: Download Wallet Extension
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Download and install Rabby wallet extension
+# Download and install Rabby wallet extension (no private key needed for this step)
 node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
 ```
 
@@ -103,7 +118,8 @@ node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
 SKILL_DIR="<path-to-this-skill>"
 
 # Initialize wallet with private key import
-node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+# ⚠️ MUST pass WALLET_PRIVATE_KEY inline!
+WALLET_PRIVATE_KEY="0xUserProvidedKey" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```
 
 **What this does:**
@@ -126,9 +142,16 @@ node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 
 ### "WALLET_PRIVATE_KEY not set"
 
+**Cause:** Using `export` separately doesn't work because each command runs in a new shell.
+
+**Solution:** Pass the key inline with the command:
 ```bash
-# Set the environment variable
-export WALLET_PRIVATE_KEY="0xYourPrivateKeyHere"
+# ✅ CORRECT - pass inline
+WALLET_PRIVATE_KEY="0xYourKey" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+
+# ❌ WRONG - export is lost
+export WALLET_PRIVATE_KEY="0xYourKey"
+node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```
 
 ### "Extension download failed"

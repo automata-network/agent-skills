@@ -42,7 +42,32 @@ Execute tests from persistent test cases in `./tests/` directory.
 - Tests will FAIL if wallet is not set up first
 - Wallet popups cannot be handled without proper setup
 
-### Rule 2: Follow Execution Order
+### Rule 2: Pass WALLET_PRIVATE_KEY Inline
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  ⚠️  IMPORTANT: Environment Variables                          │
+│                                                                │
+│  Each bash command runs in a NEW shell process.               │
+│  Using "export" separately DOES NOT WORK!                      │
+│                                                                │
+│  ❌ WRONG:                                                     │
+│     export WALLET_PRIVATE_KEY="0x..."                          │
+│     node wallet-setup-helper.js ...   ← KEY IS LOST!           │
+│                                                                │
+│  ✅ CORRECT:                                                   │
+│     WALLET_PRIVATE_KEY="0x..." node wallet-setup-helper.js ... │
+│                                                                │
+│  Always pass WALLET_PRIVATE_KEY inline with EVERY command!     │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**How to handle:**
+1. Ask user: "Please provide your test wallet private key"
+2. User provides: `0xabc123...`
+3. Use inline: `WALLET_PRIVATE_KEY="0xabc123..." node ...`
+
+### Rule 3: Follow Execution Order
 
 Always execute skills in this exact order:
 1. `web-test-cleanup` - Clean previous session
