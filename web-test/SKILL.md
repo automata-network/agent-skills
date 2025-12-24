@@ -13,6 +13,47 @@ allowed-tools: Bash Read Write Glob Grep Task Skill
 
 Execute tests from persistent test cases in `./tests/` directory.
 
+## ⚠️ CRITICAL RULES - READ FIRST
+
+### Rule 1: Web3 Wallet Setup is MANDATORY
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  IF config.yaml contains:                                      │
+│                                                                │
+│    web3:                                                       │
+│      enabled: true                                             │
+│                                                                │
+│  THEN YOU MUST RUN:                                            │
+│                                                                │
+│    1. skill web-test-wallet-setup    ← REQUIRED!               │
+│    2. skill web-test-wallet-connect  ← REQUIRED!               │
+│                                                                │
+│  BEFORE executing ANY test cases!                              │
+│                                                                │
+│  ❌ DO NOT skip wallet setup for Web3 DApps                    │
+│  ❌ DO NOT execute tests without wallet ready                  │
+│  ✅ Wallet MUST be connected before first test                 │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Why this matters:**
+- Web3 DApps require wallet connection for most features
+- Tests will FAIL if wallet is not set up first
+- Wallet popups cannot be handled without proper setup
+
+### Rule 2: Follow Execution Order
+
+Always execute skills in this exact order:
+1. `web-test-cleanup` - Clean previous session
+2. `web-test-wallet-setup` - **(if web3.enabled: true)**
+3. `web-test-wallet-connect` - **(if web3.enabled: true)**
+4. Execute test cases
+5. `web-test-report` - Generate report
+6. `web-test-cleanup --keep-data` - Final cleanup
+
+---
+
 ## Prerequisites
 
 **Test cases must exist in `./tests/` directory.**
