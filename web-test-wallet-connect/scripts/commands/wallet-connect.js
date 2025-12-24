@@ -92,7 +92,7 @@ async function clickApproveButton(popup, maxRetries = 3) {
     'button[type="submit"]',
     '[class*="primary"]',
     '[class*="confirm"]',
-    // Rabby specific
+    // MetaMask specific
     '[class*="FooterButton"]',
     '[class*="action-button"]',
   ];
@@ -184,7 +184,7 @@ const commands = {
 
       console.log(JSON.stringify({
         success: true,
-        message: `Navigated to ${url} with Rabby Wallet available`,
+        message: `Navigated to ${url} with MetaMask Wallet available`,
         url: newPage.url(),
         screenshot: 'dapp-home.jpg',
         nextSteps: [
@@ -246,7 +246,7 @@ const commands = {
 
       // Step 2: If no existing popup, wait for one
       if (!popup) {
-        console.log(JSON.stringify({ status: 'info', message: 'Waiting for Rabby popup window...' }));
+        console.log(JSON.stringify({ status: 'info', message: 'Waiting for MetaMask popup window...' }));
 
         // Use pending promise if we started listening early
         if (pendingPopupPromise) {
@@ -282,7 +282,7 @@ const commands = {
       // Step 4: Take screenshot
       if (!popup.isClosed()) {
         await popup.screenshot({
-          path: path.join(SCREENSHOTS_DIR, 'rabby-popup.jpg'),
+          path: path.join(SCREENSHOTS_DIR, 'metamask-popup.jpg'),
           type: 'jpeg',
           quality: 60
         }).catch(() => {});
@@ -309,7 +309,7 @@ const commands = {
       // Step 7: Take screenshot after first click
       if (!popup.isClosed()) {
         await popup.screenshot({
-          path: path.join(SCREENSHOTS_DIR, 'rabby-popup-after-approve.jpg'),
+          path: path.join(SCREENSHOTS_DIR, 'metamask-popup-after-approve.jpg'),
           type: 'jpeg',
           quality: 60
         }).catch(() => {});
@@ -356,7 +356,7 @@ const commands = {
         message: 'Wallet approval completed',
         approved: approved,
         popupClosed: popup.isClosed(),
-        screenshots: ['rabby-popup.jpg', 'rabby-popup-after-approve.jpg', 'after-wallet-approve.jpg']
+        screenshots: ['metamask-popup.jpg', 'metamask-popup-after-approve.jpg', 'after-wallet-approve.jpg']
       }));
 
     } catch (error) {

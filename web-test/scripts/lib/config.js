@@ -17,7 +17,7 @@ const USER_DATA_DIR = path.join(OUTPUT_DIR, 'chrome-profile');
 const CDP_PORT = 9222;
 
 // Wallet extension configuration
-const RABBY_WEBSTORE_URL = 'https://chromewebstore.google.com/detail/rabby-wallet/acmacodkjbdgmoleebolmdjonilkdbch';
+const METAMASK_WEBSTORE_URL = 'https://chromewebstore.google.com/detail/metamask/nkbihfbeogaeaoehlefnkodbefgpgknn';
 
 // Network configurations for Web3
 const NETWORKS = {
@@ -55,7 +55,7 @@ module.exports = {
   DEV_SERVER_FILE,
   USER_DATA_DIR,
   CDP_PORT,
-  RABBY_WEBSTORE_URL,
+  METAMASK_WEBSTORE_URL,
   NETWORKS,
   SCREENSHOT_FORMAT,
   SCREENSHOT_QUALITY,

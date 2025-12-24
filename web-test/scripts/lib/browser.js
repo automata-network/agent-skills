@@ -24,22 +24,22 @@ let context = null;
 let page = null;
 let walletExtensionPage = null;
 let persistentContext = null;
-let rabbyExtensionId = null;
+let metamaskExtensionId = null;
 
 // Helper functions to get extension URLs
-function getRabbyProfileUrl() {
-  if (!rabbyExtensionId) throw new Error('Rabby extension not loaded. Run wallet-import or wallet-unlock first with --wallet flag.');
-  return `chrome-extension://${rabbyExtensionId}/desktop.html#/desktop/profile`;
+function getMetaMaskHomeUrl() {
+  if (!metamaskExtensionId) throw new Error('MetaMask extension not loaded. Run wallet-setup first with --wallet flag.');
+  return `chrome-extension://${metamaskExtensionId}/home.html`;
 }
 
-function getRabbyPopupUrl() {
-  if (!rabbyExtensionId) throw new Error('Rabby extension not loaded. Run wallet-import or wallet-unlock first with --wallet flag.');
-  return `chrome-extension://${rabbyExtensionId}/popup.html`;
+function getMetaMaskPopupUrl() {
+  if (!metamaskExtensionId) throw new Error('MetaMask extension not loaded. Run wallet-setup first with --wallet flag.');
+  return `chrome-extension://${metamaskExtensionId}/popup.html`;
 }
 
-function getRabbyImportPrivateKeyUrl() {
-  if (!rabbyExtensionId) throw new Error('Rabby extension not loaded. Run wallet-import or wallet-unlock first with --wallet flag.');
-  return `chrome-extension://${rabbyExtensionId}/index.html#/new-user/import/private-key`;
+function getMetaMaskOnboardingUrl() {
+  if (!metamaskExtensionId) throw new Error('MetaMask extension not loaded. Run wallet-setup first with --wallet flag.');
+  return `chrome-extension://${metamaskExtensionId}/home.html#onboarding/welcome`;
 }
 
 // Try to connect to existing browser via CDP
@@ -66,8 +66,8 @@ async function tryConnectExistingBrowser() {
           const url = p.url();
           if (url.startsWith('chrome-extension://')) {
             // Detect extension ID
-            if (!rabbyExtensionId) {
-              rabbyExtensionId = url.split('/')[2];
+            if (!metamaskExtensionId) {
+              metamaskExtensionId = url.split('/')[2];
             }
           } else if (!selectedPage && url !== 'about:blank') {
             // Prefer non-extension, non-blank pages
@@ -78,15 +78,15 @@ async function tryConnectExistingBrowser() {
         // If no non-extension page found, use first page or create new
         page = selectedPage || (pages.length > 0 ? pages[0] : await context.newPage());
 
-        // If not found from pages, use fallback
-        if (!rabbyExtensionId) {
-          rabbyExtensionId = 'dedbkciaajbkfglbaikbmmhdhelboppf';
+        // If not found from pages, extension ID will be detected later
+        if (!metamaskExtensionId) {
+          // MetaMask extension ID is dynamic, will be detected from service worker
         }
 
         console.log(JSON.stringify({
           status: 'info',
           message: 'Connected to existing browser via CDP',
-          extensionId: rabbyExtensionId,
+          extensionId: metamaskExtensionId,
           currentPage: page.url()
         }));
         return true;
@@ -146,13 +146,13 @@ async function startBrowser(options) {
 
   if (useWalletMode) {
     // Wallet mode: Use Playwright's Chromium with extension loading
-    const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
+    const metamaskPath = path.join(EXTENSIONS_DIR, 'metamask');
 
-    if (!fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
+    if (!fs.existsSync(path.join(metamaskPath, 'manifest.json'))) {
       console.log(JSON.stringify({
         success: false,
-        error: 'Rabby wallet extension not found. Run wallet-setup first.',
-        hint: 'node test-helper.js wallet-setup'
+        error: 'MetaMask wallet extension not found. Run wallet-setup first.',
+        hint: 'node wallet-setup-helper.js wallet-setup'
       }));
       process.exit(1);
     }
@@ -163,8 +163,8 @@ async function startBrowser(options) {
       args: [
         '--no-first-run',
         '--disable-blink-features=AutomationControlled',
-        `--disable-extensions-except=${path.resolve(rabbyPath)}`,
-        `--load-extension=${path.resolve(rabbyPath)}`,
+        `--disable-extensions-except=${path.resolve(metamaskPath)}`,
+        `--load-extension=${path.resolve(metamaskPath)}`,
         `--remote-debugging-port=${CDP_PORT}`,
         // Critical for extension popups
         '--disable-popup-blocking',
@@ -183,7 +183,7 @@ async function startBrowser(options) {
       ...contextOptions,
     };
 
-    console.log(JSON.stringify({ status: 'info', message: 'Starting Chromium with Rabby wallet extension...' }));
+    console.log(JSON.stringify({ status: 'info', message: 'Starting Chromium with MetaMask wallet extension...' }));
 
     persistentContext = await chromium.launchPersistentContext(USER_DATA_DIR, launchOptions);
     context = persistentContext;
@@ -198,8 +198,8 @@ async function startBrowser(options) {
         serviceWorker = await persistentContext.waitForEvent('serviceworker', { timeout: 10000 });
       }
       const swUrl = serviceWorker.url();
-      rabbyExtensionId = swUrl.split('/')[2];
-      console.log(JSON.stringify({ status: 'info', message: 'Rabby wallet extension loaded successfully', extensionId: rabbyExtensionId }));
+      metamaskExtensionId = swUrl.split('/')[2];
+      console.log(JSON.stringify({ status: 'info', message: 'MetaMask wallet extension loaded successfully', extensionId: metamaskExtensionId }));
     } catch (e) {
       console.log(JSON.stringify({ status: 'warning', message: 'Extension service worker not detected, trying fallback detection...' }));
 
@@ -208,13 +208,13 @@ async function startBrowser(options) {
         for (const p of allPages) {
           const url = p.url();
           if (url.startsWith('chrome-extension://')) {
-            rabbyExtensionId = url.split('/')[2];
-            console.log(JSON.stringify({ status: 'info', message: 'Extension ID detected from page', extensionId: rabbyExtensionId }));
+            metamaskExtensionId = url.split('/')[2];
+            console.log(JSON.stringify({ status: 'info', message: 'Extension ID detected from page', extensionId: metamaskExtensionId }));
             break;
           }
         }
 
-        if (!rabbyExtensionId) {
+        if (!metamaskExtensionId) {
           const testPage = await context.newPage();
           await testPage.goto('chrome://extensions/', { timeout: 5000 }).catch(() => {});
           await testPage.waitForTimeout(1000);
@@ -225,20 +225,18 @@ async function startBrowser(options) {
           }).catch(() => []);
 
           if (extensionIds.length > 0) {
-            rabbyExtensionId = extensionIds[0];
-            console.log(JSON.stringify({ status: 'info', message: 'Extension ID detected from chrome://extensions', extensionId: rabbyExtensionId }));
+            metamaskExtensionId = extensionIds[0];
+            console.log(JSON.stringify({ status: 'info', message: 'Extension ID detected from chrome://extensions', extensionId: metamaskExtensionId }));
           }
 
           await testPage.close().catch(() => {});
         }
 
-        if (!rabbyExtensionId) {
-          rabbyExtensionId = 'dedbkciaajbkfglbaikbmmhdhelboppf';
-          console.log(JSON.stringify({ status: 'warning', message: 'Using fallback extension ID', extensionId: rabbyExtensionId }));
+        if (!metamaskExtensionId) {
+          console.log(JSON.stringify({ status: 'warning', message: 'MetaMask extension ID could not be detected' }));
         }
       } catch (fallbackError) {
-        rabbyExtensionId = 'dedbkciaajbkfglbaikbmmhdhelboppf';
-        console.log(JSON.stringify({ status: 'warning', message: 'Using fallback extension ID', extensionId: rabbyExtensionId }));
+        console.log(JSON.stringify({ status: 'warning', message: 'MetaMask extension ID detection failed' }));
       }
     }
 
@@ -373,8 +371,8 @@ function getBrowser() { return browser; }
 function getContext() { return context; }
 function getPage() { return page; }
 function getPersistentContext() { return persistentContext; }
-function getRabbyExtensionId() { return rabbyExtensionId; }
-function setRabbyExtensionId(id) { rabbyExtensionId = id; }
+function getMetaMaskExtensionId() { return metamaskExtensionId; }
+function setMetaMaskExtensionId(id) { metamaskExtensionId = id; }
 
 module.exports = {
   startBrowser,
@@ -384,14 +382,14 @@ module.exports = {
   tryConnectExistingBrowser,
   saveCDPInfo,
   clearCDPInfo,
-  getRabbyProfileUrl,
-  getRabbyPopupUrl,
-  getRabbyImportPrivateKeyUrl,
+  getMetaMaskHomeUrl,
+  getMetaMaskPopupUrl,
+  getMetaMaskOnboardingUrl,
   getBrowser,
   getContext,
   getPage,
   setPage,
   getPersistentContext,
-  getRabbyExtensionId,
-  setRabbyExtensionId,
+  getMetaMaskExtensionId,
+  setMetaMaskExtensionId,
 };

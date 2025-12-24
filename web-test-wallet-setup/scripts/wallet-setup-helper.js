@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Wallet Setup Helper - Setup and initialize Rabby wallet
+ * Wallet Setup Helper - Setup and initialize MetaMask wallet
  *
  * Commands:
- *   wallet-setup   - Download and install Rabby wallet extension
+ *   wallet-setup   - Download and install MetaMask wallet extension
  *   wallet-init    - Initialize wallet with private key
  *
  * Usage:
@@ -19,10 +19,10 @@ const commands = {
 
   async help() {
     console.log(`
-Wallet Setup Helper - Setup and initialize Rabby wallet
+Wallet Setup Helper - Setup and initialize MetaMask wallet
 
 Commands:
-  wallet-setup              Download and install Rabby wallet extension
+  wallet-setup              Download and install MetaMask extension
   wallet-init               Initialize wallet with private key (import/unlock)
 
 Options:
@@ -32,7 +32,7 @@ Options:
   --keep-open               Keep browser open after command
 
 Usage:
-  # 1. Download and install Rabby extension
+  # 1. Download and install MetaMask extension
   node wallet-setup-helper.js wallet-setup
 
   # 2. Initialize wallet (reads WALLET_PRIVATE_KEY from tests/.test-env)

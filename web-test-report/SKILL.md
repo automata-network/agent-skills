@@ -118,7 +118,7 @@ Generate a clear, visually scannable test report.
 | | |
 |---|---|
 | **Status** | ✅ Connected |
-| **Wallet** | Rabby |
+| **Wallet** | MetaMask |
 | **Address** | 0x1234...abcd |
 | **Network** | Ethereum |
 

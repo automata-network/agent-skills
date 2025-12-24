@@ -94,7 +94,6 @@ const commands = {
         if (bodyHtml.includes('github')) availableOptions.push('github');
         if (bodyHtml.includes('twitter')) availableOptions.push('twitter');
         if (hasEmailInput) availableOptions.push('email');
-        if (bodyHtml.includes('rabby')) availableOptions.push('rabby');
         if (bodyHtml.includes('metamask')) availableOptions.push('metamask');
 
         return {

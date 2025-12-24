@@ -30,13 +30,13 @@ This document contains detailed technical information for the web-test skill.
 | `--headed` | Run with visible browser | false |
 | `--headless` | Run headless | true |
 | `--timeout <ms>` | Action timeout | 10000 |
-| `--wallet` | Load with Rabby wallet extension | false |
+| `--wallet` | Load with MetaMask wallet extension | false |
 | `--network <name>` | Specify network for Web3 | ethereum |
 
 ## Web3 DApp Testing
 
 **Note:** Wallet setup and connection are handled by separate skills:
-- `web-test-wallet-setup` - Downloads and initializes Rabby wallet
+- `web-test-wallet-setup` - Downloads and initializes MetaMask wallet
 - `web-test-wallet-connect` - Connects wallet to DApp, handles popups
 
 ### When Web3 Testing is Needed

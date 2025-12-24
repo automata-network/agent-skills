@@ -1,17 +1,17 @@
 ---
 name: web-test-wallet-connect
-description: Connect wallet to Web3 DApp - navigate to DApp, click Connect Wallet, approve in Rabby popup, verify connection. Use AFTER wallet-setup, BEFORE running tests.
+description: Connect wallet to Web3 DApp - navigate to DApp, click Connect Wallet, approve in MetaMask popup, verify connection. Use AFTER wallet-setup, BEFORE running tests.
 license: MIT
 compatibility: Node.js 18+, Playwright
 metadata:
   author: AI Agent
-  version: 1.0.0
+  version: 2.0.0
 allowed-tools: Bash Read
 ---
 
 # Wallet Connect
 
-Connect the Rabby wallet to a Web3 DApp.
+Connect MetaMask wallet to a Web3 DApp.
 
 ## When to Use This Skill
 
@@ -39,7 +39,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot before-connec
 # Click Connect Wallet button (coordinates from screenshot analysis)
 node $SKILL_DIR/scripts/wallet-connect-helper.js vision-click <x> <y> --wallet --headed --keep-open
 
-# Approve connection in Rabby popup
+# Approve connection in MetaMask popup
 node $SKILL_DIR/scripts/wallet-connect-helper.js wallet-approve --wallet --headed --keep-open
 
 # Verify connection
@@ -105,27 +105,26 @@ SKILL_DIR="<path-to-this-skill>"
 # Take screenshot of modal
 node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot wallet-modal.jpg --wallet --headed --keep-open
 
-# Click "Injected" or "Browser Wallet" or "Rabby" option
+# Click "Injected" or "Browser Wallet" or "MetaMask" option
 node $SKILL_DIR/scripts/wallet-connect-helper.js vision-click <x> <y> --wallet --headed --keep-open
 ```
 
 **Common Modal Options:**
+- "MetaMask"
 - "Injected Wallet"
 - "Browser Wallet"
-- "Rabby"
-- "MetaMask" (Rabby is compatible)
 
-### Step 5: Approve Connection in Rabby
+### Step 5: Approve Connection in MetaMask
 
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Auto-approve the Rabby connection popup
+# Auto-approve the MetaMask connection popup
 node $SKILL_DIR/scripts/wallet-connect-helper.js wallet-approve --wallet --headed --keep-open
 ```
 
 **What this does:**
-- Detects Rabby popup window
+- Detects MetaMask popup window
 - Takes screenshot of popup
 - Clicks "Connect" or "Confirm" button
 - Waits for popup to close
@@ -180,7 +179,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot step2-modal.j
 # 5. Click Browser Wallet option
 node $SKILL_DIR/scripts/wallet-connect-helper.js vision-click 400 300 --wallet --headed --keep-open
 
-# 6. Approve in Rabby
+# 6. Approve in MetaMask
 node $SKILL_DIR/scripts/wallet-connect-helper.js wallet-approve --wallet --headed --keep-open
 
 # 7. Verify connection
@@ -193,7 +192,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot step3-connect
 | Command | Description |
 |---------|-------------|
 | `wallet-navigate <url>` | Navigate to DApp with wallet extension |
-| `wallet-approve` | Auto-approve Rabby popup |
+| `wallet-approve` | Auto-approve MetaMask popup |
 | `wallet-switch-network <name>` | Switch network |
 | `wallet-get-address` | Get connected address |
 | `vision-screenshot [name]` | Take screenshot for AI |
@@ -210,9 +209,9 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot step3-connect
 ### "Wallet modal doesn't appear"
 - Click may have missed the button - verify coordinates
 
-### "Rabby popup not detected"
+### "MetaMask popup not detected"
 - Extension may not be properly loaded
-- Check `./test-output/extensions/rabby/` exists
+- Check `./test-output/extensions/metamask/` exists
 
 ### "Connection rejected"
 - Check if DApp requires specific network

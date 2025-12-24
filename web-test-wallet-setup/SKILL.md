@@ -1,17 +1,19 @@
 ---
 name: web-test-wallet-setup
-description: Set up Rabby wallet extension for Web3 DApp testing - download extension, import wallet from private key. REQUIRED for Web3 DApp testing before wallet-connect.
+description: Set up MetaMask wallet extension for Web3 DApp testing - download extension, import wallet from private key. REQUIRED for Web3 DApp testing before wallet-connect.
 license: MIT
 compatibility: Node.js 18+, Playwright
 metadata:
   author: AI Agent
-  version: 1.0.0
+  version: 2.1.0
 allowed-tools: Bash Read
 ---
 
 # Wallet Setup
 
-Set up Rabby wallet extension for Web3 DApp testing.
+Set up MetaMask wallet extension for Web3 DApp testing.
+
+**Updated for MetaMask v13** with new UI support.
 
 ## When to Use This Skill
 
@@ -40,8 +42,12 @@ node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ## How It Works
 
 - **Reads** `WALLET_PRIVATE_KEY` from `tests/.test-env`
+- **Converts** private key to 24-word mnemonic using BIP-39 algorithm
+- **Imports** wallet using the generated mnemonic (first account = your private key's address)
 - **Writes** `WALLET_PASSWORD` to `tests/.test-env` (auto-generated if not set)
 - Private key is only used locally in Playwright browser, never exposed to AI APIs
+
+**Technical Note**: The private key (256 bits) is used as entropy to generate a 24-word BIP-39 mnemonic. This mnemonic, when imported into MetaMask, creates a wallet where the first derived account corresponds exactly to the original private key.
 
 ## Instructions
 
@@ -50,21 +56,21 @@ node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Download and install Rabby wallet extension
+# Download and install MetaMask wallet extension
 node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
 ```
 
 **What this does:**
-- Downloads Rabby wallet from GitHub releases
-- Extracts to `./test-output/extensions/rabby/`
+- Downloads MetaMask wallet from GitHub releases
+- Extracts to `./test-output/extensions/metamask/`
 - Prepares extension for browser loading
 
 **Expected Output:**
 ```json
 {
   "success": true,
-  "message": "Rabby Wallet vX.X.X installed successfully",
-  "extensionPath": "./test-output/extensions/rabby"
+  "message": "MetaMask Wallet v13.13.1 installed successfully",
+  "extensionPath": "./test-output/extensions/metamask"
 }
 ```
 
@@ -128,7 +134,7 @@ node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 │   └── .test-env        # Reads WALLET_PRIVATE_KEY, writes WALLET_PASSWORD
 └── test-output/
     ├── extensions/
-    │   └── rabby/       # Wallet extension files
+    │   └── metamask/    # MetaMask extension files
     ├── chrome-profile/  # Browser profile with wallet state
     └── screenshots/     # Setup screenshots for debugging
 ```
@@ -152,3 +158,26 @@ After wallet setup is complete:
 - Wallet state persists in chrome-profile between test runs
 - Use `web-test-cleanup` without `--keep-data` to reset wallet
 - Always use a test wallet with minimal funds for testing
+
+## Technical Details (MetaMask v13)
+
+The script supports both the new MetaMask v13 UI and older versions:
+
+**New UI Flow (v13+)**:
+1. Welcome Page: Click "I have an existing wallet"
+2. Sign-in Options: Click "Import using Secret Recovery Phrase"
+3. SRP Input: Single textarea (use `keyboard.type()` for proper event handling)
+4. Password: "Create new password" + "Confirm password" + checkbox
+5. Complete: Click through "Got it" / "Done" dialogs
+
+**Key Selectors (v13)**:
+- Welcome: `button:has-text("I have an existing wallet")`
+- Import SRP: `button:has-text("Import using Secret Recovery Phrase")`
+- SRP Input: `textarea` (NOT 12 separate inputs)
+- Continue: `button:has-text("Continue")`
+- Password: `input[type="password"]` (2 inputs)
+- Create: `button:has-text("Create password")`
+- Account menu: `[data-testid="account-menu-icon"]`
+- Add account: `[data-testid="multichain-account-menu-popover-action-button"]`
+- Import account: `[data-testid="multichain-account-menu-popover-add-imported-account"]`
+- Private key: `#private-key-box`

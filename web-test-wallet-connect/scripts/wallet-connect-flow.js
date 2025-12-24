@@ -324,19 +324,19 @@ function trySelectWalletInModal() {
 
   // Common selectors for wallet selection in modals
   const walletSelectors = [
+    // MetaMask specific (prioritize)
+    'button:has-text("MetaMask")',
+    '[data-testid*="metamask"]',
+    '[data-testid*="MetaMask"]',
     // Injected/Browser wallet options
     'button:has-text("Injected")',
     'button:has-text("Browser Wallet")',
     'button:has-text("Browser")',
-    'button:has-text("Rabby")',
-    'button:has-text("MetaMask")',
     // "Installed" wallet indicator
     '[class*="installed"]',
     'button:has-text("Installed")',
     // Rainbow Kit specific
     '[data-testid*="injected"]',
-    '[data-testid*="rabby"]',
-    '[data-testid*="metamask"]',
     // Generic wallet list items
     '[class*="wallet-option"]',
     '[class*="walletOption"]',
@@ -467,7 +467,7 @@ async function connectWalletWithRetry() {
         const walletResult = trySelectWalletInModal();
 
         if (walletResult.success) {
-          // Step 7: Try to approve in Rabby popup
+          // Step 7: Try to approve in MetaMask popup
           console.log("[STEP 7] Attempting wallet approval...");
           const approveResult = runCommand("wallet-approve", [], { timeout: 30000 });
 
@@ -492,7 +492,7 @@ async function connectWalletWithRetry() {
       console.log(
         '2. In Rainbow/Privy modal, click "Installed" or wallet icon'
       );
-      console.log("3. Approve connection in Rabby wallet popup");
+      console.log("3. Approve connection in MetaMask wallet popup");
       console.log("4. If signature is required, approve it");
       console.log(
         "\nUse click command with text selector first, fallback to vision-click if needed."
@@ -510,7 +510,7 @@ async function connectWalletWithRetry() {
           'Try: click \'button:has-text("Connect Wallet")\'',
           'Try: click \'button:has-text("Connect")\'',
           "If selectors fail, use vision-screenshot and vision-click",
-          "Use wallet-approve for Rabby popup",
+          "Use wallet-approve for MetaMask popup",
           "Run: node wallet-connect-flow.js --skip-setup --skip-import <url> to verify",
         ],
       };

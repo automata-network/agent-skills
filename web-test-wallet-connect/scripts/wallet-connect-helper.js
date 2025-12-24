@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Wallet Connect Helper - Connect Rabby wallet to DApps
+ * Wallet Connect Helper - Connect MetaMask wallet to DApps
  *
  * Commands:
  *   wallet-navigate <url>    - Navigate to DApp with wallet extension
@@ -23,7 +23,7 @@ const commands = {
 
   async help() {
     console.log(`
-Wallet Connect Helper - Connect Rabby wallet to DApps
+Wallet Connect Helper - Connect MetaMask wallet to DApps
 
 Commands:
   wallet-navigate <url>     Navigate to DApp with wallet extension loaded
@@ -52,7 +52,7 @@ Usage:
   # 3. Click Connect Wallet button (AI determines coordinates)
   node wallet-connect-helper.js vision-click 500 50 --wallet --headed --keep-open
 
-  # 4. Approve Rabby popup (auto-detects and clicks approve button)
+  # 4. Approve MetaMask popup (auto-detects and clicks approve button)
   node wallet-connect-helper.js wallet-approve --wallet --headed --keep-open
 
   # 5. Verify connection

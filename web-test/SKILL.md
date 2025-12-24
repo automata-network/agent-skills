@@ -269,7 +269,7 @@ execution_order:
    ├─ vision-screenshot before-connect.jpg
    ├─ [AI analyzes screenshot, finds Connect button at 850, 45]
    ├─ vision-click 850 45
-   ├─ [AI analyzes screenshot, finds Rabby option at 400, 300]
+   ├─ [AI analyzes screenshot, finds MetaMask option at 400, 300]
    ├─ vision-click 400 300
    ├─ wallet-approve
    ├─ vision-screenshot after-connect.jpg

@@ -73,7 +73,7 @@ project:
 
 web3:
   enabled: true
-  wallet: rabby
+  wallet: metamask
   network: ethereum
 
 generated:
@@ -113,7 +113,7 @@ test_cases:
       - action: vision-click
         target: Connect Wallet button
       - action: vision-click
-        target: Rabby option in modal
+        target: MetaMask option in modal
       - action: wallet-approve
       - action: vision-screenshot
         name: after-connect
@@ -298,7 +298,7 @@ project:
 
 web3:
   enabled: [true/false]
-  wallet: rabby
+  wallet: metamask
   network: [from research]
 
 generated:

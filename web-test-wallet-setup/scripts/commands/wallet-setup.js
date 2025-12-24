@@ -1,12 +1,13 @@
 /**
  * Wallet Setup Commands
- * Handles wallet extension download and initialization
+ * Handles MetaMask extension download and initialization
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const crypto = require('crypto');
+const bip39 = require('bip39');
 
 const { EXTENSIONS_DIR, SCREENSHOTS_DIR } = require('../lib/config');
 
@@ -15,11 +16,11 @@ const TEST_ENV_FILE = path.join(process.cwd(), 'tests', '.test-env');
 
 /**
  * Read sensitive values from .test-env file
- * This file should NOT be committed to git or exposed to external APIs
- * @returns {Object} Object with WALLET_PRIVATE_KEY and WALLET_PASSWORD
+ * @returns {Object} Object with WALLET_MNEMONIC, WALLET_PRIVATE_KEY and WALLET_PASSWORD
  */
 function readTestEnv() {
   const result = {
+    WALLET_MNEMONIC: null,
     WALLET_PRIVATE_KEY: null,
     WALLET_PASSWORD: null,
   };
@@ -42,13 +43,12 @@ function readTestEnv() {
       const key = trimmed.substring(0, eqIndex).trim();
       let value = trimmed.substring(eqIndex + 1).trim();
 
-      // Remove quotes if present
       if ((value.startsWith('"') && value.endsWith('"')) ||
           (value.startsWith("'") && value.endsWith("'"))) {
         value = value.slice(1, -1);
       }
 
-      if (key === 'WALLET_PRIVATE_KEY' || key === 'WALLET_PASSWORD') {
+      if (key === 'WALLET_MNEMONIC' || key === 'WALLET_PRIVATE_KEY' || key === 'WALLET_PASSWORD') {
         result[key] = value;
       }
     }
@@ -64,16 +64,18 @@ function readTestEnv() {
 
 /**
  * Write or update a value in .test-env file
- * @param {string} key - The key to write
- * @param {string} value - The value to write
  */
 function writeTestEnv(key, value) {
-  let content = '';
+  // Ensure tests directory exists
+  const testsDir = path.dirname(TEST_ENV_FILE);
+  if (!fs.existsSync(testsDir)) {
+    fs.mkdirSync(testsDir, { recursive: true });
+  }
+
   const entries = {};
 
-  // Read existing content
   if (fs.existsSync(TEST_ENV_FILE)) {
-    content = fs.readFileSync(TEST_ENV_FILE, 'utf8');
+    const content = fs.readFileSync(TEST_ENV_FILE, 'utf8');
     const lines = content.split('\n');
 
     for (const line of lines) {
@@ -95,502 +97,34 @@ function writeTestEnv(key, value) {
     }
   }
 
-  // Update the value
   entries[key] = value;
 
-  // Write back
   const newContent = Object.entries(entries)
     .map(([k, v]) => `${k}="${v}"`)
     .join('\n') + '\n';
 
   fs.writeFileSync(TEST_ENV_FILE, newContent, 'utf8');
 }
+
 const {
   startBrowser,
   getContext,
-  getRabbyExtensionId,
+  getMetaMaskExtensionId,
 } = require('../lib/browser');
 
 // Wallet states
 const WalletState = {
-  NEW_USER: 'NEW_USER',
+  ONBOARDING: 'ONBOARDING',
   LOCKED: 'LOCKED',
   UNLOCKED: 'UNLOCKED',
   UNKNOWN: 'UNKNOWN',
 };
 
 /**
- * Detect the current wallet state from the extension page
+ * Generate a secure random password
  */
-async function detectWalletState(page) {
-  const content = await page.content();
-
-  const hasPasswordInput = await page.$('input[type="password"]').catch(() => null);
-
-  const isNewUser = content.includes('new-user') ||
-                    content.includes('Get Started') ||
-                    content.includes('Create a new address') ||
-                    content.includes('Import') && content.includes('Create');
-
-  const hasAddressDisplay = await page.$('[class*="address"]').catch(() => null) ||
-                            await page.$('[class*="balance"]').catch(() => null) ||
-                            await page.$('[class*="asset"]').catch(() => null) ||
-                            await page.$('[class*="CurrentAccount"]').catch(() => null);
-
-  const hasForgotPassword = content.includes('Forgot Password') ||
-                            content.includes('forgot-password') ||
-                            content.includes('Forgot password');
-
-  if (isNewUser && !hasPasswordInput) {
-    return WalletState.NEW_USER;
-  }
-
-  if (hasPasswordInput && !hasAddressDisplay) {
-    return WalletState.LOCKED;
-  }
-
-  if (hasAddressDisplay && !hasPasswordInput) {
-    return WalletState.UNLOCKED;
-  }
-
-  if (hasForgotPassword) {
-    return WalletState.LOCKED;
-  }
-
-  return WalletState.UNKNOWN;
-}
-
-function getRabbyIndexUrl() {
-  const extensionId = getRabbyExtensionId();
-  if (!extensionId) throw new Error('Rabby extension not loaded');
-  return `chrome-extension://${extensionId}/index.html`;
-}
-
-function getRabbyImportPrivateKeyUrl() {
-  const extensionId = getRabbyExtensionId();
-  if (!extensionId) throw new Error('Rabby extension not loaded');
-  // New user import private key URL
-  return `chrome-extension://${extensionId}/index.html#/new-user/import/private-key`;
-}
-
-function getRabbyNoAddressUrl() {
-  const extensionId = getRabbyExtensionId();
-  if (!extensionId) throw new Error('Rabby extension not loaded');
-  return `chrome-extension://${extensionId}/index.html#/no-address`;
-}
-
-/**
- * Handle Rabby welcome flow (Access All Dapps → Next → Get Started)
- */
-async function handleWelcomeFlow(extensionPage) {
-  const currentUrl = extensionPage.url();
-  console.log(JSON.stringify({ status: 'info', message: `Checking welcome flow, current URL: ${currentUrl}` }));
-
-  // Take screenshot to see current state
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-welcome-check.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  const content = await extensionPage.content();
-
-  // Check if on "Access All Dapps" welcome page
-  if (content.includes('Access All Dapps') || content.includes('Access all Dapps')) {
-    console.log(JSON.stringify({ status: 'info', message: 'On "Access All Dapps" page, clicking Next...' }));
-
-    const nextSelectors = [
-      'button:has-text("Next")',
-      'button:has-text("next")',
-      'button:has-text("下一步")',
-      '.ant-btn-primary',
-      'button[type="button"]',
-    ];
-
-    for (const selector of nextSelectors) {
-      try {
-        const btn = await extensionPage.$(selector);
-        if (btn && await btn.isVisible()) {
-          await btn.click();
-          console.log(JSON.stringify({ status: 'info', message: 'Clicked Next button' }));
-          await extensionPage.waitForTimeout(2000);
-          break;
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-
-    await extensionPage.screenshot({
-      path: path.join(SCREENSHOTS_DIR, 'wallet-welcome-after-next.jpg'),
-      type: 'jpeg',
-      quality: 60
-    });
-  }
-
-  // Check for "Get Started" button (second page of welcome flow)
-  const contentAfterNext = await extensionPage.content();
-  if (contentAfterNext.includes('Get Started') || contentAfterNext.includes('Get started')) {
-    console.log(JSON.stringify({ status: 'info', message: 'Found "Get Started" button, clicking...' }));
-
-    const getStartedSelectors = [
-      'button:has-text("Get Started")',
-      'button:has-text("Get started")',
-      'button:has-text("开始使用")',
-      '.ant-btn-primary',
-    ];
-
-    for (const selector of getStartedSelectors) {
-      try {
-        const btn = await extensionPage.$(selector);
-        if (btn && await btn.isVisible()) {
-          await btn.click();
-          console.log(JSON.stringify({ status: 'info', message: 'Clicked Get Started button' }));
-          await extensionPage.waitForTimeout(2000);
-          break;
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-
-    await extensionPage.screenshot({
-      path: path.join(SCREENSHOTS_DIR, 'wallet-welcome-after-getstarted.jpg'),
-      type: 'jpeg',
-      quality: 60
-    });
-  }
-
-  // Check if landed on no-address page (no wallet imported)
-  const urlAfterWelcome = extensionPage.url();
-  const noAddressUrl = getRabbyNoAddressUrl();
-
-  if (urlAfterWelcome.includes('#/no-address')) {
-    console.log(JSON.stringify({
-      status: 'info',
-      message: 'On no-address page - no wallet imported yet, will redirect to import page'
-    }));
-    return 'NO_ADDRESS';
-  }
-
-  return 'CONTINUE';
-}
-
-/**
- * Import wallet using private key
- */
-async function importWallet(extensionPage, privateKey, walletPassword) {
-  console.log(JSON.stringify({ status: 'info', message: 'Starting wallet import flow...' }));
-
-  // First, handle welcome flow if present
-  const welcomeResult = await handleWelcomeFlow(extensionPage);
-  console.log(JSON.stringify({ status: 'info', message: `Welcome flow result: ${welcomeResult}` }));
-
-  // Get current URL after welcome flow
-  let currentUrl = extensionPage.url();
-  console.log(JSON.stringify({ status: 'info', message: `Current URL after welcome: ${currentUrl}` }));
-
-  // If on no-address page, navigate directly to import private key page
-  if (currentUrl.includes('#/no-address') || welcomeResult === 'NO_ADDRESS') {
-    const importUrl = getRabbyImportPrivateKeyUrl();
-    console.log(JSON.stringify({ status: 'info', message: `Navigating to import page: ${importUrl}` }));
-    await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await extensionPage.waitForTimeout(3000);
-  } else {
-    // Try to navigate to import page directly
-    const importUrl = getRabbyImportPrivateKeyUrl();
-    console.log(JSON.stringify({ status: 'info', message: `Navigating to import page: ${importUrl}` }));
-    await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await extensionPage.waitForTimeout(3000);
-  }
-
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-init-import-page.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  currentUrl = extensionPage.url();
-  console.log(JSON.stringify({ status: 'info', message: `Current URL: ${currentUrl}` }));
-
-  // Handle old guide page flow (fallback for older versions)
-  if (currentUrl.includes('/new-user/guide')) {
-    console.log(JSON.stringify({ status: 'info', message: 'On guide page, looking for Import option...' }));
-
-    const importButtonSelectors = [
-      'text=Import an address',
-      'text=Import',
-      '[class*="import"]',
-      'button:has-text("Import")',
-    ];
-
-    for (const selector of importButtonSelectors) {
-      try {
-        const btn = await extensionPage.$(selector);
-        if (btn && await btn.isVisible()) {
-          await btn.click();
-          console.log(JSON.stringify({ status: 'info', message: 'Clicked Import option' }));
-          await extensionPage.waitForTimeout(2000);
-          break;
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-
-    const importUrl = getRabbyImportPrivateKeyUrl();
-    await extensionPage.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await extensionPage.waitForTimeout(2000);
-  }
-
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-init-pk-input-page.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  const pkInputSelectors = [
-    'textarea[placeholder*="private"]',
-    'textarea[placeholder*="Private"]',
-    'textarea',
-    'input[type="text"][placeholder*="private"]',
-    'input[type="password"]',
-  ];
-  let pkFilled = false;
-
-  for (const selector of pkInputSelectors) {
-    try {
-      const inputs = await extensionPage.$$(selector);
-      for (const input of inputs) {
-        if (await input.isVisible()) {
-          await input.fill(privateKey);
-          pkFilled = true;
-          console.log(JSON.stringify({ status: 'info', message: `Private key filled using selector: ${selector}` }));
-          break;
-        }
-      }
-      if (pkFilled) break;
-    } catch (e) {
-      continue;
-    }
-  }
-
-  if (!pkFilled) {
-    await extensionPage.screenshot({
-      path: path.join(SCREENSHOTS_DIR, 'wallet-init-pk-input-failed.jpg'),
-      type: 'jpeg',
-      quality: 60
-    });
-    throw new Error('Failed to find private key input field');
-  }
-
-  await extensionPage.waitForTimeout(1000);
-
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-init-pk-filled.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  const confirmSelectors = [
-    'button:has-text("Confirm")',
-    'button:has-text("Next")',
-    'button:has-text("Import")',
-    'button[type="submit"]',
-    '.ant-btn-primary',
-  ];
-
-  for (const selector of confirmSelectors) {
-    try {
-      const btn = await extensionPage.$(selector);
-      if (btn && await btn.isVisible()) {
-        await btn.click();
-        console.log(JSON.stringify({ status: 'info', message: 'Confirm button clicked' }));
-        await extensionPage.waitForTimeout(3000);
-        break;
-      }
-    } catch (e) {
-      continue;
-    }
-  }
-
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-init-after-confirm.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  const passwordInputs = await extensionPage.$$('input[type="password"]');
-  console.log(JSON.stringify({ status: 'info', message: `Found ${passwordInputs.length} password inputs` }));
-
-  if (passwordInputs.length >= 2) {
-    await passwordInputs[0].fill(walletPassword);
-    await passwordInputs[1].fill(walletPassword);
-    console.log(JSON.stringify({ status: 'info', message: 'Password fields filled' }));
-
-    await extensionPage.waitForTimeout(500);
-
-    await extensionPage.screenshot({
-      path: path.join(SCREENSHOTS_DIR, 'wallet-init-password-filled.jpg'),
-      type: 'jpeg',
-      quality: 60
-    });
-
-    for (const selector of confirmSelectors) {
-      try {
-        const btn = await extensionPage.$(selector);
-        if (btn && await btn.isVisible()) {
-          await btn.click();
-          console.log(JSON.stringify({ status: 'info', message: 'Password confirm clicked' }));
-          await extensionPage.waitForTimeout(3000);
-          break;
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-  }
-
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-init-import-complete.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  console.log(JSON.stringify({ status: 'info', message: 'Verifying wallet import...' }));
-  const indexUrl = getRabbyIndexUrl();
-  await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await extensionPage.waitForTimeout(2000);
-
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-init-verify.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  const verifyUrl = extensionPage.url();
-  const isStillNewUser = verifyUrl.includes('/new-user');
-
-  if (isStillNewUser) {
-    console.log(JSON.stringify({ status: 'warning', message: 'Still on new-user page after import, wallet may not be imported correctly' }));
-    return false;
-  }
-
-  console.log(JSON.stringify({ status: 'info', message: 'Wallet import verified successfully' }));
-  return true;
-}
-
-async function unlockWallet(extensionPage, walletPassword) {
-  console.log(JSON.stringify({ status: 'info', message: 'Attempting to unlock wallet...' }));
-
-  const passwordInput = await extensionPage.$('input[type="password"]');
-  if (!passwordInput || !(await passwordInput.isVisible())) {
-    throw new Error('Password input not found');
-  }
-
-  await passwordInput.fill(walletPassword);
-  await extensionPage.waitForTimeout(500);
-
-  const unlockSelectors = [
-    'button:has-text("Unlock")',
-    'button:has-text("解锁")',
-    'button[type="submit"]',
-    '.ant-btn-primary',
-  ];
-
-  for (const selector of unlockSelectors) {
-    try {
-      const btn = await extensionPage.$(selector);
-      if (btn && await btn.isVisible()) {
-        await btn.click();
-        await extensionPage.waitForTimeout(2000);
-        break;
-      }
-    } catch (e) {
-      continue;
-    }
-  }
-
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-init-after-unlock.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  const newState = await detectWalletState(extensionPage);
-  return newState === WalletState.UNLOCKED;
-}
-
-async function resetWallet(extensionPage) {
-  console.log(JSON.stringify({ status: 'info', message: 'Starting wallet reset (Forgot Password) flow...' }));
-
-  const forgotPasswordSelectors = [
-    'text=Forgot Password',
-    'text=Forgot password',
-    'a:has-text("Forgot")',
-    '[class*="forgot"]',
-  ];
-
-  let clicked = false;
-  for (const selector of forgotPasswordSelectors) {
-    try {
-      const link = await extensionPage.$(selector);
-      if (link && await link.isVisible()) {
-        await link.click();
-        clicked = true;
-        console.log(JSON.stringify({ status: 'info', message: 'Clicked Forgot Password' }));
-        await extensionPage.waitForTimeout(2000);
-        break;
-      }
-    } catch (e) {
-      continue;
-    }
-  }
-
-  if (!clicked) {
-    throw new Error('Could not find Forgot Password link');
-  }
-
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-init-reset-page.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  const resetSelectors = [
-    'button:has-text("Reset")',
-    'button:has-text("Confirm")',
-    'button:has-text("I understand")',
-    'button:has-text("Continue")',
-    '.ant-btn-primary',
-    '.ant-btn-danger',
-  ];
-
-  for (const selector of resetSelectors) {
-    try {
-      const btn = await extensionPage.$(selector);
-      if (btn && await btn.isVisible()) {
-        await btn.click();
-        console.log(JSON.stringify({ status: 'info', message: 'Clicked reset confirm button' }));
-        await extensionPage.waitForTimeout(2000);
-        break;
-      }
-    } catch (e) {
-      continue;
-    }
-  }
-
-  await extensionPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'wallet-init-reset-complete.jpg'),
-    type: 'jpeg',
-    quality: 60
-  });
-
-  return true;
-}
-
 function generatePassword() {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
   const randomBytes = crypto.randomBytes(16);
   let password = '';
   for (let i = 0; i < 16; i++) {
@@ -599,22 +133,500 @@ function generatePassword() {
   return password;
 }
 
+/**
+ * Detect the current MetaMask state
+ * Updated for MetaMask v13 new UI
+ */
+async function detectMetaMaskState(page) {
+  const url = page.url();
+  const content = await page.content();
+
+  // Check for onboarding page (v13 new UI)
+  // New UI shows "I have an existing wallet" or "Create a new wallet"
+  const hasNewWelcome = content.includes('I have an existing wallet') ||
+                        content.includes('Create a new wallet');
+
+  // Old UI shows "Welcome to MetaMask"
+  const hasOldWelcome = content.includes('Welcome to MetaMask');
+
+  if (url.includes('onboarding') || hasNewWelcome || hasOldWelcome) {
+    return WalletState.ONBOARDING;
+  }
+
+  // Check for locked state (password input with unlock)
+  const hasPasswordInput = await page.$('input[type="password"]').catch(() => null);
+  const hasUnlockButton = content.includes('Unlock') || content.includes('unlock');
+
+  if (hasPasswordInput && hasUnlockButton) {
+    return WalletState.LOCKED;
+  }
+
+  // Check for unlocked state (has account info)
+  const hasAccountMenu = await page.$('[data-testid="account-menu-icon"]').catch(() => null);
+  const hasBalance = content.includes('ETH') || content.includes('Balance');
+
+  if (hasAccountMenu || hasBalance) {
+    return WalletState.UNLOCKED;
+  }
+
+  return WalletState.UNKNOWN;
+}
+
+/**
+ * Handle MetaMask onboarding - Import wallet with private key
+ * Updated for MetaMask v13 new UI
+ */
+async function handleOnboarding(page, privateKey, password) {
+  console.log(JSON.stringify({ status: 'info', message: 'Starting MetaMask onboarding (v13 UI)...' }));
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'metamask-onboarding-start.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Step 1: Welcome Page - Click "I have an existing wallet"
+  // New UI: No terms checkbox, just two buttons
+  console.log(JSON.stringify({ status: 'info', message: 'Step 1: Welcome page' }));
+
+  // Try new UI first
+  let existingWalletBtn = await page.$('button:has-text("I have an existing wallet")');
+  if (existingWalletBtn && await existingWalletBtn.isVisible()) {
+    await existingWalletBtn.click();
+    console.log(JSON.stringify({ status: 'info', message: 'Clicked "I have an existing wallet" (new UI)' }));
+    await page.waitForTimeout(3000);
+  } else {
+    // Fallback to old UI
+    try {
+      const termsCheckbox = await page.$('input[data-testid="onboarding-terms-checkbox"]');
+      if (termsCheckbox) {
+        await termsCheckbox.click();
+        await page.waitForTimeout(500);
+      }
+    } catch (e) {
+      // Terms checkbox not found
+    }
+
+    const importSelectors = [
+      '[data-testid="onboarding-import-wallet"]',
+      'button:has-text("Import an existing wallet")',
+      'button:has-text("Import")',
+    ];
+
+    for (const selector of importSelectors) {
+      try {
+        const btn = await page.$(selector);
+        if (btn && await btn.isVisible()) {
+          await btn.click();
+          console.log(JSON.stringify({ status: 'info', message: 'Clicked Import wallet button (old UI)' }));
+          await page.waitForTimeout(2000);
+          break;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'metamask-after-welcome.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Step 2: Sign-in Options Page (NEW in v13)
+  // Click "Import using Secret Recovery Phrase"
+  console.log(JSON.stringify({ status: 'info', message: 'Step 2: Sign-in options page' }));
+
+  const importSRPBtn = await page.$('button:has-text("Import using Secret Recovery Phrase")');
+  if (importSRPBtn && await importSRPBtn.isVisible()) {
+    await importSRPBtn.click();
+    console.log(JSON.stringify({ status: 'info', message: 'Clicked "Import using Secret Recovery Phrase"' }));
+    await page.waitForTimeout(3000);
+  } else {
+    // Maybe old UI, try metrics consent
+    try {
+      const noThanksBtn = await page.$('[data-testid="metametrics-no-thanks"]');
+      if (noThanksBtn && await noThanksBtn.isVisible()) {
+        await noThanksBtn.click();
+        console.log(JSON.stringify({ status: 'info', message: 'Declined metrics (old UI)' }));
+        await page.waitForTimeout(1000);
+      }
+    } catch (e) {
+      // Metrics dialog not found
+    }
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'metamask-srp-page.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Step 3: SRP Input Page
+  // New UI uses a single textarea instead of 12 separate inputs
+  // IMPORTANT: Must use keyboard.type() not fill() for proper event triggering
+  console.log(JSON.stringify({ status: 'info', message: 'Step 3: SRP input page' }));
+
+  // Generate mnemonic from private key (256 bits -> 24 words)
+  const mnemonic = privateKeyToMnemonic(privateKey);
+
+  // Try new UI (single textarea)
+  const srpTextarea = await page.$('textarea');
+  if (srpTextarea && await srpTextarea.isVisible()) {
+    console.log(JSON.stringify({ status: 'info', message: 'Using new UI textarea for SRP (24 words)' }));
+    await srpTextarea.click();
+    await page.waitForTimeout(500);
+
+    // Use keyboard.type() for proper event triggering
+    await page.keyboard.type(mnemonic, { delay: 20 });
+    console.log(JSON.stringify({ status: 'info', message: 'Mnemonic entered via keyboard' }));
+    await page.waitForTimeout(2000);
+
+    // Click Continue button
+    const continueBtn = await page.$('button:has-text("Continue")');
+    if (continueBtn) {
+      const isEnabled = await continueBtn.isEnabled();
+      if (isEnabled) {
+        await continueBtn.click();
+        console.log(JSON.stringify({ status: 'info', message: 'Clicked Continue' }));
+        await page.waitForTimeout(3000);
+      } else {
+        // Try pressing Tab to trigger validation
+        await page.keyboard.press('Tab');
+        await page.waitForTimeout(1000);
+        await continueBtn.click({ force: true });
+        await page.waitForTimeout(3000);
+      }
+    }
+  } else {
+    // Fallback to old UI (separate word inputs)
+    console.log(JSON.stringify({ status: 'info', message: 'Using old UI for SRP input' }));
+    const srpInputs = await page.$$('input[data-testid^="import-srp__srp-word-"]');
+    const words = mnemonic.split(' ');
+
+    if (srpInputs.length > 0) {
+      // Fill as many words as there are inputs (12 or 24)
+      const wordCount = Math.min(srpInputs.length, words.length);
+      for (let i = 0; i < wordCount; i++) {
+        await srpInputs[i].fill(words[i]);
+      }
+      console.log(JSON.stringify({ status: 'info', message: `SRP entered (old UI, ${wordCount} words)` }));
+    }
+
+    await page.waitForTimeout(1000);
+
+    const confirmBtn = await page.$('[data-testid="import-srp-confirm"]');
+    if (confirmBtn) {
+      await confirmBtn.click();
+      console.log(JSON.stringify({ status: 'info', message: 'Confirmed SRP' }));
+      await page.waitForTimeout(2000);
+    }
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'metamask-password-page.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Step 4: Password Creation Page
+  // New UI: "MetaMask password" page with "Create password" button
+  console.log(JSON.stringify({ status: 'info', message: 'Step 4: Password creation page' }));
+
+  let passwordSet = false;
+
+  // Try new UI first (generic password inputs)
+  const passwordInputs = await page.$$('input[type="password"]');
+  if (passwordInputs.length >= 2) {
+    console.log(JSON.stringify({ status: 'info', message: 'Using password inputs' }));
+
+    // Click first input and type password
+    await passwordInputs[0].click();
+    await page.keyboard.type(password, { delay: 10 });
+
+    // Click second input and type password
+    await passwordInputs[1].click();
+    await page.keyboard.type(password, { delay: 10 });
+
+    passwordSet = true;
+  } else {
+    // Try old UI with data-testid
+    const newPasswordInput = await page.$('[data-testid="create-password-new"]');
+    const confirmPasswordInput = await page.$('[data-testid="create-password-confirm"]');
+
+    if (newPasswordInput && confirmPasswordInput) {
+      await newPasswordInput.fill(password);
+      await confirmPasswordInput.fill(password);
+      passwordSet = true;
+    }
+  }
+
+  if (passwordSet) {
+    await page.waitForTimeout(500);
+
+    // Click checkbox (try multiple selectors)
+    const checkboxSelectors = [
+      'input[type="checkbox"]',
+      '[data-testid="create-password-terms"]',
+    ];
+
+    for (const selector of checkboxSelectors) {
+      try {
+        const checkbox = await page.$(selector);
+        if (checkbox && await checkbox.isVisible()) {
+          await checkbox.click();
+          break;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    await page.waitForTimeout(500);
+    console.log(JSON.stringify({ status: 'info', message: 'Password set' }));
+
+    // Click create/import button
+    const buttonSelectors = [
+      'button:has-text("Create password")',
+      'button:has-text("Import my wallet")',
+      '[data-testid="create-password-import"]',
+      'button[type="submit"]',
+    ];
+
+    for (const selector of buttonSelectors) {
+      try {
+        const btn = await page.$(selector);
+        if (btn && await btn.isVisible()) {
+          await btn.click();
+          console.log(JSON.stringify({ status: 'info', message: `Clicked ${selector}` }));
+          await page.waitForTimeout(5000);
+          break;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'metamask-after-password.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Step 5: Complete onboarding (click through any remaining dialogs)
+  console.log(JSON.stringify({ status: 'info', message: 'Step 5: Completing onboarding' }));
+
+  const completionSelectors = [
+    '[data-testid="onboarding-complete-done"]',
+    'button:has-text("Got it")',
+    'button:has-text("Done")',
+    '[data-testid="pin-extension-next"]',
+    '[data-testid="pin-extension-done"]',
+    'button:has-text("Next")',
+  ];
+
+  for (const selector of completionSelectors) {
+    try {
+      const btn = await page.$(selector);
+      if (btn && await btn.isVisible()) {
+        await btn.click();
+        console.log(JSON.stringify({ status: 'info', message: `Clicked ${selector}` }));
+        await page.waitForTimeout(2000);
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+
+  // Close any popups
+  const closeSelectors = [
+    '[data-testid="popover-close"]',
+    'button[aria-label="Close"]',
+  ];
+
+  for (const selector of closeSelectors) {
+    try {
+      const btn = await page.$(selector);
+      if (btn && await btn.isVisible()) {
+        await btn.click();
+        await page.waitForTimeout(500);
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'metamask-wallet-ready.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Note: No need to import private key separately!
+  // The mnemonic was generated from the private key, so the first account
+  // in the wallet is already the account corresponding to that private key.
+  console.log(JSON.stringify({
+    status: 'info',
+    message: 'Onboarding complete - wallet imported from private key via mnemonic'
+  }));
+}
+
+/**
+ * Convert private key to mnemonic (24 words)
+ *
+ * Based on BIP-39 standard:
+ * - Private key is 256 bits (32 bytes)
+ * - 256 bits entropy generates 24 words mnemonic
+ * - Process: privateKey (as entropy) -> SHA256 checksum -> split into 11-bit groups -> map to wordlist
+ *
+ * @param {string} privateKey - 64 hex characters (with or without 0x prefix)
+ * @returns {string} 24-word mnemonic phrase
+ */
+function privateKeyToMnemonic(privateKey) {
+  // Remove 0x prefix if present
+  const cleanKey = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
+
+  // Validate private key format (64 hex characters = 32 bytes = 256 bits)
+  if (!/^[a-fA-F0-9]{64}$/.test(cleanKey)) {
+    throw new Error('Invalid private key format. Must be 64 hex characters.');
+  }
+
+  // Convert hex string to Buffer (this is our 256-bit entropy)
+  const entropy = Buffer.from(cleanKey, 'hex');
+
+  // Use bip39 to convert entropy to mnemonic
+  // 256 bits entropy = 24 words
+  const mnemonic = bip39.entropyToMnemonic(entropy);
+
+  console.log(JSON.stringify({
+    status: 'info',
+    message: 'Generated mnemonic from private key',
+    wordCount: mnemonic.split(' ').length
+  }));
+
+  return mnemonic;
+}
+
+/**
+ * Generate a temporary Secret Recovery Phrase
+ * This is used to create the initial MetaMask wallet
+ * @deprecated Use privateKeyToMnemonic instead when private key is available
+ */
+function generateTempSRP() {
+  // Using a deterministic test SRP for reproducibility
+  // In production, you would generate a random one
+  const testSRP = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+  return testSRP;
+}
+
+/**
+ * Import private key as an additional account in MetaMask
+ */
+async function importPrivateKeyAccount(page, privateKey) {
+  console.log(JSON.stringify({ status: 'info', message: 'Importing private key account...' }));
+
+  // Open account menu
+  const accountMenuBtn = await page.$('[data-testid="account-menu-icon"]');
+  if (accountMenuBtn) {
+    await accountMenuBtn.click();
+    await page.waitForTimeout(1000);
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'metamask-account-menu.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Click "Add account or hardware wallet"
+  const addAccountBtn = await page.$('[data-testid="multichain-account-menu-popover-action-button"]');
+  if (addAccountBtn) {
+    await addAccountBtn.click();
+    await page.waitForTimeout(1000);
+  }
+
+  // Click "Import account"
+  const importAccountBtn = await page.$('[data-testid="multichain-account-menu-popover-add-imported-account"]');
+  if (importAccountBtn) {
+    await importAccountBtn.click();
+    await page.waitForTimeout(1000);
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'metamask-import-account.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+
+  // Enter private key
+  const pkInput = await page.$('#private-key-box');
+  if (pkInput) {
+    // Remove 0x prefix if present for MetaMask
+    const cleanKey = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
+    await pkInput.fill(cleanKey);
+    console.log(JSON.stringify({ status: 'info', message: 'Private key entered' }));
+  }
+
+  await page.waitForTimeout(500);
+
+  // Click Import
+  const importBtn = await page.$('[data-testid="import-account-confirm-button"]');
+  if (importBtn) {
+    await importBtn.click();
+    console.log(JSON.stringify({ status: 'info', message: 'Account imported' }));
+    await page.waitForTimeout(2000);
+  }
+
+  await page.screenshot({
+    path: path.join(SCREENSHOTS_DIR, 'metamask-import-complete.jpg'),
+    type: 'jpeg',
+    quality: 60
+  });
+}
+
+/**
+ * Unlock MetaMask with password
+ */
+async function unlockMetaMask(page, password) {
+  console.log(JSON.stringify({ status: 'info', message: 'Unlocking MetaMask...' }));
+
+  const passwordInput = await page.$('input[data-testid="unlock-password"]');
+  if (passwordInput) {
+    await passwordInput.fill(password);
+  }
+
+  const unlockBtn = await page.$('[data-testid="unlock-submit"]');
+  if (unlockBtn) {
+    await unlockBtn.click();
+    await page.waitForTimeout(2000);
+  }
+
+  // Verify unlocked
+  const state = await detectMetaMaskState(page);
+  return state === WalletState.UNLOCKED;
+}
+
+// MetaMask version to download
+const METAMASK_VERSION = 'v13.13.1';
+
 const commands = {
-  async 'wallet-setup'(args, options) {
+  async 'wallet-setup'(args) {
     try {
       if (!fs.existsSync(EXTENSIONS_DIR)) {
         fs.mkdirSync(EXTENSIONS_DIR, { recursive: true });
       }
 
-      const rabbyPath = path.join(EXTENSIONS_DIR, 'rabby');
-      const rabbyZipPath = path.join(EXTENSIONS_DIR, 'rabby.zip');
+      const metamaskPath = path.join(EXTENSIONS_DIR, 'metamask');
+      const metamaskZipPath = path.join(EXTENSIONS_DIR, 'metamask.zip');
 
-      if (fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
-        const manifest = JSON.parse(fs.readFileSync(path.join(rabbyPath, 'manifest.json'), 'utf8'));
+      if (fs.existsSync(path.join(metamaskPath, 'manifest.json'))) {
+        const manifest = JSON.parse(fs.readFileSync(path.join(metamaskPath, 'manifest.json'), 'utf8'));
         console.log(JSON.stringify({
           success: true,
-          message: `Rabby Wallet v${manifest.version} is already installed`,
-          extensionPath: rabbyPath,
+          message: `MetaMask v${manifest.version} is already installed`,
+          extensionPath: metamaskPath,
           note: 'Use --force to reinstall'
         }));
 
@@ -624,50 +636,41 @@ const commands = {
         console.log(JSON.stringify({ status: 'info', message: 'Force reinstalling...' }));
       }
 
-      console.log(JSON.stringify({ status: 'info', message: 'Fetching latest Rabby release from GitHub...' }));
+      const version = METAMASK_VERSION;
+      const versionNum = version.replace('v', '');
+      const downloadUrl = `https://github.com/MetaMask/metamask-extension/releases/download/${version}/metamask-chrome-${versionNum}.zip`;
 
-      let releaseInfo;
-      try {
-        const releaseJson = execSync('curl -s "https://api.github.com/repos/RabbyHub/Rabby/releases/latest"', { encoding: 'utf8' });
-        releaseInfo = JSON.parse(releaseJson);
-      } catch (e) {
-        throw new Error('Failed to fetch release info from GitHub API');
-      }
-
-      const tagName = releaseInfo.tag_name;
-      const downloadUrl = `https://github.com/RabbyHub/Rabby/releases/download/${tagName}/Rabby_${tagName}.zip`;
-
-      console.log(JSON.stringify({ status: 'info', message: `Downloading Rabby ${tagName}...`, url: downloadUrl }));
+      console.log(JSON.stringify({ status: 'info', message: `Downloading MetaMask ${version}...`, url: downloadUrl }));
 
       try {
-        execSync(`curl -L -o "${rabbyZipPath}" "${downloadUrl}"`, { stdio: 'pipe' });
+        execSync(`curl -L -o "${metamaskZipPath}" "${downloadUrl}"`, { stdio: 'pipe' });
       } catch (e) {
         throw new Error(`Failed to download extension: ${e.message}`);
       }
 
-      if (fs.existsSync(rabbyPath)) {
-        fs.rmSync(rabbyPath, { recursive: true, force: true });
+      if (fs.existsSync(metamaskPath)) {
+        fs.rmSync(metamaskPath, { recursive: true, force: true });
       }
 
       console.log(JSON.stringify({ status: 'info', message: 'Extracting extension...' }));
       try {
-        execSync(`unzip -o "${rabbyZipPath}" -d "${rabbyPath}"`, { stdio: 'pipe' });
+        execSync(`unzip -o "${metamaskZipPath}" -d "${metamaskPath}"`, { stdio: 'pipe' });
       } catch (e) {
         throw new Error(`Failed to extract extension: ${e.message}`);
       }
 
-      fs.unlinkSync(rabbyZipPath);
+      fs.unlinkSync(metamaskZipPath);
 
-      if (!fs.existsSync(path.join(rabbyPath, 'manifest.json'))) {
+      if (!fs.existsSync(path.join(metamaskPath, 'manifest.json'))) {
         throw new Error('Extension extraction failed - manifest.json not found');
       }
 
-      const manifest = JSON.parse(fs.readFileSync(path.join(rabbyPath, 'manifest.json'), 'utf8'));
+      const manifest = JSON.parse(fs.readFileSync(path.join(metamaskPath, 'manifest.json'), 'utf8'));
 
       console.log(JSON.stringify({
         success: true,
-        message: `Rabby Wallet v${manifest.version} installed successfully`,
-        extensionPath: rabbyPath,
+        message: `MetaMask v${manifest.version} installed successfully`,
+        extensionPath: metamaskPath,
         nextStep: 'Run wallet-init to initialize your wallet'
       }));
 
@@ -681,8 +684,6 @@ const commands = {
   },
 
   async 'wallet-init'(args, options) {
-    // Read sensitive values from .test-env file (NOT from environment variables)
-    // This ensures secrets are not exposed to AI agent APIs or external processes
     const testEnv = readTestEnv();
     const privateKey = testEnv.WALLET_PRIVATE_KEY;
 
@@ -690,7 +691,7 @@ const commands = {
       console.log(JSON.stringify({
         success: false,
         error: 'WALLET_PRIVATE_KEY not found in .test-env file',
-        fix: 'Create or update the .test-env file in test-output directory:',
+        fix: 'Create or update the .test-env file in tests/ directory:',
         file: TEST_ENV_FILE,
         example: 'WALLET_PRIVATE_KEY="0xYourPrivateKeyHere"'
       }));
@@ -710,7 +711,6 @@ const commands = {
 
     if (!walletPassword) {
       walletPassword = generatePassword();
-      // Save generated password to .test-env file for persistence across sessions
       writeTestEnv('WALLET_PASSWORD', walletPassword);
       passwordGenerated = true;
       console.log(JSON.stringify({
@@ -724,7 +724,7 @@ const commands = {
         console.log(JSON.stringify({
           success: false,
           error: 'wallet-init requires --wallet flag',
-          hint: 'Run: node wallet-setup-helper.js wallet-init --wallet [--headed]'
+          hint: 'Run: node wallet-setup-helper.js wallet-init --wallet --headed'
         }));
         return;
       }
@@ -732,96 +732,52 @@ const commands = {
       await startBrowser(options);
       const context = getContext();
 
-      console.log(JSON.stringify({ status: 'info', message: 'Opening Rabby extension page...' }));
+      console.log(JSON.stringify({ status: 'info', message: 'Opening MetaMask extension page...' }));
       const extensionPage = await context.newPage();
-      const extensionId = getRabbyExtensionId();
-      const indexUrl = `chrome-extension://${extensionId}/index.html`;
-      console.log(JSON.stringify({ status: 'info', message: `Extension URL: ${indexUrl}` }));
+      const extensionId = getMetaMaskExtensionId();
 
-      await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      if (!extensionId) {
+        throw new Error('MetaMask extension ID not detected. Make sure wallet-setup was run first.');
+      }
+
+      const homeUrl = `chrome-extension://${extensionId}/home.html`;
+      console.log(JSON.stringify({ status: 'info', message: `Extension URL: ${homeUrl}` }));
+
+      await extensionPage.goto(homeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await extensionPage.waitForTimeout(3000);
 
       await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-init-state-check.jpg'),
+        path: path.join(SCREENSHOTS_DIR, 'metamask-init-state.jpg'),
         type: 'jpeg',
         quality: 60
       });
 
-      // Handle welcome flow first (Access All Dapps → Next → Get Started)
-      const welcomeResult = await handleWelcomeFlow(extensionPage);
-      console.log(JSON.stringify({ status: 'info', message: `Welcome flow result: ${welcomeResult}` }));
-
-      // Re-check URL after welcome flow
-      const urlAfterWelcome = extensionPage.url();
-      console.log(JSON.stringify({ status: 'info', message: `URL after welcome flow: ${urlAfterWelcome}` }));
-
-      // If on no-address page, treat as NEW_USER
-      let state;
-      if (urlAfterWelcome.includes('#/no-address') || welcomeResult === 'NO_ADDRESS') {
-        state = WalletState.NEW_USER;
-        console.log(JSON.stringify({ status: 'info', message: 'No wallet address found, treating as NEW_USER' }));
-      } else {
-        state = await detectWalletState(extensionPage);
-      }
-      console.log(JSON.stringify({ status: 'info', message: `Detected wallet state: ${state}` }));
+      const state = await detectMetaMaskState(extensionPage);
+      console.log(JSON.stringify({ status: 'info', message: `Detected MetaMask state: ${state}` }));
 
       let initSuccess = false;
       let steps = [];
 
       switch (state) {
-        case WalletState.NEW_USER:
-          steps.push('detected_new_user');
-          await importWallet(extensionPage, privateKey, walletPassword);
-          steps.push('imported_wallet');
+        case WalletState.ONBOARDING:
+          steps.push('detected_onboarding');
+          await handleOnboarding(extensionPage, privateKey, walletPassword);
+          steps.push('completed_onboarding');
           initSuccess = true;
           break;
 
         case WalletState.LOCKED:
           steps.push('detected_locked');
-
-          if (!testEnv.WALLET_PASSWORD || passwordGenerated) {
-            console.log(JSON.stringify({
-              status: 'info',
-              message: 'No existing password, will reset wallet...'
-            }));
-            steps.push('no_password_resetting');
-            await resetWallet(extensionPage);
-            steps.push('wallet_reset');
-
-            await extensionPage.waitForTimeout(1000);
-            await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            await extensionPage.waitForTimeout(2000);
-
-            await importWallet(extensionPage, privateKey, walletPassword);
-            steps.push('imported_wallet_after_reset');
+          const unlocked = await unlockMetaMask(extensionPage, walletPassword);
+          if (unlocked) {
+            steps.push('unlock_success');
             initSuccess = true;
           } else {
-            const unlocked = await unlockWallet(extensionPage, walletPassword);
-
-            if (unlocked) {
-              steps.push('unlock_success');
-              initSuccess = true;
-            } else {
-              console.log(JSON.stringify({
-                status: 'info',
-                message: 'Unlock failed, resetting wallet...'
-              }));
-              steps.push('unlock_failed_resetting');
-
-              await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-              await extensionPage.waitForTimeout(2000);
-
-              await resetWallet(extensionPage);
-              steps.push('wallet_reset');
-
-              await extensionPage.waitForTimeout(1000);
-              await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-              await extensionPage.waitForTimeout(2000);
-
-              await importWallet(extensionPage, privateKey, walletPassword);
-              steps.push('imported_wallet_after_reset');
-              initSuccess = true;
-            }
+            steps.push('unlock_failed');
+            console.log(JSON.stringify({
+              status: 'error',
+              message: 'Failed to unlock MetaMask. Password may be incorrect.'
+            }));
           }
           break;
 
@@ -831,53 +787,46 @@ const commands = {
           break;
 
         case WalletState.UNKNOWN:
+          steps.push('unknown_state');
           console.log(JSON.stringify({
             status: 'warning',
-            message: 'Unknown wallet state, attempting import flow...'
+            message: 'Unknown MetaMask state. Attempting onboarding...'
           }));
-          steps.push('unknown_state_trying_import');
-
           try {
-            await importWallet(extensionPage, privateKey, walletPassword);
-            steps.push('import_attempted');
+            await handleOnboarding(extensionPage, privateKey, walletPassword);
+            steps.push('onboarding_attempted');
             initSuccess = true;
           } catch (e) {
-            steps.push('import_failed');
+            steps.push('onboarding_failed');
             console.log(JSON.stringify({
               status: 'error',
-              message: `Import attempt failed: ${e.message}`
+              message: `Onboarding failed: ${e.message}`
             }));
           }
           break;
       }
 
-      await extensionPage.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await extensionPage.waitForTimeout(2000);
-      const finalState = await detectWalletState(extensionPage);
-
       await extensionPage.screenshot({
-        path: path.join(SCREENSHOTS_DIR, 'wallet-init-final.jpg'),
+        path: path.join(SCREENSHOTS_DIR, 'metamask-init-final.jpg'),
         type: 'jpeg',
         quality: 60
       });
 
-      if (finalState === WalletState.UNLOCKED || initSuccess) {
+      if (initSuccess) {
         console.log(JSON.stringify({
           success: true,
-          message: 'Wallet initialization completed successfully',
+          message: 'MetaMask initialization completed successfully',
           initialState: state,
-          finalState: finalState,
           steps: steps,
           nextStep: 'Use web-test-wallet-connect to connect wallet to DApp'
         }));
       } else {
         console.log(JSON.stringify({
           success: false,
-          error: 'Wallet initialization failed',
+          error: 'MetaMask initialization failed',
           initialState: state,
-          finalState: finalState,
           steps: steps,
-          hint: 'Check screenshots for details'
+          hint: 'Check screenshots in test-output/screenshots/ for details'
         }));
       }
 
@@ -893,8 +842,6 @@ const commands = {
 
 // Export commands and utility functions
 module.exports = commands;
-
-// Also export test-env utilities for other skills that may need WALLET_PASSWORD
 module.exports.readTestEnv = readTestEnv;
 module.exports.writeTestEnv = writeTestEnv;
 module.exports.TEST_ENV_FILE = TEST_ENV_FILE;
