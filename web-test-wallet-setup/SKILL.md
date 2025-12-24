@@ -30,46 +30,59 @@ Set up Rabby wallet extension for Web3 DApp testing.
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Pass private key INLINE with each command (REQUIRED)
-WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
-WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+# Step 1: Check if WALLET_PRIVATE_KEY is set in environment
+echo $WALLET_PRIVATE_KEY | head -c 10
+
+# Step 2: Download wallet extension (no key needed)
+node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
+
+# Step 3: Initialize wallet - pass $WALLET_PRIVATE_KEY to child process
+WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```
 
-**Note:** You MUST pass `WALLET_PRIVATE_KEY` inline with each command. Using `export` separately will NOT work because each command runs in a new shell.
+**Note:** Use `$WALLET_PRIVATE_KEY` (with $) to pass the environment variable to the child process.
 
 ## Environment Setup
 
 ### Setting the Private Key
 
-**CRITICAL:** The private key must be passed to each command.
+**CRITICAL:** The private key must be passed to child processes.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  ⚠️  IMPORTANT: How to Pass Private Key                       │
+│  ⚠️  IMPORTANT: Pass Environment Variable to Child Process     │
 │                                                                │
-│  Claude Code runs each command in a NEW shell process.        │
-│  Environment variables DO NOT persist between commands!       │
+│  Step 1: Check if WALLET_PRIVATE_KEY exists in environment    │
 │                                                                │
-│  ❌ WRONG (variable lost between commands):                   │
-│     export WALLET_PRIVATE_KEY="0x..."                         │
-│     node wallet-setup-helper.js wallet-setup  ← KEY IS LOST!  │
+│     echo $WALLET_PRIVATE_KEY | head -c 10                      │
 │                                                                │
-│  ✅ CORRECT (pass inline with EACH command):                  │
-│     WALLET_PRIVATE_KEY="0x..." node wallet-setup-helper.js    │
+│  Step 2: If exists, pass it to child process using $VAR       │
+│                                                                │
+│     WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node ...          │
+│                                                                │
+│  Step 3: If NOT exists, ask user to set it first              │
+│                                                                │
+│     "Please set WALLET_PRIVATE_KEY before running tests"       │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-**Always use inline environment variable:**
+**How to check and use:**
 ```bash
-# Pass WALLET_PRIVATE_KEY inline with the command
-WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
-WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+# Step 1: Check if variable exists in environment
+echo $WALLET_PRIVATE_KEY | head -c 10
+
+# Step 2: If it shows the key prefix, pass it to child process
+WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```
 
-**How to get the private key:**
-1. Ask user: "Please provide your test wallet private key"
-2. User provides: `0xabc123...`
-3. Use inline: `WALLET_PRIVATE_KEY="0xabc123..." node ...`
+**If variable is not set:**
+```
+Ask user: "WALLET_PRIVATE_KEY is not set in your environment.
+Please run this command in your terminal and restart Claude Code:
+
+export WALLET_PRIVATE_KEY=\"0xYourPrivateKey\"
+"
+```
 
 **Security Notes:**
 - NEVER commit private keys to version control
@@ -79,15 +92,23 @@ WALLET_PRIVATE_KEY="0x..." node $SKILL_DIR/scripts/wallet-setup-helper.js wallet
 
 ## Instructions
 
-### Step 1: Get Private Key from User
+### Step 1: Check Environment Variable
 
-**Ask the user for their test wallet private key:**
+**First, check if WALLET_PRIVATE_KEY is set:**
+
+```bash
+echo $WALLET_PRIVATE_KEY | head -c 10
+```
+
+- If output shows `0x...` prefix → Variable is set, continue to Step 2
+- If output is empty → Ask user to set it:
 
 ```
-"Please provide your test wallet private key (starts with 0x)"
-```
+"WALLET_PRIVATE_KEY is not set. Please run this in your terminal and restart Claude Code:
 
-Once user provides the key (e.g., `0xabc123...`), use it inline with commands in the following steps.
+export WALLET_PRIVATE_KEY=\"0xYourPrivateKey\"
+"
+```
 
 ### Step 2: Download Wallet Extension
 
@@ -117,9 +138,9 @@ node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-setup
 ```bash
 SKILL_DIR="<path-to-this-skill>"
 
-# Initialize wallet with private key import
-# ⚠️ MUST pass WALLET_PRIVATE_KEY inline!
-WALLET_PRIVATE_KEY="0xUserProvidedKey" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+# Initialize wallet - pass $WALLET_PRIVATE_KEY to child process
+# ⚠️ Use $WALLET_PRIVATE_KEY (with $) to reference the environment variable!
+WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```
 
 **What this does:**
@@ -142,16 +163,24 @@ WALLET_PRIVATE_KEY="0xUserProvidedKey" node $SKILL_DIR/scripts/wallet-setup-help
 
 ### "WALLET_PRIVATE_KEY not set"
 
-**Cause:** Using `export` separately doesn't work because each command runs in a new shell.
+**Cause:** The environment variable is not set, or not passed to the child process.
 
-**Solution:** Pass the key inline with the command:
+**Solution:**
+
+1. First check if the variable exists:
 ```bash
-# ✅ CORRECT - pass inline
-WALLET_PRIVATE_KEY="0xYourKey" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+echo $WALLET_PRIVATE_KEY | head -c 10
+```
 
-# ❌ WRONG - export is lost
+2. If empty, ask user to set it in their terminal and restart Claude Code:
+```bash
 export WALLET_PRIVATE_KEY="0xYourKey"
-node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
+```
+
+3. If set, pass it to child process using `$WALLET_PRIVATE_KEY`:
+```bash
+# ✅ CORRECT - use $WALLET_PRIVATE_KEY to reference the variable
+WALLET_PRIVATE_KEY="$WALLET_PRIVATE_KEY" node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 ```
 
 ### "Extension download failed"

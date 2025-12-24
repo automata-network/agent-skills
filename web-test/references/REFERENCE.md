@@ -35,24 +35,28 @@ This document contains detailed technical information for the web-test skill.
 
 ## Web3 DApp Testing
 
-### Wallet Commands
+**Note:** Wallet setup and connection are handled by separate skills:
+- `web-test-wallet-setup` - Downloads and initializes Rabby wallet
+- `web-test-wallet-connect` - Connects wallet to DApp, handles popups
+
+### When Web3 Testing is Needed
+
+If `tests/config.yaml` contains:
+```yaml
+web3:
+  enabled: true
+```
+
+Then `web-test` will automatically call the wallet skills before executing tests.
+
+### Wallet Commands in test-helper.js
+
+These commands are used by the wallet skills internally:
 
 | Command | Description |
 |---------|-------------|
-| `wallet-setup` | Open Chrome Web Store to install Rabby Wallet |
-| `wallet-import` | Import wallet (uses `WALLET_PRIVATE_KEY`, auto-generates `WALLET_PASSWORD`) |
-| `wallet-unlock` | Unlock wallet (uses `WALLET_PASSWORD` env var) |
-| `wallet-navigate <url>` | Navigate to DApp with Rabby Wallet available |
-| `wallet-connect` | Connect wallet to current DApp |
-| `wallet-switch-network <n>` | Switch network (ethereum, polygon, arbitrum, etc.) |
-| `wallet-get-address` | Get current wallet address |
-
-### Environment Variables
-
-| Variable | Description | Security |
-|----------|-------------|----------|
-| `WALLET_PRIVATE_KEY` | Your wallet private key (64 hex chars, optional 0x prefix) | LOCAL ONLY - never logged or transmitted |
-| `WALLET_PASSWORD` | Wallet unlock password (auto-generated during wallet-import) | LOCAL ONLY - never logged or transmitted |
+| `wallet-navigate <url>` | Navigate to URL with wallet extension loaded |
+| `wallet-approve` | Approve wallet popup (connect, sign, transaction) |
 
 ### Supported Networks
 
@@ -68,39 +72,9 @@ This document contains detailed technical information for the web-test skill.
 | Goerli Testnet | 0x5 |
 | Sepolia Testnet | 0xaa36a7 |
 
-### Web3 Test Flow Example
-
-```bash
-SKILL_DIR="/path/to/web-test"
-
-# Step 1: Install Rabby Wallet (one-time)
-node $SKILL_DIR/scripts/test-helper.js wallet-setup
-
-# Step 2: Set private key and import wallet (one-time)
-# This auto-generates WALLET_PASSWORD and stores it in the process env
-export WALLET_PRIVATE_KEY="your_private_key_here"
-node $SKILL_DIR/scripts/test-helper.js wallet-import
-
-# Step 3: Unlock wallet if locked (uses WALLET_PASSWORD from env)
-node $SKILL_DIR/scripts/test-helper.js wallet-unlock
-
-# Step 4: Navigate to DApp with wallet
-node $SKILL_DIR/scripts/test-helper.js wallet-navigate "https://app.uniswap.org"
-
-# Step 5: Connect wallet
-node $SKILL_DIR/scripts/test-helper.js wallet-connect
-
-# Step 6: Switch network if needed
-node $SKILL_DIR/scripts/test-helper.js wallet-switch-network polygon
-
-# Step 7: Interact with DApp
-node $SKILL_DIR/scripts/test-helper.js click "button.swap"
-node $SKILL_DIR/scripts/test-helper.js fill "#amount" "100"
-```
-
 ### Security Principles
 
-- Private key is read from `WALLET_PRIVATE_KEY` environment variable ONLY
+- Private key is handled by `web-test-wallet-setup` skill only
 - Private key is **NEVER** uploaded to AI APIs or logged
 - Private key is only used locally in Playwright browser context
 - All wallet operations happen in local browser instance
