@@ -34,10 +34,13 @@ $SKILL_DIR/scripts/cleanup.sh --keep-data
 
 ## What Gets Cleaned Up
 
+### Dev Server Stopped
+- Reads `test-output/.dev-server.json` to find and stop the dev server process
+- Kills any processes occupying common dev ports (3000, 5173, 8080, 4200, 4321)
+
 ### Processes Killed
-- Test browser processes (Chromium using test-output profile)
+- Test browser processes (Chrome/Chromium using test-output profile)
 - Browsers using remote-debugging-port 9222
-- Dev server processes (npm, vite, next, webpack, node)
 
 ### Ports Freed
 - 3000 (Next.js, CRA)
@@ -45,6 +48,11 @@ $SKILL_DIR/scripts/cleanup.sh --keep-data
 - 8080 (Vue CLI, Webpack)
 - 4200 (Angular)
 - 4321 (Astro)
+
+### State Files Cleaned
+- `.browser-cdp.json` - Browser CDP connection info
+- `.browser-state.json` - Browser state
+- `.dev-server.json` - Dev server process info
 
 ### Files Removed (unless `--keep-data`)
 ```
@@ -96,17 +104,23 @@ This:
 If the cleanup script is not available, you can run these commands manually:
 
 ```bash
+# Stop dev server using saved PID
+DEV_PID=$(node -e "console.log(require('./test-output/.dev-server.json').pid)" 2>/dev/null)
+kill -9 $DEV_PID 2>/dev/null
+
 # Kill browser processes
+pkill -f "Google Chrome.*test-output"
 pkill -f "chromium.*test-output"
 pkill -f "remote-debugging-port=9222"
 
-# Kill dev servers
-pkill -f "npm run dev"
-pkill -f "vite"
-pkill -f "next dev"
-
 # Free specific port
 lsof -ti:3000 | xargs kill -9
+lsof -ti:5173 | xargs kill -9
+
+# Remove state files
+rm -f ./test-output/.dev-server.json
+rm -f ./test-output/.browser-cdp.json
+rm -f ./test-output/.browser-state.json
 
 # Remove test data
 rm -rf ./test-output/
