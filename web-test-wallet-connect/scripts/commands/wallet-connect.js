@@ -4,6 +4,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 
 const { SCREENSHOTS_DIR, NETWORKS } = require('../lib/config');
 const {
@@ -12,7 +13,160 @@ const {
   getContext,
   getPage,
   setPage,
+  getMetaMaskExtensionId,
 } = require('../lib/browser');
+
+/**
+ * Load wallet credentials from tests/.test-env file
+ * File format: KEY="value" or KEY=value per line
+ */
+function loadTestEnv() {
+  const testEnvPath = path.join(process.cwd(), 'tests', '.test-env');
+  const config = {};
+
+  if (fs.existsSync(testEnvPath)) {
+    const content = fs.readFileSync(testEnvPath, 'utf-8');
+    const lines = content.split('\n');
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const match = trimmed.match(/^([A-Z_]+)=["']?(.+?)["']?$/);
+      if (match) {
+        config[match[1]] = match[2];
+      }
+    }
+  }
+
+  return config;
+}
+
+// Load wallet password from tests/.test-env (required)
+const testEnvConfig = loadTestEnv();
+const WALLET_PASSWORD = testEnvConfig.WALLET_PASSWORD;
+
+/**
+ * Check MetaMask status and unlock if needed
+ * Returns: { status: 'unlocked' | 'locked' | 'not_initialized', message: string }
+ */
+async function checkAndUnlockMetaMask(context) {
+  const extensionId = getMetaMaskExtensionId();
+  if (!extensionId) {
+    return { status: 'error', message: 'MetaMask extension ID not found' };
+  }
+
+  const metamaskHomeUrl = `chrome-extension://${extensionId}/home.html`;
+  let metamaskPage = null;
+
+  try {
+    // Open MetaMask home page in a new tab
+    metamaskPage = await context.newPage();
+    await metamaskPage.goto(metamaskHomeUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await metamaskPage.waitForTimeout(2000);
+
+    const currentUrl = metamaskPage.url();
+    console.log(JSON.stringify({ status: 'info', message: `MetaMask page URL: ${currentUrl}` }));
+
+    // Check if it's the onboarding/welcome page (not initialized)
+    if (currentUrl.includes('onboarding') || currentUrl.includes('welcome')) {
+      await metamaskPage.close().catch(() => {});
+      return {
+        status: 'not_initialized',
+        message: 'MetaMask wallet not initialized. Please run wallet-setup first.',
+        hint: 'node wallet-setup-helper.js wallet-init --wallet --headed'
+      };
+    }
+
+    // Check for password input field (locked state)
+    const passwordInput = await metamaskPage.$('input[type="password"], input[data-testid="unlock-password"]');
+
+    if (passwordInput) {
+      // Check if WALLET_PASSWORD is configured
+      if (!WALLET_PASSWORD) {
+        await metamaskPage.close().catch(() => {});
+        return {
+          status: 'error',
+          message: 'MetaMask is locked but WALLET_PASSWORD is not configured in tests/.test-env',
+          hint: 'Add WALLET_PASSWORD="your_password" to tests/.test-env file'
+        };
+      }
+
+      console.log(JSON.stringify({ status: 'info', message: 'MetaMask is locked, attempting to unlock...' }));
+
+      // Take screenshot before unlock
+      await metamaskPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'metamask-locked.jpg'),
+        type: 'jpeg',
+        quality: 60
+      }).catch(() => {});
+
+      // Enter password using keyboard.type() for better compatibility
+      await passwordInput.click();
+      await metamaskPage.waitForTimeout(200);
+      await metamaskPage.keyboard.type(WALLET_PASSWORD, { delay: 50 });
+      await metamaskPage.waitForTimeout(500);
+
+      // Click unlock button using data-testid (most reliable)
+      const unlockButton = await metamaskPage.$('button[data-testid="unlock-submit"]');
+      if (unlockButton) {
+        const isEnabled = await unlockButton.isEnabled().catch(() => false);
+        if (isEnabled) {
+          await unlockButton.click();
+          await metamaskPage.waitForTimeout(3000);
+        }
+      } else {
+        // Fallback to text selector
+        const unlockByText = await metamaskPage.$('button:has-text("Unlock")');
+        if (unlockByText) {
+          await unlockByText.click();
+          await metamaskPage.waitForTimeout(3000);
+        }
+      }
+
+      // Check if unlock was successful - URL should not contain 'unlock' anymore
+      const newUrl = metamaskPage.url();
+      const stillLocked = newUrl.includes('unlock') && await metamaskPage.$('input[type="password"]');
+
+      if (stillLocked) {
+        await metamaskPage.screenshot({
+          path: path.join(SCREENSHOTS_DIR, 'metamask-unlock-failed.jpg'),
+          type: 'jpeg',
+          quality: 60
+        }).catch(() => {});
+        await metamaskPage.close().catch(() => {});
+        return {
+          status: 'error',
+          message: 'Failed to unlock MetaMask. Password may be incorrect.',
+          hint: 'Check WALLET_PASSWORD in tests/.test-env file'
+        };
+      }
+
+      console.log(JSON.stringify({ status: 'info', message: 'MetaMask unlocked successfully' }));
+
+      // Take screenshot after unlock
+      await metamaskPage.screenshot({
+        path: path.join(SCREENSHOTS_DIR, 'metamask-unlocked.jpg'),
+        type: 'jpeg',
+        quality: 60
+      }).catch(() => {});
+
+      await metamaskPage.close().catch(() => {});
+      return { status: 'unlocked', message: 'MetaMask unlocked successfully' };
+    }
+
+    // No password input found - wallet is already unlocked
+    console.log(JSON.stringify({ status: 'info', message: 'MetaMask is already unlocked' }));
+    await metamaskPage.close().catch(() => {});
+    return { status: 'unlocked', message: 'MetaMask is already unlocked' };
+
+  } catch (error) {
+    if (metamaskPage) {
+      await metamaskPage.close().catch(() => {});
+    }
+    return { status: 'error', message: `Error checking MetaMask: ${error.message}` };
+  }
+}
 
 // Store pending popup promise for pre-emptive listening
 let pendingPopupPromise = null;
@@ -168,8 +322,33 @@ const commands = {
 
       await startBrowser(options);
       const context = getContext();
-      const newPage = await context.newPage();
 
+      // Check and unlock MetaMask before navigating
+      console.log(JSON.stringify({ status: 'info', message: 'Checking MetaMask wallet status...' }));
+      const walletStatus = await checkAndUnlockMetaMask(context);
+
+      if (walletStatus.status === 'not_initialized') {
+        console.log(JSON.stringify({
+          success: false,
+          error: walletStatus.message,
+          hint: walletStatus.hint,
+          action: 'Please run wallet-setup to initialize MetaMask first'
+        }));
+        return;
+      }
+
+      if (walletStatus.status === 'error') {
+        console.log(JSON.stringify({
+          success: false,
+          error: walletStatus.message,
+          hint: walletStatus.hint
+        }));
+        return;
+      }
+
+      console.log(JSON.stringify({ status: 'info', message: walletStatus.message }));
+
+      const newPage = await context.newPage();
       setPage(newPage);
 
       console.log(JSON.stringify({ status: 'info', message: `Navigating to ${url}...` }));
@@ -186,10 +365,10 @@ const commands = {
         success: true,
         message: `Navigated to ${url} with MetaMask Wallet available`,
         url: newPage.url(),
+        walletStatus: walletStatus.status,
         screenshot: 'dapp-home.jpg',
         nextSteps: [
-          'Use vision-screenshot to see the page',
-          'Use vision-click to click Connect Wallet button',
+          'Use dapp-click to click Connect Wallet button',
           'Use wallet-approve to approve the connection'
         ]
       }));
@@ -497,6 +676,137 @@ const commands = {
       console.log(JSON.stringify({
         success: false,
         error: `Failed to take screenshot: ${error.message}`
+      }));
+    }
+  },
+
+  /**
+   * Click element using text/css selector first, fallback to coordinates
+   * Usage: dapp-click "Connect Wallet" --fallback-x 1133 --fallback-y 24
+   *        dapp-click "button.connect-btn"
+   *        dapp-click --text "Connect Wallet"
+   *        dapp-click --css "button[data-testid='connect']"
+   */
+  async 'dapp-click'(args, options) {
+    await ensureBrowser(options);
+    const page = getPage();
+
+    if (!page) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'No page open. Run wallet-navigate first.'
+      }));
+      return;
+    }
+
+    const selector = args[0];
+    const textSelector = options.text;
+    const cssSelector = options.css;
+    const fallbackX = parseInt(options['fallback-x']) || parseInt(options.x);
+    const fallbackY = parseInt(options['fallback-y']) || parseInt(options.y);
+
+    if (!selector && !textSelector && !cssSelector && (isNaN(fallbackX) || isNaN(fallbackY))) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'Selector or coordinates required. Usage: dapp-click "Button Text" or dapp-click --css "selector" or dapp-click --x 100 --y 200'
+      }));
+      return;
+    }
+
+    // Start listening for popup before click
+    startPopupListener();
+
+    let clicked = false;
+    let clickMethod = '';
+
+    try {
+      // Strategy 1: Try text selector (exact match)
+      if (!clicked && (textSelector || selector)) {
+        const textToFind = textSelector || selector;
+        const textSelectors = [
+          `text="${textToFind}"`,
+          `button:has-text("${textToFind}")`,
+          `a:has-text("${textToFind}")`,
+          `div:has-text("${textToFind}")`,
+          `span:has-text("${textToFind}")`,
+          `[role="button"]:has-text("${textToFind}")`,
+        ];
+
+        for (const sel of textSelectors) {
+          try {
+            const element = await page.$(sel);
+            if (element) {
+              const isVisible = await element.isVisible().catch(() => false);
+              if (isVisible) {
+                await element.scrollIntoViewIfNeeded().catch(() => {});
+                await page.waitForTimeout(200);
+                await element.click({ timeout: 5000 });
+                clicked = true;
+                clickMethod = `text selector: ${sel}`;
+                console.log(JSON.stringify({ status: 'info', message: `Found element with ${sel}` }));
+                break;
+              }
+            }
+          } catch (e) {
+            // Continue to next selector
+          }
+        }
+      }
+
+      // Strategy 2: Try CSS selector
+      if (!clicked && (cssSelector || selector)) {
+        const cssToTry = cssSelector || selector;
+        try {
+          const element = await page.$(cssToTry);
+          if (element) {
+            const isVisible = await element.isVisible().catch(() => false);
+            if (isVisible) {
+              await element.scrollIntoViewIfNeeded().catch(() => {});
+              await page.waitForTimeout(200);
+              await element.click({ timeout: 5000 });
+              clicked = true;
+              clickMethod = `css selector: ${cssToTry}`;
+              console.log(JSON.stringify({ status: 'info', message: `Found element with CSS: ${cssToTry}` }));
+            }
+          }
+        } catch (e) {
+          // Continue to fallback
+        }
+      }
+
+      // Strategy 3: Fallback to coordinates (vision-click)
+      if (!clicked && !isNaN(fallbackX) && !isNaN(fallbackY)) {
+        console.log(JSON.stringify({ status: 'info', message: `Selector not found, falling back to coordinates (${fallbackX}, ${fallbackY})` }));
+        await page.mouse.click(fallbackX, fallbackY);
+        clicked = true;
+        clickMethod = `coordinates: (${fallbackX}, ${fallbackY})`;
+      }
+
+      if (!clicked) {
+        console.log(JSON.stringify({
+          success: false,
+          error: `Could not find element with selector "${selector || textSelector || cssSelector}"`,
+          hint: 'Try providing fallback coordinates with --fallback-x and --fallback-y'
+        }));
+        return;
+      }
+
+      await page.waitForTimeout(500);
+
+      const screenshotPath = path.join(SCREENSHOTS_DIR, 'after-dapp-click.jpg');
+      await page.screenshot({ path: screenshotPath, type: 'jpeg', quality: 60 });
+
+      console.log(JSON.stringify({
+        success: true,
+        message: `Clicked using ${clickMethod}`,
+        method: clickMethod,
+        screenshot: 'after-dapp-click.jpg',
+        hint: 'If this triggered a wallet popup, run wallet-approve next'
+      }));
+    } catch (error) {
+      console.log(JSON.stringify({
+        success: false,
+        error: `Failed to click: ${error.message}`
       }));
     }
   },

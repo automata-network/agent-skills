@@ -31,8 +31,9 @@ Commands:
   wallet-approve            Approve wallet popup (connect/sign/confirm)
   wallet-switch-network <n> Switch network (ethereum, polygon, arbitrum, etc.)
   wallet-get-address        Get current wallet address
+  dapp-click <selector>     Click using text/css selector (preferred over vision-click)
   vision-screenshot [name]  Take screenshot for AI analysis
-  vision-click <x> <y>      Click at coordinates
+  vision-click <x> <y>      Click at coordinates (fallback method)
   vision-type <text>        Type text at cursor
   wait <ms>                 Wait milliseconds
 
@@ -46,19 +47,22 @@ Usage:
   # 1. Navigate to DApp with wallet
   node wallet-connect-helper.js wallet-navigate "http://localhost:3000" --wallet --headed --keep-open
 
-  # 2. Take screenshot to find Connect button
-  node wallet-connect-helper.js vision-screenshot before-connect.jpg --wallet --headed --keep-open
+  # 2. Click Connect Wallet using text selector (preferred)
+  node wallet-connect-helper.js dapp-click "Connect Wallet" --wallet --headed --keep-open
 
-  # 3. Click Connect Wallet button (AI determines coordinates)
-  node wallet-connect-helper.js vision-click 500 50 --wallet --headed --keep-open
+  # 3. Or click with CSS selector
+  node wallet-connect-helper.js dapp-click --css "button.connect-btn" --wallet --headed --keep-open
 
-  # 4. Approve MetaMask popup (auto-detects and clicks approve button)
+  # 4. Or use fallback coordinates if selector fails
+  node wallet-connect-helper.js dapp-click "Connect Wallet" --fallback-x 1133 --fallback-y 24 --wallet --headed --keep-open
+
+  # 5. Approve MetaMask popup (auto-detects and clicks approve button)
   node wallet-connect-helper.js wallet-approve --wallet --headed --keep-open
 
-  # 5. Verify connection
-  node wallet-connect-helper.js vision-screenshot after-connect.jpg --wallet --headed --keep-open
+  # 6. Verify connection
+  node wallet-connect-helper.js wallet-get-address --wallet --headed --keep-open
 
-Note: wallet-navigate and vision-click automatically start popup listeners.
+Note: dapp-click tries text selector -> CSS selector -> coordinates (fallback).
 `);
   }
 };
