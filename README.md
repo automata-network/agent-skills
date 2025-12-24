@@ -73,6 +73,24 @@ This will:
 2. Generate test cases in `./tests/` directory
 3. You can commit these to git for repeatable testing
 
+### Git Configuration
+
+After generating test cases, configure your project's git:
+
+```bash
+# Add tests/ to git (persistent test cases)
+git add tests/
+git commit -m "Add test cases"
+
+# Add test-output/ to .gitignore (temporary artifacts)
+echo "test-output/" >> .gitignore
+```
+
+| Directory | Git Status | Contents |
+|-----------|------------|----------|
+| `tests/` | **Commit to git** | Test case definitions (YAML), reusable across runs |
+| `test-output/` | **Add to .gitignore** | Screenshots, reports, browser profiles (temporary) |
+
 ### Execute Tests
 
 ```
