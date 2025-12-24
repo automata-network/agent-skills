@@ -73,6 +73,24 @@ This will:
 2. Generate test cases in `./tests/` directory
 3. You can commit these to git for repeatable testing
 
+### Execute Tests
+
+```
+"Run the tests for this project"
+```
+
+or
+
+```
+"Use web-test to execute the test cases"
+```
+
+This will:
+1. Load test cases from `./tests/`
+2. Set up browser and wallet (if Web3)
+3. Execute all tests
+4. Generate a report in `./test-output/`
+
 ### Git Configuration
 
 After generating test cases, configure your project's git:
@@ -90,24 +108,6 @@ echo "test-output/" >> .gitignore
 |-----------|------------|----------|
 | `tests/` | **Commit to git** | Test case definitions (YAML), reusable across runs |
 | `test-output/` | **Add to .gitignore** | Screenshots, reports, browser profiles (temporary) |
-
-### Execute Tests
-
-```
-"Run the tests for this project"
-```
-
-or
-
-```
-"Use web-test to execute the test cases"
-```
-
-This will:
-1. Load test cases from `./tests/`
-2. Set up browser and wallet (if Web3)
-3. Execute all tests
-4. Generate a report
 
 ## 5. Project Structure
 
@@ -154,7 +154,47 @@ agent-skills/
 
 ## 6. How It Works
 
+### Two-Phase Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         PHASE 1: GENERATE                               │
+│                                                                         │
+│   $ skill web-test-case-gen                                             │
+│                                                                         │
+│   ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐  │
+│   │ Analyze Code    │────▶│ Take UI         │────▶│ Generate YAML   │  │
+│   │ (package.json,  │     │ Screenshots     │     │ Test Cases      │  │
+│   │  WebSearch)     │     │ (Playwright)    │     │ (tests/*.yaml)  │  │
+│   └─────────────────┘     └─────────────────┘     └─────────────────┘  │
+│                                                                         │
+│   Output: tests/config.yaml, tests/test-cases.yaml → Commit to Git     │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         PHASE 2: EXECUTE                                │
+│                                                                         │
+│   $ skill web-test                                                      │
+│                                                                         │
+│   ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐  │
+│   │ Load Test Cases │────▶│ Setup Wallet    │────▶│ Execute Tests   │  │
+│   │ (tests/*.yaml)  │     │ (if Web3 DApp)  │     │ (Vision-based)  │  │
+│   └─────────────────┘     └─────────────────┘     └─────────────────┘  │
+│                                                           │             │
+│                                                           ▼             │
+│                                                   ┌─────────────────┐  │
+│                                                   │ Generate Report │  │
+│                                                   │ (test-output/)  │  │
+│                                                   └─────────────────┘  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ### Vision-Based Testing
+
+During test execution, AI uses vision to interact with the UI:
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
@@ -165,13 +205,8 @@ agent-skills/
          │◀──────────── Screenshot (Base64) ◀─────────────┘
          │
          ▼
-   Visual Analysis & Decision
+   Visual Analysis → Determine click coordinates → Execute action
 ```
-
-1. **Browser Control**: Node.js uses Playwright to control Chrome
-2. **Screenshot Capture**: After each action, capture screenshot
-3. **AI Vision Analysis**: AI analyzes screenshot to determine next action
-4. **Task Execution**: AI executes test steps based on visual analysis
 
 ### Test Case Format
 
@@ -210,53 +245,7 @@ test_cases:
       - Wallet address displayed
 ```
 
-## 7. Two Workflows
-
-### Workflow 1: Generate Test Cases
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  $ skill web-test-case-gen                                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. web-test-research    (Analyze code + take UI screenshots)   │
-│         ↓                                                       │
-│  2. Generate YAML test cases                                    │
-│         ↓                                                       │
-│  Output: tests/*.yaml    (Commit to GitHub)                     │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Workflow 2: Execute Tests
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  $ skill web-test                                               │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Check tests/ exists?                                        │
-│     ├─ NO  → Prompt user, wait 2 min, fail if no response       │
-│     └─ YES → Continue                                           │
-│         ↓                                                       │
-│  2. web-test-cleanup         (Clean previous session)           │
-│         ↓                                                       │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  If Web3 DApp:                                          │   │
-│  │  3. web-test-wallet-setup                               │   │
-│  │  4. web-test-wallet-connect                             │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│         ↓                                                       │
-│  5. Execute test cases       (Vision-based testing)             │
-│         ↓                                                       │
-│  6. web-test-report          (Generate report)                  │
-│         ↓                                                       │
-│  7. web-test-cleanup --keep-data                                │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## 8. Available Skills
+## 7. Available Skills
 
 ### User-Facing Skills
 
@@ -314,7 +303,7 @@ These skills are called automatically by user-facing skills. Do not invoke direc
 | **web-test-wallet-connect** | Navigate with wallet extension, click Connect Wallet, handle popups, verify connection |
 | **web-test-report** | Collect test results, generate markdown report with ✅/❌ indicators, document failures |
 
-## 9. Learn More
+## 8. Learn More
 
 - [agentskills.io](https://agentskills.io/) - Open standard for AI agent skills
 - [ai-agent-skills on npm](https://www.npmjs.com/package/ai-agent-skills) - CLI for installing skills
