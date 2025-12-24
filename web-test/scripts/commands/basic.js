@@ -7,6 +7,7 @@ const path = require('path');
 const { OUTPUT_DIR, SCREENSHOTS_DIR } = require('../lib/config');
 const { startBrowser, stopBrowser, ensureBrowser, takeScreenshot, getPage, getContext } = require('../lib/browser');
 const { ParallelScheduler } = require('../lib/scheduler');
+const { handleWalletPopup } = require('../lib/wallet-utils');
 
 const commands = {
   async start(args, options) {
@@ -61,10 +62,21 @@ const commands = {
   async click(args, options) {
     await ensureBrowser(options);
     const page = getPage();
+    const context = getContext();
     const selector = args[0];
     if (!selector) throw new Error('Selector required');
 
     await page.click(selector, { timeout: parseInt(options.timeout) });
+
+    // Auto-detect wallet popup after click (if wallet mode and not ignored)
+    let walletResult = null;
+    if (options.wallet && options.walletAction !== 'ignore') {
+      walletResult = await handleWalletPopup(
+        context,
+        options.walletAction || 'approve',
+        3000
+      );
+    }
 
     if (options.wait) await page.waitForTimeout(parseInt(options.wait));
 
@@ -73,12 +85,18 @@ const commands = {
       screenshotPath = await takeScreenshot(options.screenshot);
     }
 
-    console.log(JSON.stringify({
+    const result = {
       success: true,
       action: 'click',
       selector,
       screenshot: screenshotPath
-    }));
+    };
+
+    if (walletResult && walletResult.hasPopup) {
+      result.walletPopup = walletResult;
+    }
+
+    console.log(JSON.stringify(result));
   },
 
   async fill(args, options) {

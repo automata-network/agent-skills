@@ -5,7 +5,8 @@
 
 const path = require('path');
 const { SCREENSHOTS_DIR } = require('../lib/config');
-const { ensureBrowser, takeScreenshot, getPage } = require('../lib/browser');
+const { ensureBrowser, takeScreenshot, getPage, getContext } = require('../lib/browser');
+const { handleWalletPopup } = require('../lib/wallet-utils');
 
 const commands = {
   async 'vision-screenshot'(args, options) {
@@ -37,6 +38,7 @@ const commands = {
   async 'vision-click'(args, options) {
     await ensureBrowser(options);
     const page = getPage();
+    const context = getContext();
 
     const x = parseInt(args[0]);
     const y = parseInt(args[1]);
@@ -51,6 +53,16 @@ const commands = {
 
     await page.mouse.click(x, y);
 
+    // Auto-detect wallet popup after click (if wallet mode and not ignored)
+    let walletResult = null;
+    if (options.wallet && options.walletAction !== 'ignore') {
+      walletResult = await handleWalletPopup(
+        context,
+        options.walletAction || 'approve',
+        3000
+      );
+    }
+
     if (options.wait) {
       await page.waitForTimeout(parseInt(options.wait));
     } else {
@@ -64,14 +76,20 @@ const commands = {
       screenshotPath = await takeScreenshot(`after-click-${x}-${y}`);
     }
 
-    console.log(JSON.stringify({
+    const result = {
       success: true,
       action: 'vision-click',
       coordinates: { x, y },
       screenshot: screenshotPath,
       url: page.url(),
       instruction: 'Click performed. Use the Read tool to view the screenshot and verify the result.'
-    }));
+    };
+
+    if (walletResult && walletResult.hasPopup) {
+      result.walletPopup = walletResult;
+    }
+
+    console.log(JSON.stringify(result));
   },
 
   async 'vision-double-click'(args, options) {

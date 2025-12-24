@@ -193,6 +193,34 @@ For each test ID in `execution_order`:
 | `wait` | `node $SKILL_DIR/scripts/test-helper.js wait [ms] --headed --keep-open` |
 | `wallet-approve` | Use `wallet-approve` from web-test-wallet-connect skill |
 
+### Automatic Wallet Sign Detection
+
+After each `click` or `vision-click` action in wallet mode, the system automatically detects MetaMask popups and handles them. Use the `walletAction` field to control the behavior:
+
+| walletAction | Behavior |
+|--------------|----------|
+| `approve` (default) | Auto-approve signatures and transactions (reject if gas error) |
+| `reject` | Reject the signature/transaction (for testing rejection flows) |
+| `ignore` | Don't wait for popup, skip detection |
+
+**Example:**
+```yaml
+steps:
+  # Auto-approve (default behavior)
+  - action: click
+    selector: "#sign-button"
+
+  # Test rejection flow
+  - action: click
+    selector: "#sign-button"
+    walletAction: reject
+
+  # Skip popup detection for non-wallet clicks
+  - action: click
+    selector: "#regular-button"
+    walletAction: ignore
+```
+
 ### Step 7: Generate Report
 
 ```

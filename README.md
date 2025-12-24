@@ -165,6 +165,13 @@ agent-skills/
 │       ├── lib/
 │       └── commands/
 │
+├── web-test-wallet-sign/           # Wallet sign/tx (internal)
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── wallet-sign-helper.js
+│       ├── lib/
+│       └── commands/
+│
 └── web-test-report/                # Report generation (internal)
     └── SKILL.md
 ```
@@ -285,6 +292,7 @@ These skills are called automatically by user-facing skills. Do not invoke direc
 | [web-test-cleanup](./web-test-cleanup/SKILL.md)               | Kill browsers, stop dev servers, free ports, clean artifacts                      | `web-test`           |
 | [web-test-wallet-setup](./web-test-wallet-setup/SKILL.md)     | Download and initialize MetaMask wallet extension                                 | `web-test` (if Web3) |
 | [web-test-wallet-connect](./web-test-wallet-connect/SKILL.md) | Connect wallet to DApp, handle approval popups                                    | `web-test` (if Web3) |
+| [web-test-wallet-sign](./web-test-wallet-sign/SKILL.md)       | Handle MetaMask signature/transaction popups, auto-approve or reject              | `web-test` (if Web3) |
 | [web-test-report](./web-test-report/SKILL.md)                 | Generate test report with pass/fail indicators                                    | `web-test`           |
 
 ### Skill Dependency Map
@@ -304,6 +312,9 @@ These skills are called automatically by user-facing skills. Do not invoke direc
 │             │                        │                                   │
 │             │                        ▼                                   │
 │             │                 web-test-wallet-connect (internal)         │
+│             │                        │                                   │
+│             │                        ▼                                   │
+│             │                 web-test-wallet-sign (auto on click)       │
 │             │                                                            │
 │             └───────────────▶ web-test-report (internal)                 │
 │                                                                          │
@@ -320,6 +331,7 @@ These skills are called automatically by user-facing skills. Do not invoke direc
 | **web-test-cleanup**        | Kill Chromium/Chrome processes, stop dev servers, free ports (3000, 5173, 8080), remove test-output           |
 | **web-test-wallet-setup**   | Download MetaMask wallet, import private key, initialize and unlock wallet                                    |
 | **web-test-wallet-connect** | Navigate with wallet extension, click Connect Wallet, handle popups, verify connection                        |
+| **web-test-wallet-sign**    | Auto-detect MetaMask popups after clicks, approve signatures/transactions, reject on gas errors              |
 | **web-test-report**         | Collect test results, generate markdown report with ✅/❌ indicators, document failures                       |
 
 ## 8. Learn More

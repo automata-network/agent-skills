@@ -4,6 +4,7 @@
 
 const path = require('path');
 const { SCREENSHOTS_DIR } = require('./config');
+const { handleWalletPopup } = require('./wallet-utils');
 
 // Build dependency graph and detect cycles
 function buildDependencyGraph(tasks) {
@@ -56,8 +57,10 @@ function buildDependencyGraph(tasks) {
 }
 
 // Execute a single step on a page
-async function executeStep(taskPage, step, screenshotsDir) {
+// context is optional, only needed for wallet popup handling
+async function executeStep(taskPage, step, screenshotsDir, context = null) {
   const { action, ...params } = step;
+  let walletResult = null;
 
   switch (action) {
     case 'navigate':
@@ -65,6 +68,17 @@ async function executeStep(taskPage, step, screenshotsDir) {
       break;
     case 'click':
       await taskPage.click(params.selector, { timeout: params.timeout || 10000 });
+      // Auto-detect wallet popup after click (if context available and not ignored)
+      if (context && step.walletAction !== 'ignore') {
+        walletResult = await handleWalletPopup(
+          context,
+          step.walletAction || 'approve',
+          3000
+        );
+        if (walletResult.testFailed) {
+          throw new Error(`Wallet transaction failed: ${walletResult.error}`);
+        }
+      }
       break;
     case 'fill':
       await taskPage.fill(params.selector, params.value, { timeout: params.timeout || 10000 });
@@ -108,6 +122,9 @@ async function executeStep(taskPage, step, screenshotsDir) {
     const ssPath = path.join(screenshotsDir, step.screenshot);
     await taskPage.screenshot({ path: ssPath, fullPage: step.fullPage || false });
   }
+
+  // Return wallet result if any popup was handled
+  return { walletResult };
 }
 
 // Parallel task scheduler class
@@ -181,8 +198,8 @@ class ParallelScheduler {
         if (this.aborted) break;
 
         try {
-          const result = await executeStep(taskPage, step, this.screenshotsDir);
-          stepResults.push({ step, success: true, result });
+          const result = await executeStep(taskPage, step, this.screenshotsDir, this.context);
+          stepResults.push({ step, success: true, result, walletResult: result?.walletResult });
         } catch (error) {
           stepResults.push({ step, success: false, error: error.message });
 
