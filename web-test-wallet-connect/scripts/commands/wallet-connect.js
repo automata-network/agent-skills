@@ -230,12 +230,17 @@ async function findExistingPopup() {
  */
 async function clickApproveButton(popup, maxRetries = 3) {
   const approveSelectors = [
-    // Primary buttons
+    // MetaMask specific data-testid selectors (most reliable)
+    'button[data-testid="confirm-btn"]',
+    'button[data-testid="page-container-footer-next"]',
+    'button[data-testid="confirmation-submit-button"]',
+    // Primary text buttons
     'button:has-text("Connect")',
     'button:has-text("Confirm")',
     'button:has-text("Approve")',
     'button:has-text("Sign")',
     'button:has-text("Allow")',
+    'button:has-text("Next")',
     // Chinese text
     'button:has-text("确认")',
     'button:has-text("连接")',
@@ -246,7 +251,7 @@ async function clickApproveButton(popup, maxRetries = 3) {
     'button[type="submit"]',
     '[class*="primary"]',
     '[class*="confirm"]',
-    // MetaMask specific
+    // MetaMask class-based fallbacks
     '[class*="FooterButton"]',
     '[class*="action-button"]',
   ];
@@ -404,8 +409,12 @@ const commands = {
 
   /**
    * Improved wallet-approve with better popup handling
+   * Now supports directly opening MetaMask notification page if no popup detected
    */
   async 'wallet-approve'(args, options) {
+    // Ensure we're connected to the browser
+    await ensureBrowser(options);
+
     const context = getContext();
     if (!context) {
       console.log(JSON.stringify({
@@ -423,7 +432,23 @@ const commands = {
       // Step 1: Check if popup already exists
       popup = await findExistingPopup();
 
-      // Step 2: If no existing popup, wait for one
+      // Step 2: If no existing popup, try to open MetaMask notification page directly
+      if (!popup) {
+        console.log(JSON.stringify({ status: 'info', message: 'No popup detected, opening MetaMask notification page...' }));
+
+        const extensionId = getMetaMaskExtensionId();
+        if (extensionId) {
+          // Open MetaMask notification page directly
+          const notificationUrl = `chrome-extension://${extensionId}/notification.html`;
+          popup = await context.newPage();
+          await popup.goto(notificationUrl, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          await popup.waitForTimeout(2000);
+
+          console.log(JSON.stringify({ status: 'info', message: `Opened MetaMask notification page: ${notificationUrl}` }));
+        }
+      }
+
+      // Step 3: If still no popup, wait for one
       if (!popup) {
         console.log(JSON.stringify({ status: 'info', message: 'Waiting for MetaMask popup window...' }));
 

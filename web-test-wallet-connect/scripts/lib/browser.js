@@ -60,23 +60,28 @@ async function tryConnectExistingBrowser() {
         context = contexts[0];
         const pages = context.pages();
 
-        // Find a non-extension page first, or use the first page
+        // Find a non-extension page first (prefer http/https DApp pages)
         let selectedPage = null;
+        let httpPage = null;
+
         for (const p of pages) {
           const url = p.url();
           if (url.startsWith('chrome-extension://')) {
-            // Detect extension ID
+            // Detect extension ID from extension pages
             if (!metamaskExtensionId) {
               metamaskExtensionId = url.split('/')[2];
             }
+          } else if (url.startsWith('http://') || url.startsWith('https://')) {
+            // Prefer actual http/https pages (DApp pages)
+            httpPage = p;
           } else if (!selectedPage && url !== 'about:blank') {
-            // Prefer non-extension, non-blank pages
+            // Other non-extension, non-blank pages as fallback
             selectedPage = p;
           }
         }
 
-        // If no non-extension page found, use first page or create new
-        page = selectedPage || (pages.length > 0 ? pages[0] : await context.newPage());
+        // Priority: httpPage > selectedPage > new page (never use extension pages)
+        page = httpPage || selectedPage || await context.newPage();
 
         // If not found from pages, extension ID will be detected later
         if (!metamaskExtensionId) {
@@ -178,8 +183,15 @@ async function startBrowser(options) {
         '--disable-features=ExtensionsToolbarMenu',
         // Ensure popup windows stay open
         '--disable-features=BlockInsecurePrivateNetworkRequests',
+        // Enable test mode for MetaMask to open notifications in new tab
+        '--enable-features=ExtensionsMenuAccessControl',
       ],
       ignoreDefaultArgs: ['--disable-extensions', '--enable-automation'],
+      // Set environment variables for MetaMask test mode
+      env: {
+        ...process.env,
+        METAMASK_DEBUG: 'true',
+      },
       ...contextOptions,
     };
 
