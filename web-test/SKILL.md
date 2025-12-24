@@ -42,7 +42,34 @@ Execute tests from persistent test cases in `./tests/` directory.
 - Tests will FAIL if wallet is not set up first
 - Wallet popups cannot be handled without proper setup
 
-### Rule 2: Follow Execution Order
+### Rule 2: NEVER Skip Tests Due to Time Constraints
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  ❌ INVALID reasons to skip a test case:                       │
+│     - "Time constraints"                                       │
+│     - "To save time"                                           │
+│     - "Already running too long"                               │
+│     - "Similar to another test"                                │
+│                                                                │
+│  ✅ VALID reasons to skip a test case:                         │
+│     - Feature no longer exists in the project                  │
+│     - Test case is outdated/deprecated                         │
+│     - User level/permissions don't allow testing               │
+│       (e.g., admin-only feature, paid tier required)           │
+│     - Explicit dependency failed (e.g., wallet not connected)  │
+│                                                                │
+│  YOU MUST execute ALL test cases unless a VALID reason applies │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Why this matters:**
+- Every test case exists for a reason
+- Skipping tests defeats the purpose of testing
+- Users expect ALL their test cases to be executed
+- If a test is truly unnecessary, it should be removed from the test suite, not skipped
+
+### Rule 3: Follow Execution Order
 
 Always execute in this exact order:
 1. Check for test cases
