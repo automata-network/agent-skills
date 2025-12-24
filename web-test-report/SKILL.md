@@ -283,12 +283,19 @@ Payment API not responding.
 
 ## Instructions
 
-1. **Collect results** - List all test outcomes
-2. **Use symbols** - ✅ ❌ ⏭️ for every test status
-3. **Create table** - Summary table with counts
-4. **Detail failures** - Each failed test with screenshots and steps
-5. **List issues** - With severity indicators
-6. **Add recommendations** - Prioritized action items
+1. **Read test cases** - Load test case IDs from `./tests/test-cases.yaml`
+2. **Collect results** - Match results to test case IDs
+3. **Use symbols** - ✅ ❌ ⏭️ for every test status
+4. **Create table** - Summary table with counts
+5. **Detail failures** - Each failed test with screenshots and steps
+6. **List issues** - With severity indicators
+7. **Add recommendations** - Prioritized action items
+
+## Input
+
+Read test case definitions from:
+- `./tests/config.yaml` - Project configuration
+- `./tests/test-cases.yaml` - Test case definitions with IDs
 
 ## Output
 
@@ -296,5 +303,8 @@ Save to: `./test-output/test-report.md`
 
 ## Related Skills
 
-- **web-test** - Run tests first
-- **web-test-cleanup** - Clean up after report (use --keep-data)
+| Skill | Relationship |
+|-------|--------------|
+| web-test | Runs tests, calls this skill to generate report |
+| web-test-case-gen | Generates test cases that this skill references |
+| web-test-cleanup | Clean up after report (use --keep-data) |
