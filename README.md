@@ -83,6 +83,25 @@ This will:
 2. Generate test cases in `./tests/` directory
 3. You can commit these to git for repeatable testing
 
+### Add Single Test Case (Interactive)
+
+```
+"Add a test case for: clicking the Claim Rewards button and verifying rewards are claimed"
+```
+
+or
+
+```
+"Add a test case for: testing the search function with invalid input"
+```
+
+This will:
+
+1. Read related source code for the feature
+2. Launch browser and explore the feature visually
+3. Generate a test case based on code + visual analysis
+4. Append to existing `./tests/test-cases.yaml`
+
 ### Execute Tests
 
 ```
@@ -279,7 +298,7 @@ These skills can be invoked directly by users:
 
 | Skill                                             | Description                                                                  | Usage                     |
 | ------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------- |
-| [web-test-case-gen](./web-test-case-gen/SKILL.md) | Generate persistent test cases from project analysis (code + UI screenshots) | `skill web-test-case-gen` |
+| [web-test-case-gen](./web-test-case-gen/SKILL.md) | Generate test cases from project analysis, or add single test case via prompt with browser exploration | `skill web-test-case-gen` |
 | [web-test](./web-test/SKILL.md)                   | Execute tests from `./tests/` directory and generate report                  | `skill web-test`          |
 
 ### Internal Skills
@@ -325,7 +344,7 @@ These skills are called automatically by user-facing skills. Do not invoke direc
 
 | Skill                       | Key Responsibilities                                                                                          |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **web-test-case-gen**       | Run research, generate YAML test cases, save to `./tests/`                                                    |
+| **web-test-case-gen**       | Run research, generate YAML test cases, or add single test case interactively with browser exploration        |
 | **web-test**                | Load test cases, orchestrate full test flow, execute vision-based tests                                       |
 | **web-test-research**       | Read package.json, WebSearch dependencies, read code, start dev server, take UI screenshots, analyze features |
 | **web-test-cleanup**        | Kill Chromium/Chrome processes, stop dev servers, free ports (3000, 5173, 8080), remove test-output           |

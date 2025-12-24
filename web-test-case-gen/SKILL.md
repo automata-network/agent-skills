@@ -1,6 +1,6 @@
 ---
 name: web-test-case-gen
-description: Generate persistent test cases from project analysis. Runs web-test-research first, then generates YAML test cases to ./tests/ directory. Commit to git for repeatable testing.
+description: Generate persistent test cases from project analysis, or add individual test cases interactively. Supports full project analysis or adding single test cases via prompt description with browser exploration.
 license: MIT
 compatibility: Node.js 18+
 metadata:
@@ -15,15 +15,42 @@ Generate persistent test cases that can be committed to version control for repe
 
 ## What This Skill Does
 
+### Full Project Analysis Mode
 1. **Runs web-test-research** - Analyze project, detect features, research protocols
 2. **Generates test cases** - Create YAML files based on research
 3. **Saves to ./tests/** - In the TARGET PROJECT (not agent-skills)
 4. **Ready for git commit** - Test cases persist across sessions
 
+### Add Single Test Case Mode (Interactive)
+1. **Parse user description** - Extract feature, actions, expected outcomes
+2. **Read source code** - Search codebase for related components
+3. **Explore in browser** - Launch browser, navigate, take screenshots
+4. **Generate test case** - Create YAML based on code + visual analysis
+5. **Append to existing** - Add to test-cases.yaml and update execution_order
+
 ## Quick Start
+
+### Generate All Test Cases (Full Analysis)
 
 ```
 Generate test cases for this project
+```
+
+### Add Single Test Case (Interactive)
+
+```
+Add a test case for: [describe the feature you want to test]
+```
+
+Example prompts:
+```
+Add a test case for: clicking the "Claim Rewards" button and verifying rewards are claimed
+```
+```
+Add a test case for: testing the search function with invalid input
+```
+```
+Add a test case for: user can stake tokens and see updated balance
 ```
 
 ## Workflow
@@ -49,6 +76,209 @@ Generate test cases for this project
 │  Step 3: Output ready for git commit                            │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+## Add Single Test Case (Interactive Mode)
+
+When user provides a specific test case description, follow this workflow:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  web-test-case-gen (Add Single Test Case)                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Step 1: Parse user's test description                          │
+│          ↓                                                      │
+│          - Extract feature name                                 │
+│          - Identify expected actions                            │
+│          - Note expected outcomes                               │
+│          ↓                                                      │
+│  Step 2: Check if tests/config.yaml exists                      │
+│          ├─ NO  → Run web-test-research first                   │
+│          └─ YES → Read existing config                          │
+│          ↓                                                      │
+│  Step 3: Read related source code                               │
+│          ↓                                                      │
+│          - Search for feature in codebase (Grep/Glob)           │
+│          - Read relevant component/function code                │
+│          - Understand the implementation                        │
+│          ↓                                                      │
+│  Step 4: Launch browser and explore feature                     │
+│          ↓                                                      │
+│          - Use skill web-test-cleanup                           │
+│          - If Web3 DApp, use skill web-test-wallet-setup        │
+│          - Navigate to project URL                              │
+│          - Take screenshots of relevant pages                   │
+│          - Identify UI elements needed for test                 │
+│          ↓                                                      │
+│  Step 5: Generate test case YAML                                │
+│          ↓                                                      │
+│          - Create unique ID (FEATURE-NNN)                       │
+│          - Define steps based on exploration                    │
+│          - Add expected outcomes                                │
+│          ↓                                                      │
+│  Step 6: Append to test-cases.yaml                              │
+│          ↓                                                      │
+│          - Add test case to existing file                       │
+│          - Update execution_order in config.yaml                │
+│          ↓                                                      │
+│  Step 7: Cleanup browser                                        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Step-by-Step: Add Single Test Case
+
+#### Step 1: Parse User Description
+
+Extract key information from the user's prompt:
+
+| User Says | Extract |
+|-----------|---------|
+| "clicking the Claim Rewards button" | Action: click, Target: "Claim Rewards" button |
+| "verifying rewards are claimed" | Expected: success message or balance change |
+| "testing search with invalid input" | Action: type invalid input, Expected: error message |
+| "user can stake tokens" | Feature: staking, Action: stake flow |
+
+#### Step 2: Check Existing Config
+
+```bash
+# Check if tests directory exists
+ls ./tests/config.yaml
+```
+
+If no config exists:
+```
+No existing test configuration found.
+Running web-test-research to analyze the project first...
+```
+Then use `skill web-test-research` and create initial config.
+
+#### Step 3: Read Related Source Code
+
+Search for the feature in codebase:
+
+```bash
+# Search for feature keywords in code
+grep -r "Claim" --include="*.tsx" --include="*.ts" --include="*.jsx" --include="*.js" src/
+```
+
+Read relevant files to understand:
+- Component structure
+- Function signatures
+- Expected inputs/outputs
+- Error handling
+
+#### Step 4: Launch Browser and Explore
+
+Use test-helper.js commands to explore:
+
+```bash
+SKILL_DIR="<path-to-web-test-skill>"
+
+# Start browser and navigate
+node $SKILL_DIR/scripts/test-helper.js navigate [project-url] --headed --keep-open
+
+# Take screenshot for analysis
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot explore-feature.jpg --headed --keep-open
+
+# Use Read tool to view screenshot and identify elements
+```
+
+Analyze the screenshot:
+- Locate the target button/element
+- Note its position and context
+- Identify any prerequisite steps (login, navigation)
+
+#### Step 5: Generate Test Case YAML
+
+Create test case based on exploration:
+
+```yaml
+- id: REWARD-001   # Auto-generate unique ID
+  name: Claim Rewards Success
+  feature: Rewards
+  priority: high
+  web3: true       # Set based on config
+  wallet_popups: 1 # Estimate based on action type
+  preconditions:
+    - WALLET-001 passed
+    - Has claimable rewards
+  steps:
+    - action: navigate
+      url: /rewards
+    - action: vision-screenshot
+      name: before-claim
+    - action: vision-click
+      target: Claim Rewards button
+    - action: wallet-approve
+    - action: wait
+      ms: 5000
+      reason: Wait for transaction
+    - action: vision-screenshot
+      name: after-claim
+  expected:
+    - Success message displayed
+    - Rewards balance updated
+```
+
+#### Step 6: Append to Existing Files
+
+Read current test-cases.yaml:
+```bash
+cat ./tests/test-cases.yaml
+```
+
+Append new test case:
+```bash
+cat >> ./tests/test-cases.yaml << 'EOF'
+
+  - id: REWARD-001
+    name: Claim Rewards Success
+    # ... rest of test case
+EOF
+```
+
+Update config.yaml execution_order:
+```bash
+# Add new test ID to execution_order
+```
+
+#### Step 7: Cleanup and Report
+
+```bash
+# Cleanup browser
+skill web-test-cleanup --keep-data
+```
+
+Report to user:
+```
+✅ Test case added successfully!
+
+New test case:
+- ID: REWARD-001
+- Name: Claim Rewards Success
+- File: tests/test-cases.yaml
+
+Next steps:
+1. Review the generated test case
+2. Commit: git add tests/ && git commit -m "Add REWARD-001 test case"
+3. Run test: skill web-test
+```
+
+### ID Generation Rules
+
+| Feature | ID Pattern | Example |
+|---------|------------|---------|
+| Wallet | WALLET-NNN | WALLET-001 |
+| Swap | SWAP-NNN | SWAP-002 |
+| Stake | STAKE-NNN | STAKE-001 |
+| Claim | CLAIM-NNN | CLAIM-001 |
+| Custom | CUSTOM-NNN | CUSTOM-001 |
+
+Always check existing IDs and increment:
+```bash
+grep "id:" ./tests/test-cases.yaml | tail -5
 ```
 
 ## Output Files
