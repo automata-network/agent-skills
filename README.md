@@ -1,207 +1,142 @@
 # Agent Skills
 
-A collection of AI agent skills following the [agentskills.io](https://agentskills.io/) specification. These skills can be installed and used across multiple AI coding agents including Claude Code, Cursor, Codex, and more.
+A collection of AI agent skills following the [agentskills.io](https://agentskills.io/) specification for automated web application testing.
 
-## Two Workflows
+## 1. Installation
 
-The web-test skills are designed around **two distinct workflows**:
+Use the [ai-agent-skills](https://www.npmjs.com/package/ai-agent-skills) CLI to install skills:
 
-### Workflow 1: Generate Test Cases (One-time)
-
-```
-$ skill web-test-case-gen
-```
-
-Analyzes your project and generates persistent test cases that can be committed to git.
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  WORKFLOW 1: Generate Test Cases                                │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  $ skill web-test-case-gen                                      │
-│         ↓                                                       │
-│  1. web-test-research    (Analyze project, detect features)     │
-│         ↓                                                       │
-│  2. web-test-case-gen    (Generate YAML test cases)             │
-│         ↓                                                       │
-│  Output: tests/*.yaml    (Commit to GitHub)                     │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Output files (in your project):**
-```
-<your-project>/
-└── tests/
-    ├── config.yaml         # Project configuration
-    ├── test-cases.yaml     # All test cases
-    └── README.md           # How to run tests
-```
-
-### Workflow 2: Execute Tests (Repeatable)
-
-```
-$ skill web-test
-```
-
-Runs tests from your committed test cases.
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  WORKFLOW 2: Execute Tests                                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  $ skill web-test                                               │
-│         ↓                                                       │
-│  1. Check tests/ folder exists?                                 │
-│     ├─ NO  → Prompt user, wait 2 min, fail if no response       │
-│     └─ YES → Continue                                           │
-│         ↓                                                       │
-│  2. web-test-cleanup         (Clean previous session)           │
-│         ↓                                                       │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  If Web3 DApp (from config.yaml):                       │   │
-│  │  3. web-test-wallet-setup                               │   │
-│  │  4. web-test-wallet-connect                             │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│         ↓                                                       │
-│  5. Execute test cases       (Vision-based testing)             │
-│         ↓                                                       │
-│  6. web-test-report          (Generate report)                  │
-│         ↓                                                       │
-│  7. web-test-cleanup --keep-data                                │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Available Skills
-
-| Skill | Description |
-|-------|-------------|
-| [web-test](./web-test/SKILL.md) | Execute tests from persistent test cases |
-| [web-test-case-gen](./web-test-case-gen/SKILL.md) | Generate persistent test cases from project analysis |
-| [web-test-research](./web-test-research/SKILL.md) | Analyze project - detect framework, features, Web3 status |
-| [web-test-cleanup](./web-test-cleanup/SKILL.md) | Clean up test sessions - kill browsers, stop servers |
-| [web-test-wallet-setup](./web-test-wallet-setup/SKILL.md) | Set up Rabby wallet for Web3 DApp testing |
-| [web-test-wallet-connect](./web-test-wallet-connect/SKILL.md) | Connect wallet to Web3 DApp |
-| [web-test-report](./web-test-report/SKILL.md) | Generate test reports with visual indicators |
-
-## Skill Dependencies
-
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                          Skill Dependencies                              │
-├──────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  web-test-case-gen                                                       │
-│         │                                                                │
-│         └──▶ web-test-research                                           │
-│                                                                          │
-│  web-test                                                                │
-│         │                                                                │
-│         ├──▶ web-test-cleanup                                            │
-│         │                                                                │
-│         ├──▶ web-test-wallet-setup  ─▶ web-test-wallet-connect          │
-│         │    (if Web3 DApp)                                              │
-│         │                                                                │
-│         └──▶ web-test-report                                             │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-## Quick Start
-
-### 1. Install Skills
+### Claude Code
 
 ```bash
 npx ai-agent-skills install automata-network/agent-skills --agent claude
 ```
 
-### 2. Generate Test Cases (First Time)
+### Cursor
 
 ```bash
-# In your project directory
-skill web-test-case-gen
+npx ai-agent-skills install automata-network/agent-skills --agent cursor
 ```
 
-This analyzes your project and creates `tests/` directory with YAML test cases.
-
-### 3. Commit Test Cases
+### Codex
 
 ```bash
-git add tests/
-git commit -m "Add test cases"
+npx ai-agent-skills install automata-network/agent-skills --agent codex
 ```
 
-### 4. Run Tests (Anytime)
+## 2. Supported Agents
+
+These skills work with any AI coding agent that supports the SKILL.md format:
+
+- Claude Code
+- Cursor
+- Codex
+- VS Code (GitHub Copilot)
+- Amp
+- Goose
+- OpenCode
+
+## 3. Manual Configuration
+
+### Web3 DApp Testing (Optional)
+
+For testing Web3 DApps, set the wallet private key as an environment variable:
 
 ```bash
-skill web-test
+export WALLET_PRIVATE_KEY="your_private_key_here"
 ```
 
-## Test Case Format
+**Security Notes:**
+- Private key is **only read from environment variables** (not .env files)
+- `.env` files are intentionally not supported to prevent accidental commits
+- Use a **test wallet with test funds only**
+- Optionally set `WALLET_PASSWORD` for wallet unlock (auto-generated if not set)
 
-### tests/config.yaml
+## 4. How to Run
 
-```yaml
-project:
-  name: MyDApp
-  url: http://localhost:3000
-  framework: React
+Simply tell your AI agent what you want to do:
 
-web3:
-  enabled: true
-  wallet: rabby
-  network: ethereum
+### Generate Test Cases (First Time)
 
-execution_order:
-  - WALLET-001
-  - SWAP-001
-  - SWAP-002
+```
+"Generate test cases for this project"
 ```
 
-### tests/test-cases.yaml
+or
 
-```yaml
-test_cases:
-  - id: WALLET-001
-    name: Connect Wallet
-    feature: Wallet Connection
-    priority: critical
-    web3: true
-    wallet_popups: 1
-    steps:
-      - action: navigate
-        url: /
-      - action: vision-click
-        target: Connect Wallet button
-      - action: wallet-approve
-    expected:
-      - Wallet address displayed
-
-  - id: SWAP-001
-    name: Swap Native Token
-    feature: Token Swap
-    priority: critical
-    web3: true
-    wallet_popups: 1
-    preconditions:
-      - WALLET-001 passed
-    steps:
-      - action: navigate
-        url: /swap
-      - action: vision-type
-        target: amount input
-        value: "0.1"
-      - action: vision-click
-        target: Swap button
-      - action: wallet-approve
-    expected:
-      - Swap transaction succeeds
+```
+"Run web-test-case-gen to analyze and create test cases"
 ```
 
-## How Vision-Based Testing Works
+This will:
+1. Analyze your project (dependencies, code, UI screenshots)
+2. Generate test cases in `./tests/` directory
+3. You can commit these to git for repeatable testing
+
+### Execute Tests
+
+```
+"Run the tests for this project"
+```
+
+or
+
+```
+"Use web-test to execute the test cases"
+```
+
+This will:
+1. Load test cases from `./tests/`
+2. Set up browser and wallet (if Web3)
+3. Execute all tests
+4. Generate a report
+
+## 5. Project Structure
+
+```
+agent-skills/
+├── README.md
+├── LICENSE
+│
+├── web-test/                       # Test execution skill
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── test-helper.js          # Main CLI
+│       ├── lib/                    # Core libraries
+│       └── commands/               # Command modules
+│
+├── web-test-case-gen/              # Test case generation skill
+│   └── SKILL.md
+│
+├── web-test-research/              # Project analysis (internal)
+│   └── SKILL.md
+│
+├── web-test-cleanup/               # Cleanup (internal)
+│   ├── SKILL.md
+│   └── scripts/
+│       └── cleanup.sh
+│
+├── web-test-wallet-setup/          # Wallet setup (internal)
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── wallet-setup-helper.js
+│       ├── lib/
+│       └── commands/
+│
+├── web-test-wallet-connect/        # Wallet connect (internal)
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── wallet-connect-helper.js
+│       ├── lib/
+│       └── commands/
+│
+└── web-test-report/                # Report generation (internal)
+    └── SKILL.md
+```
+
+## 6. How It Works
+
+### Vision-Based Testing
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
@@ -220,77 +155,152 @@ test_cases:
 3. **AI Vision Analysis**: AI analyzes screenshot to determine next action
 4. **Task Execution**: AI executes test steps based on visual analysis
 
-## Web3 DApp Testing
+### Test Case Format
 
-For Web3 DApps, set the wallet private key:
+Test cases are stored in YAML format in your project's `./tests/` directory:
 
-```bash
-export WALLET_PRIVATE_KEY="your_private_key_here"
+**tests/config.yaml**
+```yaml
+project:
+  name: MyDApp
+  url: http://localhost:3000
+
+web3:
+  enabled: true
+  wallet: rabby
+
+execution_order:
+  - WALLET-001
+  - SWAP-001
 ```
 
-**Security Notes:**
-- Private key is only read from environment variables
-- `.env` files are intentionally not supported to prevent accidental commits
-- Use a test wallet with test funds only
-
-## Project Structure
-
-```
-agent-skills/
-├── README.md
-├── LICENSE
-│
-├── web-test/                       # Test execution skill
-│   ├── SKILL.md
-│   └── scripts/
-│       ├── test-helper.js          # Main CLI
-│       ├── lib/                    # Core libraries
-│       └── commands/               # Command modules
-│
-├── web-test-case-gen/              # Test case generation skill
-│   └── SKILL.md
-│
-├── web-test-research/              # Project research skill
-│   └── SKILL.md
-│
-├── web-test-cleanup/               # Cleanup skill
-│   ├── SKILL.md
-│   └── scripts/
-│       └── cleanup.sh
-│
-├── web-test-wallet-setup/          # Wallet setup skill
-│   ├── SKILL.md
-│   └── scripts/
-│       ├── wallet-setup-helper.js
-│       ├── lib/
-│       └── commands/
-│
-├── web-test-wallet-connect/        # Wallet connect skill
-│   ├── SKILL.md
-│   └── scripts/
-│       ├── wallet-connect-helper.js
-│       ├── lib/
-│       └── commands/
-│
-└── web-test-report/                # Report generation skill
-    └── SKILL.md
+**tests/test-cases.yaml**
+```yaml
+test_cases:
+  - id: WALLET-001
+    name: Connect Wallet
+    priority: critical
+    web3: true
+    wallet_popups: 1
+    steps:
+      - action: navigate
+        url: /
+      - action: vision-click
+        target: Connect Wallet button
+      - action: wallet-approve
+    expected:
+      - Wallet address displayed
 ```
 
-## Supported Agents
+## 7. Two Workflows
 
-- Claude Code
-- Cursor
-- Codex
-- VS Code (GitHub Copilot)
-- Amp
-- Goose
-- OpenCode
-- Any agent supporting the SKILL.md format
+### Workflow 1: Generate Test Cases
 
-## Learn More
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  $ skill web-test-case-gen                                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. web-test-research    (Analyze code + take UI screenshots)   │
+│         ↓                                                       │
+│  2. Generate YAML test cases                                    │
+│         ↓                                                       │
+│  Output: tests/*.yaml    (Commit to GitHub)                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Workflow 2: Execute Tests
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  $ skill web-test                                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Check tests/ exists?                                        │
+│     ├─ NO  → Prompt user, wait 2 min, fail if no response       │
+│     └─ YES → Continue                                           │
+│         ↓                                                       │
+│  2. web-test-cleanup         (Clean previous session)           │
+│         ↓                                                       │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  If Web3 DApp:                                          │   │
+│  │  3. web-test-wallet-setup                               │   │
+│  │  4. web-test-wallet-connect                             │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│         ↓                                                       │
+│  5. Execute test cases       (Vision-based testing)             │
+│         ↓                                                       │
+│  6. web-test-report          (Generate report)                  │
+│         ↓                                                       │
+│  7. web-test-cleanup --keep-data                                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## 8. Available Skills
+
+### User-Facing Skills
+
+These skills can be invoked directly by users:
+
+| Skill | Description | Usage |
+|-------|-------------|-------|
+| [web-test-case-gen](./web-test-case-gen/SKILL.md) | Generate persistent test cases from project analysis (code + UI screenshots) | `skill web-test-case-gen` |
+| [web-test](./web-test/SKILL.md) | Execute tests from `./tests/` directory and generate report | `skill web-test` |
+
+### Internal Skills
+
+These skills are called automatically by user-facing skills. Do not invoke directly.
+
+| Skill | Description | Called By |
+|-------|-------------|-----------|
+| [web-test-research](./web-test-research/SKILL.md) | Analyze project: detect framework, dependencies, Web3 status, take UI screenshots | `web-test-case-gen` |
+| [web-test-cleanup](./web-test-cleanup/SKILL.md) | Kill browsers, stop dev servers, free ports, clean artifacts | `web-test` |
+| [web-test-wallet-setup](./web-test-wallet-setup/SKILL.md) | Download and initialize Rabby wallet extension | `web-test` (if Web3) |
+| [web-test-wallet-connect](./web-test-wallet-connect/SKILL.md) | Connect wallet to DApp, handle approval popups | `web-test` (if Web3) |
+| [web-test-report](./web-test-report/SKILL.md) | Generate test report with pass/fail indicators | `web-test` |
+
+### Skill Dependency Map
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          Skill Dependencies                              │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  USER-FACING:                                                            │
+│                                                                          │
+│  web-test-case-gen ─────────▶ web-test-research (internal)               │
+│                                                                          │
+│  web-test ──┬───────────────▶ web-test-cleanup (internal)                │
+│             │                                                            │
+│             ├── (if Web3) ──▶ web-test-wallet-setup (internal)           │
+│             │                        │                                   │
+│             │                        ▼                                   │
+│             │                 web-test-wallet-connect (internal)         │
+│             │                                                            │
+│             └───────────────▶ web-test-report (internal)                 │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Skill Responsibilities
+
+| Skill | Key Responsibilities |
+|-------|---------------------|
+| **web-test-case-gen** | Run research, generate YAML test cases, save to `./tests/` |
+| **web-test** | Load test cases, orchestrate full test flow, execute vision-based tests |
+| **web-test-research** | Read package.json, WebSearch dependencies, read code, start dev server, take UI screenshots, analyze features |
+| **web-test-cleanup** | Kill Chromium/Chrome processes, stop dev servers, free ports (3000, 5173, 8080), remove test-output |
+| **web-test-wallet-setup** | Download Rabby wallet, import private key, initialize and unlock wallet |
+| **web-test-wallet-connect** | Navigate with wallet extension, click Connect Wallet, handle popups, verify connection |
+| **web-test-report** | Collect test results, generate markdown report with ✅/❌ indicators, document failures |
+
+## 9. Learn More
 
 - [agentskills.io](https://agentskills.io/) - Open standard for AI agent skills
 - [ai-agent-skills on npm](https://www.npmjs.com/package/ai-agent-skills) - CLI for installing skills
+- [Playwright](https://playwright.dev/) - Browser automation framework
 
 ## License
 
