@@ -348,7 +348,14 @@ async function ensureBrowser(options) {
 async function takeScreenshot(name) {
   const isJpeg = SCREENSHOT_FORMAT === 'jpeg';
   const ext = isJpeg ? '.jpg' : '.png';
-  const baseName = name ? name.replace(/\.(png|jpg|jpeg)$/i, '') : `screenshot-${Date.now()}`;
+
+  // Extract just the filename if a full path was passed (prevents duplicate paths like test-output/screenshots/test-output/screenshots/)
+  let cleanName = name || `screenshot-${Date.now()}`;
+  if (cleanName.includes('/') || cleanName.includes('\\')) {
+    cleanName = path.basename(cleanName);
+  }
+
+  const baseName = cleanName.replace(/\.(png|jpg|jpeg)$/i, '');
   const filename = baseName + ext;
   const filepath = path.join(SCREENSHOTS_DIR, filename);
 
