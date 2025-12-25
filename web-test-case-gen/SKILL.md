@@ -390,7 +390,6 @@ test_cases:
     wallet_popups: 1
     depends_on: [WALLET-001]   # Must run after WALLET-001 completes
     preconditions:
-      - WALLET-001 passed  # <-- Requires wallet connected first
       - Has native token balance
     description:
       purpose: |
@@ -440,9 +439,8 @@ test_cases:
     wallet_popups: 2
     depends_on: [WALLET-001, SWAP-001]  # Runs after SWAP-001 (may need approval state from native swap)
     preconditions:
-      - WALLET-001 passed
       - Has USDC balance
-      - First time swapping USDC
+      - First time swapping USDC (token not yet approved)
     description:
       purpose: |
         Verify ERC20 token swap with token approval flow.
@@ -489,8 +487,7 @@ test_cases:
     web3: true
     wallet_popups: 0
     depends_on: [WALLET-001]   # Only needs wallet connected
-    preconditions:
-      - WALLET-001 passed
+    preconditions: []          # No additional preconditions
     description:
       purpose: |
         Verify error handling when user enters amount exceeding balance.
@@ -580,8 +577,7 @@ test_cases:
     web3: true
     wallet_popups: 1
     depends_on: [WALLET-001]   # Needs wallet connected to test rejection
-    preconditions:
-      - WALLET-001 passed
+    preconditions: []          # No additional preconditions
     description:
       purpose: |
         Verify app handles user rejection of wallet transaction gracefully.
@@ -1083,7 +1079,41 @@ When wallet is disconnected, verify the UI shows appropriate prompts:
 2. Error UI is visible (toast, alert, inline error, etc.)
 3. User can recover (retry button, form reset, etc.)
 
-### Test Case Dependencies (depends_on)
+### Test Case Dependencies (depends_on) vs Preconditions
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  depends_on vs preconditions - IMPORTANT DISTINCTION           ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  depends_on:                                                   ║
+║  ──────────                                                    ║
+║  - ONLY for test case dependencies (TEST-CASE-ID)              ║
+║  - Controls execution order                                    ║
+║  - If dependency fails, this test is SKIPPED                   ║
+║  - Example: depends_on: [WALLET-001, SWAP-001]                 ║
+║                                                                ║
+║  preconditions:                                                ║
+║  ─────────────                                                 ║
+║  - For OTHER requirements (NOT test case IDs)                  ║
+║  - Describes state/data requirements                           ║
+║  - Example: "Has native token balance"                         ║
+║  - Example: "User is on testnet"                               ║
+║  - Example: "Token not yet approved"                           ║
+║                                                                ║
+║  ❌ WRONG - Don't put test IDs in preconditions:               ║
+║     preconditions:                                             ║
+║       - WALLET-001 passed    ← WRONG! Use depends_on instead   ║
+║                                                                ║
+║  ✅ CORRECT:                                                   ║
+║     depends_on: [WALLET-001]                                   ║
+║     preconditions:                                             ║
+║       - Has native token balance                               ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+### Dependency Rules
 
 ```
 ╔════════════════════════════════════════════════════════════════╗
@@ -1097,9 +1127,9 @@ When wallet is disconnected, verify the UI shows appropriate prompts:
 ║                                                                ║
 ║  2. Common dependency patterns:                                ║
 ║     - WALLET-001 → All Web3 tests (must connect first)         ║
-║     - Login → All authenticated features                       ║
-║     - Create → Read/Update/Delete (CRUD order)                 ║
-║     - Form fill → Submit → Verify                              ║
+║     - LOGIN-001 → All authenticated features                   ║
+║     - CREATE-001 → READ/UPDATE/DELETE (CRUD order)             ║
+║     - FORM-001 → SUBMIT-001 → VERIFY-001                       ║
 ║                                                                ║
 ║  3. depends_on field:                                          ║
 ║     depends_on: []           # No dependencies                 ║
