@@ -771,11 +771,275 @@ Use skill web-test-cleanup --keep-data
 
 **Location:** `scripts/test-helper.js`
 
-### Viewport Control
+### How to Call Scripts
 
-| Command                                    | Description                          |
-| ------------------------------------------ | ------------------------------------ |
-| `set-viewport <width> <height> [--mobile]` | Set viewport size for mobile testing |
+```
+╔════════════════════════════════════════════════════════════════╗
+║  SCRIPT CALLING GUIDE                                          ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Step 1: Get the skill directory path                          ║
+║                                                                ║
+║    SKILL_DIR="/Users/duxiaofeng/code/agent-skills/web-test"    ║
+║                                                                ║
+║  Step 2: Call test-helper.js with command and options          ║
+║                                                                ║
+║    node $SKILL_DIR/scripts/test-helper.js <command> [args] [options]
+║                                                                ║
+║  IMPORTANT OPTIONS:                                            ║
+║    --headed      Show browser window (required for vision)     ║
+║    --keep-open   Keep browser open after command               ║
+║    --wallet      Load MetaMask wallet extension                ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+**Full Command Examples:**
+
+```bash
+# Set skill directory
+SKILL_DIR="/Users/duxiaofeng/code/agent-skills/web-test"
+
+# Navigate to URL
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
+
+# Take screenshot for AI analysis
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot before-test --headed --keep-open
+
+# Click at coordinates (after AI analyzes screenshot)
+node $SKILL_DIR/scripts/test-helper.js vision-click 500 300 --headed --keep-open
+
+# Type text
+node $SKILL_DIR/scripts/test-helper.js vision-type "Hello World" --headed --keep-open
+
+# Press key
+node $SKILL_DIR/scripts/test-helper.js vision-press-key Enter --headed --keep-open
+
+# Wait for milliseconds
+node $SKILL_DIR/scripts/test-helper.js wait 2000 --headed --keep-open
+
+# Scroll page
+node $SKILL_DIR/scripts/test-helper.js vision-scroll down 500 --headed --keep-open
+
+# Set mobile viewport
+node $SKILL_DIR/scripts/test-helper.js set-viewport 375 667 --mobile --headed --keep-open
+
+# With wallet extension (for Web3 DApps)
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open --wallet
+```
+
+**Output Format:**
+
+All commands output JSON to stdout:
+```json
+{
+  "success": true,
+  "screenshot": "test-output/screenshots/before-test.jpg",
+  "url": "http://localhost:3000",
+  "instruction": "Use the Read tool to view this screenshot..."
+}
+```
+
+### All Available Commands
+
+---
+
+#### Browser Lifecycle Commands
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `start` | - | Start browser session |
+| `stop` | - | Stop browser session |
+| `browser-open` | - | Open browser and keep it running (auto --headed) |
+| `browser-close` | - | Close the browser explicitly |
+
+```bash
+# Open browser for manual inspection
+node $SKILL_DIR/scripts/test-helper.js browser-open
+
+# Close browser when done
+node $SKILL_DIR/scripts/test-helper.js browser-close
+```
+
+---
+
+#### Navigation Commands
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `navigate` | `<url>` | Navigate to URL |
+| `screenshot` | `[name]` | Take screenshot |
+| `content` | - | Get page HTML content (saves to test-output/page-content.html) |
+
+```bash
+# Navigate to URL
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
+
+# Take screenshot
+node $SKILL_DIR/scripts/test-helper.js screenshot home --headed --keep-open
+```
+
+---
+
+#### Element Interaction Commands (Selector-based)
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `click` | `<selector>` | Click element by CSS selector |
+| `fill` | `<selector> <value>` | Fill input field |
+| `select` | `<selector> <value>` | Select dropdown option |
+| `check` | `<selector>` | Check checkbox |
+| `uncheck` | `<selector>` | Uncheck checkbox |
+| `hover` | `<selector>` | Hover over element |
+| `press` | `<selector> <key>` | Press key on element |
+| `text` | `<selector>` | Get element text content |
+
+```bash
+# Click button by selector
+node $SKILL_DIR/scripts/test-helper.js click "#submit-btn" --headed --keep-open
+
+# Fill input field
+node $SKILL_DIR/scripts/test-helper.js fill "#email" "test@example.com" --headed --keep-open
+
+# Select dropdown option
+node $SKILL_DIR/scripts/test-helper.js select "#country" "US" --headed --keep-open
+
+# Check/uncheck checkbox
+node $SKILL_DIR/scripts/test-helper.js check "#agree-terms" --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js uncheck "#newsletter" --headed --keep-open
+
+# Hover over element
+node $SKILL_DIR/scripts/test-helper.js hover "#dropdown-menu" --headed --keep-open
+
+# Press key on element
+node $SKILL_DIR/scripts/test-helper.js press "#search-input" Enter --headed --keep-open
+
+# Get element text
+node $SKILL_DIR/scripts/test-helper.js text "#balance" --headed --keep-open
+```
+
+---
+
+#### Vision Commands (Coordinate-based, for AI Agent)
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `vision-screenshot` | `[name]` | Take screenshot for AI to analyze |
+| `vision-click` | `<x> <y>` | Click at coordinates |
+| `vision-double-click` | `<x> <y>` | Double-click at coordinates |
+| `vision-type` | `<text>` | Type text at current cursor position |
+| `vision-press-key` | `<key>` | Press keyboard key (Enter, Tab, Escape, etc.) |
+| `vision-scroll` | `<dir> [amount]` | Scroll page (dir: up/down/left/right) |
+| `vision-hover` | `<x> <y>` | Move mouse to coordinates |
+| `vision-drag` | `<x1> <y1> <x2> <y2>` | Drag from one point to another |
+| `vision-wait-stable` | `[ms]` | Wait for page to stabilize, then screenshot |
+| `vision-get-page-info` | - | Get page info and screenshot for AI analysis |
+
+```bash
+# Take screenshot for AI analysis
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot before-click --headed --keep-open
+
+# Click at coordinates (AI determines from screenshot)
+node $SKILL_DIR/scripts/test-helper.js vision-click 500 300 --headed --keep-open
+
+# Double-click at coordinates
+node $SKILL_DIR/scripts/test-helper.js vision-double-click 500 300 --headed --keep-open
+
+# Type text at current cursor
+node $SKILL_DIR/scripts/test-helper.js vision-type "Hello World" --headed --keep-open
+
+# Press keyboard key
+node $SKILL_DIR/scripts/test-helper.js vision-press-key Enter --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-press-key Tab --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-press-key Escape --headed --keep-open
+
+# Scroll page
+node $SKILL_DIR/scripts/test-helper.js vision-scroll down 500 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-scroll up 300 --headed --keep-open
+
+# Hover at coordinates
+node $SKILL_DIR/scripts/test-helper.js vision-hover 400 200 --headed --keep-open
+
+# Drag from point to point
+node $SKILL_DIR/scripts/test-helper.js vision-drag 100 100 300 300 --headed --keep-open
+
+# Wait for page stability then screenshot
+node $SKILL_DIR/scripts/test-helper.js vision-wait-stable 5000 --headed --keep-open
+
+# Get full page info for AI
+node $SKILL_DIR/scripts/test-helper.js vision-get-page-info --headed --keep-open
+```
+
+---
+
+#### Utility Commands
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `wait` | `<ms>` | Wait milliseconds |
+| `wait-for` | `<selector>` | Wait for element to appear |
+| `evaluate` | `<js>` | Evaluate JavaScript in page |
+| `list-elements` | - | List all interactive elements (saves to test-output/elements.json) |
+
+```bash
+# Wait 2 seconds
+node $SKILL_DIR/scripts/test-helper.js wait 2000 --headed --keep-open
+
+# Wait for element to appear
+node $SKILL_DIR/scripts/test-helper.js wait-for "#loading-complete" --headed --keep-open
+
+# Evaluate JavaScript
+node $SKILL_DIR/scripts/test-helper.js evaluate "document.title" --headed --keep-open
+
+# List all interactive elements on page
+node $SKILL_DIR/scripts/test-helper.js list-elements --headed --keep-open
+```
+
+---
+
+#### Login Detection Commands
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `detect-login-required` | - | Detect if login/auth is required |
+| `wait-for-login` | - | Wait for manual login (auto switches to headed mode) |
+
+```bash
+# Check if login is required
+node $SKILL_DIR/scripts/test-helper.js detect-login-required --headed --keep-open
+
+# Wait for user to manually login (5 min timeout by default)
+node $SKILL_DIR/scripts/test-helper.js wait-for-login --timeout 300000 --keep-open
+```
+
+---
+
+#### Dev Server Commands
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `dev-server-start` | `[dir] [port]` | Start dev server for project |
+| `dev-server-stop` | - | Stop the running dev server |
+| `dev-server-status` | - | Check dev server status |
+
+```bash
+# Start dev server (auto-detects framework)
+node $SKILL_DIR/scripts/test-helper.js dev-server-start . 3000
+
+# Check dev server status
+node $SKILL_DIR/scripts/test-helper.js dev-server-status
+
+# Stop dev server
+node $SKILL_DIR/scripts/test-helper.js dev-server-stop
+```
+
+---
+
+#### Viewport Control
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `set-viewport` | `<width> <height> [--mobile]` | Set viewport size for mobile testing |
 
 **Mobile viewport sizes:**
 
@@ -787,37 +1051,20 @@ Use skill web-test-cleanup --keep-data
 | Pixel 5      | 393   | 851    | `set-viewport 393 851 --mobile`          |
 | Samsung S20  | 360   | 800    | `set-viewport 360 800 --mobile`          |
 
-### Navigation & Screenshots
-
-| Command                    | Description             |
-| -------------------------- | ----------------------- |
-| `navigate <url>`           | Navigate to URL         |
-| `vision-screenshot [name]` | Take screenshot for AI  |
-| `vision-wait-stable`       | Wait for page stability |
-
-### Vision Interactions
-
-| Command                    | Description          |
-| -------------------------- | -------------------- |
-| `vision-click <x> <y>`     | Click at coordinates |
-| `vision-type <text>`       | Type text at cursor  |
-| `vision-press-key <key>`   | Press keyboard key   |
-| `vision-scroll <dir> [px]` | Scroll page          |
-
-### Utility Commands
-
-| Command               | Description       |
-| --------------------- | ----------------- |
-| `wait <ms>`           | Wait milliseconds |
-| `wait-for <selector>` | Wait for element  |
+---
 
 ### Common Options
 
-| Option        | Description                     |
-| ------------- | ------------------------------- |
-| `--headed`    | Show browser window             |
+| Option | Description |
+|--------|-------------|
+| `--headed` | Show browser window (required for vision commands) |
+| `--headless` | Run headless (default) |
 | `--keep-open` | Keep browser open after command |
-| `--wallet`    | Load wallet extension           |
+| `--wallet` | Load MetaMask wallet extension |
+| `--screenshot <name>` | Take screenshot after action |
+| `--wait <ms>` | Wait after action |
+| `--timeout <ms>` | Action timeout (default: 10000) |
+| `--mobile` | Use mobile viewport |
 
 ## Example Test Execution
 
