@@ -217,6 +217,7 @@ Users can request to run specific tests instead of all tests. **This is the ONLY
 | Mode | User Request Example | What to Execute |
 |------|---------------------|-----------------|
 | **All Tests** | "Run all tests" | All tests in `execution_order` |
+| **By Module** | "Run wallet module" / "Run swap module tests" | Tests where `module` matches |
 | **By Feature** | "Run Wallet tests" / "Test the swap feature" | Tests where `feature` matches |
 | **By Category** | "Run negative tests" / "Run critical tests" | Tests matching priority or type |
 | **Single Test** | "Run SWAP-001" / "Run the insufficient balance test" | Only the specified test |
@@ -230,6 +231,8 @@ Users can request to run specific tests instead of all tests. **This is the ONLY
 ║                                                                ║
 ║  1. Parse user request to determine filter:                    ║
 ║                                                                ║
+║     "Run wallet module"     → filter by module: "wallet"       ║
+║     "Run swap module tests" → filter by module: "swap"         ║
 ║     "Run swap tests"        → filter by feature: "Token Swap"  ║
 ║     "Run WALLET-001"        → filter by id: "WALLET-001"       ║
 ║     "Run critical tests"    → filter by priority: "critical"   ║
@@ -258,6 +261,34 @@ Users can request to run specific tests instead of all tests. **This is the ONLY
 ║                                                                ║
 ╚════════════════════════════════════════════════════════════════╝
 ```
+
+### Filter by Module
+
+Match tests where `test.module` equals the module ID:
+
+```yaml
+# User: "Run wallet module" or "Run wallet module tests"
+# Matches tests with module: "wallet"
+- id: WALLET-001
+  module: wallet          # ✓ Match
+- id: WALLET-DISCONNECT-001
+  module: wallet          # ✓ Match
+- id: SWAP-001
+  module: swap            # ✗ No match
+
+# Available modules are defined in config.yaml:
+modules:
+  - id: wallet
+    name: Wallet
+  - id: swap
+    name: Token Swap
+```
+
+**Module vs Feature:**
+- `module`: High-level grouping (e.g., "wallet", "swap", "rewards")
+- `feature`: Specific functionality within a module (e.g., "Wallet Connection", "Wallet Disconnect")
+
+Use module filtering when you want to run all tests related to a major functional area.
 
 ### Filter by Feature
 
@@ -341,6 +372,8 @@ Report to user:
 | User Says | Filter Applied | Tests Executed |
 |-----------|---------------|----------------|
 | "Run all tests" | None | All in execution_order |
+| "Run wallet module" | module = wallet | All tests with module: wallet |
+| "Run swap module tests" | module = swap | SWAP-001, SWAP-002, SWAP-003 + dependencies |
 | "Run WALLET-001" | id = WALLET-001 | WALLET-001 |
 | "Run swap feature tests" | feature contains "Swap" | SWAP-001, SWAP-002, SWAP-003 + dependencies |
 | "Run critical tests only" | priority = critical | WALLET-001, SWAP-001, SWAP-002 |
@@ -441,6 +474,18 @@ generated:
   date: 2024-01-15T14:30:00Z
   by: web-test-case-gen
 
+# Module definitions for organized test execution
+modules:
+  - id: wallet           # Module identifier (used in commands)
+    name: Wallet         # Human-readable name
+    description: Wallet connection and management tests
+  - id: swap
+    name: Token Swap
+    description: Token swap functionality tests
+  - id: rewards
+    name: Rewards
+    description: Rewards claiming and staking tests
+
 features: # Features detected (informational)
   - name: Token Swap
     code: src/features/swap/
@@ -456,6 +501,7 @@ execution_order: # CRITICAL: Test execution order
 |-------|-------|
 | `project.url` | Base URL - prepend to relative URLs in steps |
 | `web3.enabled` | If `true`, run `web-test-wallet-setup` before tests |
+| `modules` | Array of module definitions - for filtering tests by module |
 | `execution_order` | Array of test IDs - execute in this exact order |
 
 ---
@@ -472,6 +518,7 @@ cat ./tests/test-cases.yaml
 test_cases:
   - id: WALLET-001 # Unique test ID (matches execution_order)
     name: Connect Wallet # Human-readable name
+    module: wallet # Module this test belongs to (matches modules[].id in config.yaml)
     feature: Wallet Connection
     priority: critical # critical/high/medium/low
     web3: true # Requires wallet interaction
@@ -503,6 +550,8 @@ test_cases:
 |-------|------|-------------|
 | `id` | string | Unique identifier (e.g., WALLET-001) |
 | `name` | string | Human-readable test name |
+| `module` | string | Module ID this test belongs to (matches config.yaml modules[].id) |
+| `feature` | string | Feature category within the module |
 | `depends_on` | array | Test IDs that must pass first |
 | `preconditions` | array | Other requirements (NOT test IDs) |
 | `description.purpose` | string | What this test verifies |
