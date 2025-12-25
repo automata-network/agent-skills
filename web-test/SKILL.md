@@ -49,7 +49,8 @@ Execute tests from persistent test cases in `./tests/` directory.
 ║                    ⛔ CRITICAL RULE ⛔                          ║
 ╠════════════════════════════════════════════════════════════════╣
 ║                                                                ║
-║  "Time constraints" is NEVER a valid reason to skip tests!     ║
+║  This is AUTOMATED TESTING - user does NOT care about time!    ║
+║  Run ALL tests, no matter how long it takes.                   ║
 ║                                                                ║
 ║  ❌ FORBIDDEN - These excuses are NOT allowed:                 ║
 ║     - "Time constraints"                                       ║
@@ -61,7 +62,7 @@ Execute tests from persistent test cases in `./tests/` directory.
 ║                                                                ║
 ║  ✅ ONLY these reasons can skip a test:                        ║
 ║     - Feature does not exist in the project                    ║
-│     - Test case is explicitly deprecated                       ║
+║     - Test case is explicitly deprecated                       ║
 ║     - Required permissions unavailable (admin-only, paid tier) ║
 ║     - Blocking dependency failed (wallet setup failed)         ║
 ║                                                                ║
@@ -74,12 +75,13 @@ Execute tests from persistent test cases in `./tests/` directory.
 ```
 
 **Why this matters:**
+- **This is AUTOMATED testing** - the user does NOT care how long it takes
+- Users explicitly want ALL test cases executed, regardless of time
 - Every test case exists for a reason - skipping means missing bugs
 - Skipping tests defeats the entire purpose of testing
-- Users expect ALL their test cases to be executed
-- "Time constraints" is an excuse, not a valid technical reason
-- If a test takes too long, WAIT for it - do NOT skip it
-- If a test is truly unnecessary, it should be REMOVED from the test suite by the user, not skipped by you
+- "Time constraints" is YOUR concern, not the user's - they want completeness
+- If a test takes too long, WAIT for it - the user expects this
+- If a test is truly unnecessary, the user will REMOVE it from the test suite
 
 ### Rule 3: Follow Execution Order
 
