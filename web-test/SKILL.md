@@ -145,22 +145,89 @@ It is invoked when executing WALLET-001 test case or as a precondition check.
 ```yaml
 # Global timeout settings (apply to all tests)
 timeouts:
-  action: 30000      # Max time for any single action (30s)
-  page_load: 30000   # Max time for page to load (30s)
+  action: 30000 # Max time for any single action (30s)
+  page_load: 30000 # Max time for page to load (30s)
   api_request: 30000 # Max time for API response (30s)
   wallet_popup: 30000 # Max time for wallet popup (30s)
 
 # Recommended wait times in test steps
 wait_times:
-  after_click: 1000      # 1 second
-  after_type: 500        # 0.5 seconds
-  after_submit: 2000     # 2 seconds
-  after_navigate: 2000   # 2 seconds
-  for_animation: 500     # 0.5 seconds
-  for_api: 3000          # 3 seconds (then verify)
+  after_click: 1000 # 1 second
+  after_type: 500 # 0.5 seconds
+  after_submit: 2000 # 2 seconds
+  after_navigate: 2000 # 2 seconds
+  for_animation: 500 # 0.5 seconds
+  for_api: 3000 # 3 seconds (then verify)
 ```
 
-### Rule 5: SEQUENTIAL EXECUTION ONLY - ONE TEST AT A TIME
+### Rule 5: FIX TEST CASES DURING EXECUTION
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║          ✅ IMPROVE TEST CASES AS YOU RUN THEM                 ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Test cases from web-test-case-gen are NOT perfect!            ║
+║  Human review may also miss issues.                            ║
+║                                                                ║
+║  WHEN TO MODIFY a test case during execution:                  ║
+║                                                                ║
+║  1. Step targets incorrect element                             ║
+║     - vision-click target description doesn't match UI         ║
+║     - Selector points to wrong or non-existent element         ║
+║                                                                ║
+║  2. Steps are missing or in wrong order                        ║
+║     - Need to add intermediate steps (e.g., close modal first) ║
+║     - Steps should be reordered for correct flow               ║
+║                                                                ║
+║  3. Expected results are incorrect or incomplete               ║
+║     - Expected text doesn't match actual UI text               ║
+║     - Missing important verification points                    ║
+║                                                                ║
+║  4. Wait times are insufficient                                ║
+║     - Page needs more time to load/update                      ║
+║     - Animation takes longer than expected                     ║
+║                                                                ║
+║  5. Preconditions or dependencies are wrong                    ║
+║     - Test should depend on another test                       ║
+║     - Precondition is missing or incorrect                     ║
+║                                                                ║
+║  HOW TO MODIFY:                                                ║
+║                                                                ║
+║  1. Pause test execution                                       ║
+║  2. Edit ./tests/test-cases.yaml directly                      ║
+║  3. Resume/retry the test with fixed steps                     ║
+║                                                                ║
+║  ✅ ENCOURAGED actions:                                        ║
+║     - Fix obvious typos or selector errors                     ║
+║     - Add missing wait steps                                   ║
+║     - Correct expected result descriptions                     ║
+║     - Add missing intermediate steps                           ║
+║                                                                ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+**Example: Fixing a test case mid-execution**
+
+```
+During TEST: SWAP-001
+
+Problem detected:
+  Step 3: vision-click "Swap Now button"
+  Error: Button text is actually "Execute Swap" not "Swap Now"
+
+Action taken:
+  1. Edit ./tests/test-cases.yaml
+  2. Change step target:
+     - target: Swap Now button
+     + target: Execute Swap button
+  3. Retry SWAP-001 from step 3
+
+Result: Test now passes ✅
+```
+
+### Rule 6: SEQUENTIAL EXECUTION ONLY - ONE TEST AT A TIME
 
 ```
 ╔════════════════════════════════════════════════════════════════╗
@@ -214,13 +281,13 @@ Users can request to run specific tests instead of all tests. **This is the ONLY
 
 ### Execution Modes
 
-| Mode | User Request Example | What to Execute |
-|------|---------------------|-----------------|
-| **All Tests** | "Run all tests" | All tests in `execution_order` |
-| **By Module** | "Run wallet module" / "Run swap module tests" | Tests where `module` matches |
-| **By Feature** | "Run Wallet tests" / "Test the swap feature" | Tests where `feature` matches |
-| **By Priority/Type** | "Run negative tests" / "Run critical tests" | Tests matching priority or type |
-| **Single Test** | "Run SWAP-001" / "Run the insufficient balance test" | Only the specified test |
+| Mode                 | User Request Example                                 | What to Execute                 |
+| -------------------- | ---------------------------------------------------- | ------------------------------- |
+| **All Tests**        | "Run all tests"                                      | All tests in `execution_order`  |
+| **By Module**        | "Run wallet module" / "Run swap module tests"        | Tests where `module` matches    |
+| **By Feature**       | "Run Wallet tests" / "Test the swap feature"         | Tests where `feature` matches   |
+| **By Priority/Type** | "Run negative tests" / "Run critical tests"          | Tests matching priority or type |
+| **Single Test**      | "Run SWAP-001" / "Run the insufficient balance test" | Only the specified test         |
 
 ### Filter Logic
 
@@ -285,6 +352,7 @@ modules:
 ```
 
 **Module vs Feature:**
+
 - `module`: High-level grouping (e.g., "wallet", "swap", "rewards")
 - `feature`: Specific functionality within a module (e.g., "Wallet Connection", "Wallet Disconnect")
 
@@ -298,11 +366,11 @@ Match tests where `test.feature` contains the keyword:
 # User: "Run wallet tests"
 # Matches tests with feature containing "Wallet":
 - id: WALLET-001
-  feature: Wallet Connection  # ✓ Match
+  feature: Wallet Connection # ✓ Match
 - id: WALLET-DISCONNECT-001
-  feature: Wallet Connection  # ✓ Match
+  feature: Wallet Connection # ✓ Match
 - id: SWAP-001
-  feature: Token Swap         # ✗ No match
+  feature: Token Swap # ✗ No match
 ```
 
 ### Filter by Test ID
@@ -369,16 +437,16 @@ Report to user:
 
 ### Example Prompts
 
-| User Says | Filter Applied | Tests Executed |
-|-----------|---------------|----------------|
-| "Run all tests" | None | All in execution_order |
-| "Run wallet module" | module = wallet | All tests with module: wallet |
-| "Run swap module tests" | module = swap | SWAP-001, SWAP-002, SWAP-003 + dependencies |
-| "Run WALLET-001" | id = WALLET-001 | WALLET-001 |
-| "Run swap feature tests" | feature contains "Swap" | SWAP-001, SWAP-002, SWAP-003 + dependencies |
-| "Run critical tests only" | priority = critical | WALLET-001, SWAP-001, SWAP-002 |
-| "Run negative tests" | type = negative | SWAP-003, WALLET-DISCONNECT-*, SWAP-FAIL-001 + dependencies |
-| "Run the insufficient balance test" | name/id match | SWAP-003 + WALLET-001 (dependency) |
+| User Says                           | Filter Applied          | Tests Executed                                               |
+| ----------------------------------- | ----------------------- | ------------------------------------------------------------ |
+| "Run all tests"                     | None                    | All in execution_order                                       |
+| "Run wallet module"                 | module = wallet         | All tests with module: wallet                                |
+| "Run swap module tests"             | module = swap           | SWAP-001, SWAP-002, SWAP-003 + dependencies                  |
+| "Run WALLET-001"                    | id = WALLET-001         | WALLET-001                                                   |
+| "Run swap feature tests"            | feature contains "Swap" | SWAP-001, SWAP-002, SWAP-003 + dependencies                  |
+| "Run critical tests only"           | priority = critical     | WALLET-001, SWAP-001, SWAP-002                               |
+| "Run negative tests"                | type = negative         | SWAP-003, WALLET-DISCONNECT-\*, SWAP-FAIL-001 + dependencies |
+| "Run the insufficient balance test" | name/id match           | SWAP-003 + WALLET-001 (dependency)                           |
 
 ## Workflow
 
@@ -476,8 +544,8 @@ generated:
 
 # Module definitions for organized test execution
 modules:
-  - id: wallet           # Module identifier (used in commands)
-    name: Wallet         # Human-readable name
+  - id: wallet # Module identifier (used in commands)
+    name: Wallet # Human-readable name
     description: Wallet connection and management tests
   - id: swap
     name: Token Swap
