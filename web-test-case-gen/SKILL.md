@@ -353,6 +353,15 @@ test_cases:
     preconditions: []
     # This test case uses web-test-wallet-connect skill internally
     uses_skill: web-test-wallet-connect
+    description:
+      purpose: |
+        Verify user can connect MetaMask wallet to the DApp.
+        This is the foundation for all Web3 functionality.
+      notes:
+        - Must run FIRST before any Web3 tests
+        - Wallet extension must be set up via web-test-wallet-setup
+        - Look for wallet address displayed after connection
+        - Connection modal should close automatically
     steps:
       - action: navigate
         url: /
@@ -383,6 +392,15 @@ test_cases:
     preconditions:
       - WALLET-001 passed  # <-- Requires wallet connected first
       - Has native token balance
+    description:
+      purpose: |
+        Verify user can swap native token (ETH) for another token.
+        Tests the core swap functionality with simplest token type.
+      notes:
+        - Native token swap does NOT require approval (only 1 popup)
+        - Wait for quote to load before clicking Swap
+        - Transaction may take 10+ seconds on mainnet
+        - Check balance update after swap completes
     steps:
       - action: navigate
         url: /swap
@@ -425,6 +443,15 @@ test_cases:
       - WALLET-001 passed
       - Has USDC balance
       - First time swapping USDC
+    description:
+      purpose: |
+        Verify ERC20 token swap with token approval flow.
+        Tests the two-step process: approve token spending + execute swap.
+      notes:
+        - ERC20 tokens require approval before first swap (2 popups)
+        - First popup is token approval, second is swap transaction
+        - If token was previously approved, only 1 popup appears
+        - Approval is per-token, per-spender (router contract)
     steps:
       - action: navigate
         url: /swap
@@ -464,6 +491,15 @@ test_cases:
     depends_on: [WALLET-001]   # Only needs wallet connected
     preconditions:
       - WALLET-001 passed
+    description:
+      purpose: |
+        Verify error handling when user enters amount exceeding balance.
+        Tests client-side validation prevents invalid transactions.
+      notes:
+        - No wallet popup should appear (validation before submit)
+        - Swap button should be disabled or show error state
+        - Error message should be clear and user-friendly
+        - This is a NEGATIVE test case
     steps:
       - action: navigate
         url: /swap
@@ -489,6 +525,15 @@ test_cases:
     web3: false
     wallet_popups: 0
     preconditions: []
+    description:
+      purpose: |
+        Verify UI shows correct state when wallet is not connected.
+        Tests that users are prompted to connect before using features.
+      notes:
+        - Run with fresh browser (no wallet connected)
+        - Look for "Connect Wallet" button or similar prompt
+        - No wallet address should be displayed
+        - This is a NEGATIVE test case
     steps:
       - action: navigate
         url: /
@@ -506,6 +551,15 @@ test_cases:
     web3: false
     wallet_popups: 0
     preconditions: []
+    description:
+      purpose: |
+        Verify protected features are inaccessible without wallet connection.
+        Tests that Web3 features require authentication before use.
+      notes:
+        - Navigate directly to protected page (e.g., /swap)
+        - Swap button should be disabled or show "Connect Wallet"
+        - Should NOT be able to submit transaction
+        - This is a NEGATIVE test case
     steps:
       - action: navigate
         url: /swap
@@ -528,6 +582,16 @@ test_cases:
     depends_on: [WALLET-001]   # Needs wallet connected to test rejection
     preconditions:
       - WALLET-001 passed
+    description:
+      purpose: |
+        Verify app handles user rejection of wallet transaction gracefully.
+        Tests error recovery when user clicks "Reject" in MetaMask.
+      notes:
+        - Use wallet-reject action instead of wallet-approve
+        - App should show clear error message (not crash)
+        - Form should remain usable for retry
+        - No balance should change
+        - This is a NEGATIVE test case
     steps:
       - action: navigate
         url: /swap
@@ -552,6 +616,16 @@ test_cases:
     web3: false
     wallet_popups: 0
     preconditions: []
+    description:
+      purpose: |
+        Verify form validation prevents submission of invalid data.
+        Tests client-side validation with user-friendly error messages.
+      notes:
+        - Enter obviously invalid data (e.g., "invalid-email")
+        - Look for inline error messages near the field
+        - Form should NOT be submitted
+        - Error styling should be visible (red border, icon)
+        - This is a NEGATIVE test case
     steps:
       - action: navigate
         url: /form-page
@@ -574,6 +648,16 @@ test_cases:
     web3: false
     wallet_popups: 0
     preconditions: []
+    description:
+      purpose: |
+        Verify app handles API errors gracefully with user-friendly messages.
+        Tests error recovery when backend returns 500 or similar errors.
+      notes:
+        - Uses mock-api-error action to simulate server failure
+        - App should show error UI (toast, alert, or error component)
+        - Should provide retry option or clear next steps
+        - Should NOT show raw error or crash
+        - This is a NEGATIVE test case
     steps:
       - action: navigate
         url: /api-dependent-page
