@@ -67,8 +67,8 @@ Execute tests from persistent test cases in `./tests/` directory.
 ║  ✅ VALID reasons to skip a test:                              ║
 ║     - User requested specific tests (see Selective Execution)  ║
 ║       Example: "Run only SWAP-001" → skip other tests          ║
-║     - User requested specific feature/category                 ║
-║       Example: "Run wallet tests" → skip non-wallet tests      ║
+║     - User requested specific module/feature                   ║
+║       Example: "Run wallet module" → skip non-wallet tests     ║
 ║     - Blocking dependency failed (depends_on test failed)      ║
 ║     - Feature does not exist in the project                    ║
 ║     - Test case is explicitly deprecated                       ║
@@ -219,7 +219,7 @@ Users can request to run specific tests instead of all tests. **This is the ONLY
 | **All Tests** | "Run all tests" | All tests in `execution_order` |
 | **By Module** | "Run wallet module" / "Run swap module tests" | Tests where `module` matches |
 | **By Feature** | "Run Wallet tests" / "Test the swap feature" | Tests where `feature` matches |
-| **By Category** | "Run negative tests" / "Run critical tests" | Tests matching priority or type |
+| **By Priority/Type** | "Run negative tests" / "Run critical tests" | Tests matching priority or type |
 | **Single Test** | "Run SWAP-001" / "Run the insufficient balance test" | Only the specified test |
 
 ### Filter Logic
@@ -551,7 +551,7 @@ test_cases:
 | `id` | string | Unique identifier (e.g., WALLET-001) |
 | `name` | string | Human-readable test name |
 | `module` | string | Module ID this test belongs to (matches config.yaml modules[].id) |
-| `feature` | string | Feature category within the module |
+| `feature` | string | Specific functionality name (e.g., "Wallet Connection", "Token Swap") |
 | `depends_on` | array | Test IDs that must pass first |
 | `preconditions` | array | Other requirements (NOT test IDs) |
 | `description.purpose` | string | What this test verifies |

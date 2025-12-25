@@ -400,35 +400,20 @@ generated:
   by: web-test-case-gen
 
 # ============================================
-# CATEGORIES & MODULES
-# Users can run tests by category or module:
-#   skill web-test --category=core
-#   skill web-test --module=swap
+# MODULES
+# Users can run tests by module:
+#   "Run wallet module" or "Run swap module tests"
 # ============================================
-categories:
-  - id: core
-    name: Core Functionality
-    description: Essential features that must work
-  - id: transaction
-    name: Transactions
-    description: Blockchain transaction tests
-  - id: error-handling
-    name: Error Handling
-    description: Negative tests and error scenarios
-
 modules:
   - id: wallet
     name: Wallet
     description: Wallet connection and management
-    category: core
   - id: swap
     name: Token Swap
     description: Token swap functionality
-    category: transaction
   - id: stake
     name: Staking
     description: Token staking functionality
-    category: transaction
 
 features:
   - name: Token Swap
@@ -464,8 +449,7 @@ test_cases:
   # ============================================
   - id: WALLET-001
     name: Connect Wallet
-    category: core              # Category for grouping (core, transaction, error-handling)
-    module: wallet              # Module within category (wallet, swap, stake, etc.)
+    module: wallet              # Module this test belongs to (wallet, swap, stake, etc.)
     feature: Wallet Connection
     priority: critical
     web3: true
