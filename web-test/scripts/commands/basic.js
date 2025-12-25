@@ -43,7 +43,35 @@ const commands = {
     const url = args[0];
     if (!url) throw new Error('URL required');
 
-    await page.goto(url, { waitUntil: 'networkidle', timeout: parseInt(options.timeout) });
+    // First attempt: 10 seconds timeout
+    let loaded = false;
+    try {
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 10000 });
+      loaded = true;
+    } catch (e) {
+      if (e.name === 'TimeoutError' || e.message.includes('Timeout')) {
+        // Page didn't load in 10s, wait additional 20s
+        console.log(JSON.stringify({
+          status: 'warning',
+          message: 'Page not fully loaded in 10s, waiting additional 20s...'
+        }));
+        try {
+          await page.waitForLoadState('networkidle', { timeout: 20000 });
+          loaded = true;
+        } catch (e2) {
+          // Still not loaded after 30s total, fail
+          console.log(JSON.stringify({
+            success: false,
+            error: `Page failed to load after 30 seconds: ${url}`,
+            url: page.url()
+          }));
+          return;
+        }
+      } else {
+        throw e;
+      }
+    }
+
     const title = await page.title();
 
     let screenshotPath = null;

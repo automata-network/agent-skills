@@ -44,12 +44,17 @@ function getMetaMaskOnboardingUrl() {
 
 // Try to connect to existing browser via CDP
 async function tryConnectExistingBrowser() {
+  // Quick check: if no CDP file exists, skip connection attempt
+  if (!fs.existsSync(CDP_FILE)) {
+    return false;
+  }
+
   const checkAlive = () => new Promise((resolve) => {
     const req = http.get(`http://127.0.0.1:${CDP_PORT}/json/version`, (res) => {
       resolve(res.statusCode === 200);
     });
     req.on('error', () => resolve(false));
-    req.setTimeout(2000, () => { req.destroy(); resolve(false); });
+    req.setTimeout(300, () => { req.destroy(); resolve(false); });
   });
 
   try {
@@ -195,7 +200,7 @@ async function startBrowser(options) {
     try {
       let serviceWorker = persistentContext.serviceWorkers()[0];
       if (!serviceWorker) {
-        serviceWorker = await persistentContext.waitForEvent('serviceworker', { timeout: 10000 });
+        serviceWorker = await persistentContext.waitForEvent('serviceworker', { timeout: 3000 });
       }
       const swUrl = serviceWorker.url();
       metamaskExtensionId = swUrl.split('/')[2];
@@ -216,8 +221,8 @@ async function startBrowser(options) {
 
         if (!metamaskExtensionId) {
           const testPage = await context.newPage();
-          await testPage.goto('chrome://extensions/', { timeout: 5000 }).catch(() => {});
-          await testPage.waitForTimeout(1000);
+          await testPage.goto('chrome://extensions/', { timeout: 2000 }).catch(() => {});
+          await testPage.waitForTimeout(300);
 
           const extensionIds = await testPage.evaluate(() => {
             const items = document.querySelectorAll('extensions-item');
@@ -240,6 +245,9 @@ async function startBrowser(options) {
       }
     }
 
+    // Save CDP info for reconnection
+    saveCDPInfo(CDP_PORT);
+
   } else if (useIndependentChrome) {
     // Launch Chrome independently with CDP port
     const chromeArgs = [
@@ -258,17 +266,17 @@ async function startBrowser(options) {
     });
     chromeProcess.unref();
 
-    // Wait for CDP to be available
+    // Wait for CDP to be available (max 5 seconds)
     let connected = false;
-    for (let i = 0; i < 30; i++) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+    for (let i = 0; i < 10; i++) {
+      await new Promise(resolve => setTimeout(resolve, 300));
       try {
         const alive = await new Promise((resolve) => {
           const req = http.get(`http://127.0.0.1:${CDP_PORT}/json/version`, (res) => {
             resolve(res.statusCode === 200);
           });
           req.on('error', () => resolve(false));
-          req.setTimeout(1000, () => { req.destroy(); resolve(false); });
+          req.setTimeout(500, () => { req.destroy(); resolve(false); });
         });
         if (alive) {
           connected = true;
@@ -278,7 +286,7 @@ async function startBrowser(options) {
     }
 
     if (!connected) {
-      throw new Error('Failed to connect to Chrome CDP after 15 seconds');
+      throw new Error('Failed to connect to Chrome CDP after 5 seconds');
     }
 
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`);
@@ -289,12 +297,13 @@ async function startBrowser(options) {
 
     saveCDPInfo(CDP_PORT);
   } else {
-    // Headless mode without wallet
+    // Headless or headed mode without wallet
     const launchOptions = {
       headless: options.headless,
       args: [
         '--no-first-run',
         '--disable-blink-features=AutomationControlled',
+        `--remote-debugging-port=${CDP_PORT}`,
       ],
       ...contextOptions,
     };
@@ -304,6 +313,9 @@ async function startBrowser(options) {
 
     const pages = context.pages();
     page = pages.length > 0 ? pages[0] : await context.newPage();
+
+    // Save CDP info for reconnection
+    saveCDPInfo(CDP_PORT);
   }
 
   // Capture console logs
