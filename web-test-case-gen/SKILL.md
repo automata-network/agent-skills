@@ -1164,6 +1164,184 @@ Next steps:
 
 ## Test Case Generation Rules
 
+### Mobile Layout Detection
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  📱 MOBILE RESPONSIVE TESTING                                  ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  STEP 1: Detect if project supports mobile layout              ║
+║                                                                ║
+║  Search for CSS media queries:                                 ║
+║    grep -r "@media" --include="*.css" --include="*.scss"       ║
+║    grep -r "max-width.*768" --include="*.css" --include="*.tsx"║
+║    grep -r "useMediaQuery\|useBreakpoint" --include="*.ts"     ║
+║                                                                ║
+║  Mobile indicators to look for:                                ║
+║    - @media (max-width: 768px)                                 ║
+║    - @media screen and (max-width: 640px)                      ║
+║    - @media only screen and (max-device-width: 480px)          ║
+║    - Tailwind classes: sm:, md:, lg: in components             ║
+║    - Mobile-specific components: MobileNav, MobileMenu         ║
+║    - useMediaQuery, useBreakpoint hooks                        ║
+║                                                                ║
+║  STEP 2: If mobile layout detected, generate mobile test cases ║
+║                                                                ║
+║  Add to config.yaml:                                           ║
+║    mobile:                                                     ║
+║      enabled: true                                             ║
+║      breakpoint: 375    # iPhone SE width                      ║
+║      viewport:                                                 ║
+║        width: 375                                              ║
+║        height: 667                                             ║
+║                                                                ║
+║  STEP 3: Generate MOBILE-* test cases                          ║
+║                                                                ║
+║    For each feature with mobile layout differences:            ║
+║    - MOBILE-NAV-001: Mobile navigation menu                    ║
+║    - MOBILE-LAYOUT-001: Responsive layout verification         ║
+║    - MOBILE-MODAL-001: Mobile modal/popup styling              ║
+║    - MOBILE-TOUCH-001: Touch-specific interactions             ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+**Mobile Test Case Examples:**
+
+```yaml
+# Mobile Navigation Test
+- id: MOBILE-NAV-001
+  name: Mobile Navigation Menu
+  module: mobile
+  feature: Mobile Layout
+  priority: high
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  viewport:
+    width: 375
+    height: 667
+    deviceScaleFactor: 2
+    isMobile: true
+  description:
+    purpose: |
+      Verify mobile navigation menu works correctly.
+      Tests hamburger menu, slide-out nav, touch interactions.
+    notes:
+      - Run in mobile viewport (375x667)
+      - Desktop nav should be hidden
+      - Hamburger menu icon should be visible
+  steps:
+    - action: set-viewport
+      width: 375
+      height: 667
+      isMobile: true
+    - action: navigate
+      url: /
+    - action: vision-screenshot
+      name: mobile-initial
+    - action: vision-click
+      target: hamburger menu icon (three horizontal lines)
+    - action: wait
+      ms: 500
+      reason: Wait for menu animation
+    - action: vision-screenshot
+      name: mobile-nav-open
+    - action: vision-click
+      target: close button or outside menu area
+    - action: vision-screenshot
+      name: mobile-nav-closed
+  expected:
+    - Desktop navigation hidden
+    - Hamburger menu icon visible
+    - Mobile menu slides in on click
+    - Menu items accessible
+    - Menu closes on outside click
+
+# Mobile Modal Test
+- id: MOBILE-MODAL-001
+  name: Mobile Modal Styling
+  module: mobile
+  feature: Mobile Layout
+  priority: high
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  viewport:
+    width: 375
+    height: 667
+    isMobile: true
+  description:
+    purpose: |
+      Verify modals/popups display correctly on mobile.
+      Tests full-screen modals, bottom sheets, touch dismiss.
+  steps:
+    - action: set-viewport
+      width: 375
+      height: 667
+      isMobile: true
+    - action: navigate
+      url: /
+    - action: vision-click
+      target: button that opens modal (e.g., Connect Wallet)
+    - action: wait
+      ms: 500
+      reason: Wait for modal animation
+    - action: vision-screenshot
+      name: mobile-modal-open
+  expected:
+    - Modal fills screen or shows as bottom sheet
+    - Content readable without horizontal scroll
+    - Close button accessible
+    - Touch gestures work (swipe to dismiss if applicable)
+
+# Mobile-only Component Test
+- id: MOBILE-COMPONENT-001
+  name: Mobile-Only Components
+  module: mobile
+  feature: Mobile Layout
+  priority: medium
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  viewport:
+    width: 375
+    height: 667
+    isMobile: true
+  description:
+    purpose: |
+      Verify components that only appear on mobile.
+      Tests mobile-specific UI elements.
+  steps:
+    - action: set-viewport
+      width: 375
+      height: 667
+      isMobile: true
+    - action: navigate
+      url: /
+    - action: vision-screenshot
+      name: mobile-components
+  expected:
+    - Mobile-only components visible
+    - Desktop-only components hidden
+    - Touch-friendly button sizes (min 44x44px)
+    - Readable text size (min 16px)
+```
+
+**Mobile viewport action:**
+
+| Action | Parameters | Description |
+|--------|------------|-------------|
+| `set-viewport` | `width`, `height`, `isMobile`, `deviceScaleFactor` | Set browser to mobile viewport size |
+
+**test-helper.js command:**
+```bash
+node $SKILL_DIR/scripts/test-helper.js set-viewport 375 667 --mobile --headed --keep-open
+```
+
+---
+
 ```
 ╔════════════════════════════════════════════════════════════════╗
 ║  ⚠️  CRITICAL: GENERATE COMPREHENSIVE BUSINESS TESTS           ║

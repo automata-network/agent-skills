@@ -707,15 +707,16 @@ For each test ID in `execution_order` (SEQUENTIALLY, ONE AT A TIME):
 ╚════════════════════════════════════════════════════════════════╝
 ```
 
-| Action              | Parameters        | How to Execute                                                                                  |
-| ------------------- | ----------------- | ----------------------------------------------------------------------------------------------- |
-| `navigate`          | `url`             | `node $SKILL_DIR/scripts/test-helper.js navigate [project.url + step.url] --headed --keep-open` |
-| `vision-screenshot` | `name`            | `node $SKILL_DIR/scripts/test-helper.js vision-screenshot [step.name].jpg --headed --keep-open` |
-| `vision-click`      | `target`          | 1. Take screenshot 2. AI analyzes to find `step.target` coordinates 3. `vision-click x y`       |
-| `vision-type`       | `target`, `value` | 1. Click on target field 2. `node ... vision-type "[step.value]" --headed --keep-open`          |
-| `wait`              | `ms`, `reason`    | `node $SKILL_DIR/scripts/test-helper.js wait [step.ms] --headed --keep-open`                    |
-| `wallet-approve`    | `note`            | Use `skill web-test-wallet-sign` with approve action                                            |
-| `wallet-reject`     | `note`            | Use `skill web-test-wallet-sign` with reject action                                             |
+| Action              | Parameters                      | How to Execute                                                                                  |
+| ------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `set-viewport`      | `width`, `height`, `isMobile`   | `node $SKILL_DIR/scripts/test-helper.js set-viewport [width] [height] --mobile --headed --keep-open` |
+| `navigate`          | `url`                           | `node $SKILL_DIR/scripts/test-helper.js navigate [project.url + step.url] --headed --keep-open` |
+| `vision-screenshot` | `name`                          | `node $SKILL_DIR/scripts/test-helper.js vision-screenshot [step.name].jpg --headed --keep-open` |
+| `vision-click`      | `target`                        | 1. Take screenshot 2. AI analyzes to find `step.target` coordinates 3. `vision-click x y`       |
+| `vision-type`       | `target`, `value`               | 1. Click on target field 2. `node ... vision-type "[step.value]" --headed --keep-open`          |
+| `wait`              | `ms`, `reason`                  | `node $SKILL_DIR/scripts/test-helper.js wait [step.ms] --headed --keep-open`                    |
+| `wallet-approve`    | `note`                          | Use `skill web-test-wallet-sign` with approve action                                            |
+| `wallet-reject`     | `note`                          | Use `skill web-test-wallet-sign` with reject action                                             |
 
 **Handling `uses_skill` Field:**
 
@@ -769,6 +770,22 @@ Use skill web-test-cleanup --keep-data
 ## Test Helper Commands
 
 **Location:** `scripts/test-helper.js`
+
+### Viewport Control
+
+| Command                                    | Description                          |
+| ------------------------------------------ | ------------------------------------ |
+| `set-viewport <width> <height> [--mobile]` | Set viewport size for mobile testing |
+
+**Mobile viewport sizes:**
+
+| Device       | Width | Height | Command                                  |
+| ------------ | ----- | ------ | ---------------------------------------- |
+| iPhone SE    | 375   | 667    | `set-viewport 375 667 --mobile`          |
+| iPhone 12    | 390   | 844    | `set-viewport 390 844 --mobile`          |
+| iPhone 14 Pro| 393   | 852    | `set-viewport 393 852 --mobile`          |
+| Pixel 5      | 393   | 851    | `set-viewport 393 851 --mobile`          |
+| Samsung S20  | 360   | 800    | `set-viewport 360 800 --mobile`          |
 
 ### Navigation & Screenshots
 
