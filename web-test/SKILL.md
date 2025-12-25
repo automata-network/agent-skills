@@ -106,7 +106,61 @@ Always execute in this exact order:
 **Note:** `web-test-wallet-connect` is no longer called directly by this skill.
 It is invoked when executing WALLET-001 test case or as a precondition check.
 
-### Rule 4: SEQUENTIAL EXECUTION ONLY - ONE TEST AT A TIME
+### Rule 4: Timeout Rules - FAIL FAST
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  TIMEOUT RULES - MAXIMUM 30 SECONDS FOR ANY OPERATION          ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  All operations MUST complete within 30 seconds:               ║
+║                                                                ║
+║  | Operation              | Timeout | On Timeout              ║
+║  |------------------------|---------|-------------------------|
+║  | Button click response  | 30s     | FAIL test               |
+║  | Form submission        | 30s     | FAIL test               |
+║  | Page navigation        | 30s     | FAIL test               |
+║  | API request            | 30s     | FAIL test               |
+║  | Wallet popup appear    | 30s     | FAIL test               |
+║  | Element visibility     | 30s     | FAIL test               |
+║                                                                ║
+║  ❌ DO NOT use long wait times:                                ║
+║     - wait: 10000  ← TOO LONG, use 3000 max                   ║
+║     - wait: 5000   ← Consider reducing to 2000                ║
+║                                                                ║
+║  ✅ Recommended wait times:                                    ║
+║     - After click: 1000-2000ms                                 ║
+║     - After form submit: 2000-3000ms                           ║
+║     - After page navigate: 2000-3000ms                         ║
+║     - For API response: 3000ms (then check, retry if needed)   ║
+║                                                                ║
+║  ⚠️  If operation exceeds 30s → Mark test as FAILED           ║
+║      Record: "Timeout: {operation} exceeded 30s"               ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+**Timeout Configuration:**
+
+```yaml
+# Global timeout settings (apply to all tests)
+timeouts:
+  action: 30000      # Max time for any single action (30s)
+  page_load: 30000   # Max time for page to load (30s)
+  api_request: 30000 # Max time for API response (30s)
+  wallet_popup: 30000 # Max time for wallet popup (30s)
+
+# Recommended wait times in test steps
+wait_times:
+  after_click: 1000      # 1 second
+  after_type: 500        # 0.5 seconds
+  after_submit: 2000     # 2 seconds
+  after_navigate: 2000   # 2 seconds
+  for_animation: 500     # 0.5 seconds
+  for_api: 3000          # 3 seconds (then verify)
+```
+
+### Rule 5: SEQUENTIAL EXECUTION ONLY - ONE TEST AT A TIME
 
 ```
 ╔════════════════════════════════════════════════════════════════╗

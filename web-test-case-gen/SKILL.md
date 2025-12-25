@@ -71,6 +71,7 @@ Add a test case for: user can stake tokens and see updated balance
 │          ↓                                                      │
 │          - Create tests/config.yaml                             │
 │          - Create tests/test-cases.yaml                         │
+│          - Create tests/case-summary.md                         │
 │          - Create tests/README.md                               │
 │          ↓                                                      │
 │  Step 3: Output ready for git commit                            │
@@ -213,8 +214,8 @@ Create test case based on exploration:
       target: Claim Rewards button
     - action: wallet-approve
     - action: wait
-      ms: 5000
-      reason: Wait for transaction
+      ms: 3000
+      reason: Wait for transaction confirmation
     - action: vision-screenshot
       name: after-claim
   expected:
@@ -415,7 +416,7 @@ test_cases:
       - action: vision-click
         target: USDC option
       - action: wait
-        ms: 3000
+        ms: 2000
         reason: Wait for quote
       - action: vision-screenshot
         name: before-swap
@@ -423,7 +424,7 @@ test_cases:
         target: Swap button
       - action: wallet-approve
       - action: wait
-        ms: 10000
+        ms: 3000
         reason: Wait for transaction
       - action: vision-screenshot
         name: after-swap
@@ -465,7 +466,8 @@ test_cases:
       - action: vision-click
         target: ETH option
       - action: wait
-        ms: 3000
+        ms: 2000
+        reason: Wait for quote
       - action: vision-click
         target: Swap button
       - action: wallet-approve
@@ -473,7 +475,8 @@ test_cases:
       - action: wallet-approve
         note: Swap transaction popup
       - action: wait
-        ms: 10000
+        ms: 3000
+        reason: Wait for transaction
       - action: vision-screenshot
         name: swap-complete
     expected:
@@ -877,7 +880,7 @@ Based on the research output, generate YAML test cases:
 3. Create edge case test cases
 4. Include wallet popup counts for Web3 actions
 
-### Step 3: Write YAML Files
+### Step 3: Write Test Files (config.yaml, test-cases.yaml, case-summary.md, README.md)
 
 ```bash
 mkdir -p ./tests
@@ -1167,20 +1170,61 @@ The agent MUST analyze the project during web-test-research and determine:
 | Edge cases | Medium |
 | Optional features | Low |
 
+### Timeout Rules (IMPORTANT)
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  TIMEOUT: 30 SECONDS MAX FOR ANY OPERATION                     ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  When generating test cases, use SHORT wait times:             ║
+║                                                                ║
+║  | Scenario              | Recommended Wait | Max Allowed     ║
+║  |-----------------------|------------------|-----------------|
+║  | After click           | 1000ms           | 2000ms          ║
+║  | After type            | 500ms            | 1000ms          ║
+║  | Wait for quote/price  | 2000ms           | 3000ms          ║
+║  | Wait for transaction  | 3000ms           | 5000ms          ║
+║  | After page navigate   | 2000ms           | 3000ms          ║
+║                                                                ║
+║  ❌ NEVER use wait times > 5000ms                              ║
+║  ❌ If operation takes > 30s → Test should FAIL                ║
+║                                                                ║
+║  ✅ Use short waits + verification instead of long waits       ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+**Example - Good vs Bad:**
+```yaml
+# ❌ BAD - Too long wait
+- action: wait
+  ms: 10000
+  reason: Wait for transaction
+
+# ✅ GOOD - Short wait with verification
+- action: wait
+  ms: 3000
+  reason: Wait for transaction
+- action: vision-screenshot
+  name: verify-result
+# AI verifies expected result in screenshot
+```
+
 ### Action Types in Steps
 
-| Action | Parameters | Description |
-|--------|------------|-------------|
-| `navigate` | `url` | Go to URL |
-| `vision-screenshot` | `name` | Take screenshot |
-| `vision-click` | `target` | Click on element (AI determines coordinates) |
-| `vision-type` | `target`, `value` | Type text |
-| `wait` | `ms`, `reason` | Wait for condition |
-| `wallet-approve` | `note` | Handle wallet popup (approve) |
-| `wallet-reject` | `note` | Reject wallet popup (for negative tests) |
-| `mock-api-error` | `endpoint`, `status` | Simulate API failure |
-| `check-text-visible` | `text` | Verify text is visible on page |
-| `check-element-disabled` | `target` | Verify element is disabled |
+| Action | Parameters | Description | Timeout |
+|--------|------------|-------------|---------|
+| `navigate` | `url` | Go to URL | 30s max |
+| `vision-screenshot` | `name` | Take screenshot | 10s max |
+| `vision-click` | `target` | Click on element (AI determines coordinates) | 30s max |
+| `vision-type` | `target`, `value` | Type text | 10s max |
+| `wait` | `ms`, `reason` | Wait for condition | 5s max recommended |
+| `wallet-approve` | `note` | Handle wallet popup (approve) | 30s max |
+| `wallet-reject` | `note` | Reject wallet popup (for negative tests) | 30s max |
+| `mock-api-error` | `endpoint`, `status` | Simulate API failure | 10s max |
+| `check-text-visible` | `text` | Verify text is visible on page | 30s max |
+| `check-element-disabled` | `target` | Verify element is disabled | 30s max |
 
 ## Related Skills
 
