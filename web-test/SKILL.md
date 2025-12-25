@@ -15,7 +15,7 @@ Execute tests from persistent test cases in `./tests/` directory.
 
 ## CRITICAL RULES - READ FIRST
 
-### Rule 1: Web3 Wallet Setup is MANDATORY
+### Rule 1: Wallet Setup Based on config.yaml
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -24,23 +24,26 @@ Execute tests from persistent test cases in `./tests/` directory.
 │    web3:                                                       │
 │      enabled: true                                             │
 │                                                                │
-│  THEN YOU MUST RUN:                                            │
+│  THEN at TEST START (before any test cases):                   │
 │                                                                │
-│    1. skill web-test-wallet-setup    ← REQUIRED!               │
-│    2. skill web-test-wallet-connect  ← REQUIRED!               │
+│    1. skill web-test-wallet-setup    ← REQUIRED AT START!      │
 │                                                                │
-│  BEFORE executing ANY test cases!                              │
+│  Wallet CONNECT is handled by test cases:                      │
 │                                                                │
-│  ❌ DO NOT skip wallet setup for Web3 DApps                    │
-│  ❌ DO NOT execute tests without wallet ready                  │
-│  ✅ Wallet MUST be connected before first test                 │
+│    2. WALLET-001 test case          ← Is a TEST CASE           │
+│       (uses web-test-wallet-connect internally)                │
+│                                                                │
+│  ❌ DO NOT skip wallet-setup for Web3 DApps                    │
+│  ❌ DO NOT auto-run wallet-connect (it's a test case now)      │
+│  ✅ Run wallet-setup ONCE at start if web3.enabled: true       │
+│  ✅ Run WALLET-001 test when reached in execution_order        │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 **Why this matters:**
-- Web3 DApps require wallet connection for most features
-- Tests will FAIL if wallet is not set up first
-- Wallet popups cannot be handled without proper setup
+- Wallet **setup** prepares the extension (download, import key)
+- Wallet **connect** is now a testable feature (WALLET-001)
+- Other tests depend on WALLET-001 via preconditions
 
 ### Rule 2: NEVER Skip Tests Due to Time Constraints
 
@@ -89,11 +92,13 @@ Always execute in this exact order:
 1. Check for test cases
 2. `web-test-cleanup` - Clean previous session
 3. Read config.yaml
-4. `web-test-wallet-setup` - **(if web3.enabled: true)**
-5. `web-test-wallet-connect` - **(if web3.enabled: true)**
-6. Execute test cases
-7. `web-test-report` - Generate report
-8. `web-test-cleanup --keep-data` - Final cleanup
+4. `web-test-wallet-setup` - **(if web3.enabled: true)** - Run ONCE at start
+5. Execute test cases (including WALLET-001 which connects wallet)
+6. `web-test-report` - Generate report
+7. `web-test-cleanup --keep-data` - Final cleanup
+
+**Note:** `web-test-wallet-connect` is no longer called directly by this skill.
+It is invoked when executing WALLET-001 test case or as a precondition check.
 
 ---
 
@@ -131,20 +136,19 @@ Run the tests for this project
 │  Step 3: Read config.yaml                                       │
 │          ↓                                                      │
 │          Is Web3 DApp? (web3.enabled: true)                     │
-│          ├─ YES ↓                                               │
-│          │  Step 4: Use skill web-test-wallet-setup             │
-│          │          ↓                                           │
-│          │  Step 5: Use skill web-test-wallet-connect           │
-│          └─ NO  → Skip Steps 4-5                                │
+│          ├─ YES → Step 4: Use skill web-test-wallet-setup       │
+│          └─ NO  → Skip Step 4                                   │
 │          ↓                                                      │
-│  Step 6: Execute test cases                                     │
+│  Step 5: Execute test cases                                     │
 │          For each test in execution_order:                      │
+│          - Check preconditions (e.g., WALLET-001 passed)        │
+│          - If WALLET-001: uses web-test-wallet-connect          │
 │          - Run test steps                                       │
 │          - Record pass/fail                                     │
 │          ↓                                                      │
-│  Step 7: Use skill web-test-report                              │
+│  Step 6: Use skill web-test-report                              │
 │          ↓                                                      │
-│  Step 8: Use skill web-test-cleanup --keep-data                 │
+│  Step 7: Use skill web-test-cleanup --keep-data                 │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -205,15 +209,10 @@ cat ./tests/test-cases.yaml
 Use skill web-test-wallet-setup
 ```
 
-### Step 5: Wallet Connect (if Web3)
+This sets up the wallet extension (download, import private key).
+Wallet connection is handled by test case WALLET-001 during test execution.
 
-**Skip this step if `web3.enabled: false` or not set.**
-
-```
-Use skill web-test-wallet-connect
-```
-
-### Step 6: Execute Test Cases
+### Step 5: Execute Test Cases
 
 **⚠️ EXECUTE EVERY TEST - NO EXCEPTIONS FOR "TIME CONSTRAINTS" ⚠️**
 
@@ -282,13 +281,13 @@ steps:
     walletAction: ignore
 ```
 
-### Step 7: Generate Report
+### Step 6: Generate Report
 
 ```
 Use skill web-test-report
 ```
 
-### Step 8: Final Cleanup
+### Step 7: Final Cleanup
 
 ```
 Use skill web-test-cleanup --keep-data
@@ -338,8 +337,8 @@ web3:
   enabled: true
 
 execution_order:
-  - WALLET-001
-  - SWAP-001
+  - WALLET-001    # Connect wallet (uses web-test-wallet-connect)
+  - SWAP-001      # Requires: WALLET-001 passed
 ```
 
 **Execution flow:**
@@ -348,12 +347,13 @@ execution_order:
 1. ✓ Found tests/config.yaml
 2. ✓ Found tests/test-cases.yaml
 3. Running web-test-cleanup...
-4. Web3 DApp detected, setting up wallet...
-   - Running web-test-wallet-setup...
-   - Running web-test-wallet-connect...
+4. Web3 DApp detected (web3.enabled: true)
+   - Running web-test-wallet-setup... (ONCE at start)
+   - Wallet extension ready
 5. Executing test cases:
 
    WALLET-001: Connect Wallet
+   ├─ [This test uses web-test-wallet-connect skill]
    ├─ navigate /
    ├─ vision-screenshot before-connect.jpg
    ├─ [AI analyzes screenshot, finds Connect button at 850, 45]
@@ -365,6 +365,7 @@ execution_order:
    └─ ✅ PASS - Wallet address displayed
 
    SWAP-001: Swap Native Token
+   ├─ Check preconditions: WALLET-001 passed ✓
    ├─ navigate /swap
    ├─ [execute steps...]
    └─ ✅ PASS - Swap successful
@@ -402,8 +403,8 @@ All test artifacts in project directory:
 |-------|-------|
 | web-test-case-gen | Generates test cases (run first if no tests/) |
 | web-test-cleanup | Called at start and end |
-| web-test-wallet-setup | Called if Web3 DApp |
-| web-test-wallet-connect | Called if Web3 DApp |
+| web-test-wallet-setup | Called ONCE at start if `web3.enabled: true` |
+| web-test-wallet-connect | Called by WALLET-001 test case or as precondition |
 | web-test-report | Called after test execution |
 
 ## Error Handling

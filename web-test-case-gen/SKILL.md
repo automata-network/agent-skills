@@ -317,17 +317,23 @@ features:
     code: src/hooks/useConnect.ts
 
 execution_order:
-  - WALLET-001
-  - SWAP-001
-  - SWAP-002
-  - SWAP-003
+  # CRITICAL: Tests execute SEQUENTIALLY in this exact order
+  # Each test waits for the previous one to complete
+  # Dependencies are enforced via preconditions
+  - WALLET-001    # No dependencies, runs first
+  - SWAP-001      # Depends on: WALLET-001
+  - SWAP-002      # Depends on: WALLET-001
+  - SWAP-003      # Depends on: WALLET-001
 ```
 
 ### tests/test-cases.yaml
 
 ```yaml
 test_cases:
-  # Wallet Connection Tests
+  # ============================================
+  # WALLET CONNECTION TEST (Web3 DApps only)
+  # This is BOTH a test case AND a precondition for other tests
+  # ============================================
   - id: WALLET-001
     name: Connect Wallet
     feature: Wallet Connection
@@ -335,6 +341,8 @@ test_cases:
     web3: true
     wallet_popups: 1
     preconditions: []
+    # This test case uses web-test-wallet-connect skill internally
+    uses_skill: web-test-wallet-connect
     steps:
       - action: navigate
         url: /
@@ -351,7 +359,10 @@ test_cases:
       - Wallet address displayed in header
       - Connection modal closed
 
-  # Swap Tests
+  # ============================================
+  # TESTS REQUIRING WALLET CONNECTION
+  # These tests have WALLET-001 as precondition
+  # ============================================
   - id: SWAP-001
     name: Swap Native Token
     feature: Token Swap
@@ -359,7 +370,7 @@ test_cases:
     web3: true
     wallet_popups: 1
     preconditions:
-      - WALLET-001 passed
+      - WALLET-001 passed  # <-- Requires wallet connected first
       - Has native token balance
     steps:
       - action: navigate
@@ -690,13 +701,43 @@ Next steps:
 
 ## Test Case Generation Rules
 
+### Wallet Connection as Precondition
+
+For Web3 DApps (`web3.enabled: true`), wallet connection handling:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  WALLET CONNECTION RULES                                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. WALLET-001 (Connect Wallet) is a TEST CASE, not auto-run   │
+│     - Uses web-test-wallet-connect skill internally             │
+│     - First test in execution_order for Web3 DApps              │
+│                                                                 │
+│  2. Tests requiring wallet connection add precondition:         │
+│     preconditions:                                              │
+│       - WALLET-001 passed                                       │
+│                                                                 │
+│  3. Tests NOT requiring wallet (negative tests, etc.):          │
+│     preconditions: []                                           │
+│     - WALLET-DISCONNECT-001, WALLET-DISCONNECT-002              │
+│     - These test disconnected state behavior                    │
+│                                                                 │
+│  4. web-test executor will:                                     │
+│     - Run WALLET-001 when encountered in execution_order        │
+│     - Check preconditions before each test                      │
+│     - Skip test if precondition test failed                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ### From Research → Test Cases
 
 | Research Output | Generate |
 |-----------------|----------|
 | Feature with user flow | Happy path test case |
 | Input validation | Error handling test cases |
-| Wallet interaction | Test with wallet_popups count |
+| Wallet interaction | Test with wallet_popups count + precondition: WALLET-001 |
 | External protocol | Research-based test scenarios |
 
 ### Negative Test Cases (Conditional)

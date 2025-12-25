@@ -1,6 +1,6 @@
 ---
 name: web-test-wallet-connect
-description: Connect wallet to Web3 DApp - navigate to DApp, click Connect Wallet, approve in MetaMask popup, verify connection. Use AFTER wallet-setup, BEFORE running tests.
+description: Connect wallet to Web3 DApp - navigate to DApp, click Connect Wallet, approve in MetaMask popup, verify connection. Can be used as a test case or as a precondition for other tests.
 license: MIT
 compatibility: Node.js 18+, Playwright
 metadata:
@@ -39,13 +39,23 @@ Connect MetaMask wallet to a Web3 DApp.
 
 ## When to Use This Skill
 
-- **After web-test-wallet-setup** - Wallet must be set up first
-- **Before running Web3 tests** - Connection required for DApp features
-- **When wallet gets disconnected** - Re-establish connection
+- **As a test case (WALLET-001)** - Connecting wallet is itself a testable feature
+- **As a precondition** - When other test cases require wallet to be connected
+- **When wallet gets disconnected** - Re-establish connection during test execution
+
+## Usage Modes
+
+### Mode 1: As a Test Case
+When `tests/test-cases.yaml` contains a wallet connection test case (e.g., WALLET-001), this skill is invoked to execute that test.
+
+### Mode 2: As a Precondition
+When a test case has `preconditions: [WALLET-001 passed]` or similar, the test executor should:
+1. Check if wallet is already connected
+2. If not, invoke this skill to connect the wallet first
 
 ## Prerequisites
 
-1. **web-test-wallet-setup** completed successfully
+1. **web-test-wallet-setup** must have been executed if `web3.enabled: true` in config
 2. DApp is running and accessible
 3. Wallet extension is initialized with funds (if needed)
 
@@ -301,8 +311,8 @@ dapp-click "Connect" --fallback-x 900 --fallback-y 50 --wallet --headed --keep-o
 
 ## Related Skills
 
-- **web-test-wallet-setup** - Must complete before wallet-connect
-- **web-test** - Run tests after wallet is connected
+- **web-test-wallet-setup** - Required first if `web3.enabled: true` in config
+- **web-test** - Executes test cases (may call this skill as precondition)
 - **web-test-report** - Generate report after testing
 - **web-test-cleanup** - Clean up after testing
 

@@ -1,6 +1,6 @@
 ---
 name: web-test-wallet-setup
-description: Set up MetaMask wallet extension for Web3 DApp testing - download extension, import wallet from private key. REQUIRED for Web3 DApp testing before wallet-connect.
+description: Set up MetaMask wallet extension for Web3 DApp testing - download extension, import wallet from private key. Run at test start if tests/config.yaml has web3.enabled=true.
 license: MIT
 compatibility: Node.js 18+, Playwright
 metadata:
@@ -17,15 +17,24 @@ Set up MetaMask wallet extension for Web3 DApp testing.
 
 ## When to Use This Skill
 
-- **When testing a Web3 DApp** - Required before connecting wallet
-- **After project research confirms Web3 DApp** - Part of Web3 test setup
-- **Before web-test-wallet-connect** - Wallet must be set up first
+This skill should be executed **automatically at the start of testing** when:
+
+```yaml
+# In tests/config.yaml
+web3:
+  enabled: true  # <-- If this is true, run wallet-setup FIRST
+```
+
+**Execution timing:**
+- **Run once at test start** - Before any test cases are executed
+- **NOT between tests** - Setup only needs to run once per test session
+- **Automatic by web-test** - The web-test skill checks config.yaml and calls this automatically
 
 ## Prerequisites
 
 1. **`tests/.test-env`** file with `WALLET_PRIVATE_KEY` already exists
-2. Project research completed (web-test-research)
-3. Confirmed this is a Web3 DApp
+2. **`tests/config.yaml`** exists with `web3.enabled: true`
+3. Project research completed (web-test-research)
 
 ## Quick Start
 
@@ -141,16 +150,17 @@ node $SKILL_DIR/scripts/wallet-setup-helper.js wallet-init --wallet --headed
 
 ## Related Skills
 
-- **web-test-research** - Complete first to confirm Web3 DApp
-- **web-test-wallet-connect** - Use AFTER wallet setup to connect to DApp
-- **web-test** - Execute tests after wallet is connected
+- **web-test-research** - Analyze project, detect Web3 features
+- **web-test-case-gen** - Generates config.yaml with web3.enabled setting
+- **web-test-wallet-connect** - Called as test case or precondition (not mandatory after setup)
+- **web-test** - Orchestrates test execution, calls wallet-setup if web3.enabled
 - **web-test-cleanup** - Clean up wallet data when done
 
 ## Next Steps
 
 After wallet setup is complete:
-1. Use **web-test-wallet-connect** to connect wallet to the DApp
-2. Then proceed with **web-test** for actual testing
+1. **web-test** will execute test cases from `tests/test-cases.yaml`
+2. **web-test-wallet-connect** will be invoked when needed by test cases (as a test or precondition)
 
 ## Notes
 
