@@ -239,6 +239,8 @@ echo "test-output/" >> .gitignore
 | `tests/`       | **Commit to git**     | Test case definitions (YAML), reusable across runs |
 | `test-output/` | **Add to .gitignore** | Screenshots, reports, browser profiles (temporary) |
 
+## 5. Test Artifacts
+
 ### Tests Directory Files
 
 The `tests/` directory contains all test configuration and definitions:
@@ -343,7 +345,7 @@ Each test run generates a new report file like `test-report-20241215-143025.md`:
 - **Screenshot:** screenshots/SWAP-002-step3.png
 ```
 
-## 5. Project Structure
+## 6. Project Structure
 
 ```
 agent-skills/
@@ -393,7 +395,7 @@ agent-skills/
     └── SKILL.md
 ```
 
-## 6. How It Works
+## 7. How It Works
 
 ### Two-Phase Architecture
 
@@ -488,7 +490,7 @@ test_cases:
       - Wallet address displayed
 ```
 
-## 7. Available Skills
+## 8. Available Skills
 
 ### User-Facing Skills
 
@@ -551,7 +553,7 @@ These skills are called automatically by user-facing skills. Do not invoke direc
 | **web-test-wallet-sign**    | Auto-detect MetaMask popups after clicks, approve signatures/transactions, reject on gas errors              |
 | **web-test-report**         | Collect test results, generate markdown report with ✅/❌ indicators, document failures                       |
 
-## 8. Learn More
+## 9. Learn More
 
 - [agentskills.io](https://agentskills.io/) - Open standard for AI agent skills
 - [ai-agent-skills on npm](https://www.npmjs.com/package/ai-agent-skills) - CLI for installing skills
