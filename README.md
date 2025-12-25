@@ -239,6 +239,110 @@ echo "test-output/" >> .gitignore
 | `tests/`       | **Commit to git**     | Test case definitions (YAML), reusable across runs |
 | `test-output/` | **Add to .gitignore** | Screenshots, reports, browser profiles (temporary) |
 
+### Tests Directory Files
+
+The `tests/` directory contains all test configuration and definitions:
+
+| File                | Purpose                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `config.yaml`       | Test configuration: project URL, Web3 settings, module definitions, and test execution order        |
+| `test-cases.yaml`   | Test case definitions: all test cases with IDs, steps, expected results, and metadata               |
+| `case-summary.md`   | Quick reference: human-readable summary of all test cases with IDs and descriptions                 |
+| `README.md`         | Test outline: human-readable overview of the test scope and structure for testers                   |
+| `.test-env`         | Environment variables (optional): wallet private key for Web3 testing (add to `.gitignore`)         |
+
+**config.yaml** - Test configuration:
+```yaml
+project:
+  name: MyDApp
+  url: http://localhost:3000
+
+web3:
+  enabled: true
+  wallet: metamask
+
+modules:
+  - id: swap
+    name: Token Swap
+    description: Token swap functionality
+
+execution_order:
+  - WALLET-001
+  - SWAP-001
+```
+
+**test-cases.yaml** - Test case definitions:
+```yaml
+test_cases:
+  - id: SWAP-001
+    name: Basic Token Swap
+    module: swap
+    priority: critical
+    steps:
+      - action: navigate
+        url: /swap
+      - action: vision-click
+        target: Token input field
+    expected:
+      - Swap completed successfully
+```
+
+**case-summary.md** - Quick overview:
+```markdown
+# Test Cases Summary
+
+## Swap Module
+- SWAP-001: Basic Token Swap (critical)
+- SWAP-002: Swap with slippage (high)
+```
+
+### Test Output Directory
+
+The `test-output/` directory is created during test execution and contains all runtime artifacts:
+
+```
+test-output/
+├── report.md                    # Test report with pass/fail results
+├── screenshots/                 # Test execution screenshots
+│   ├── SWAP-001-step1.png       # Screenshots named by test ID and step
+│   ├── SWAP-001-step2.png
+│   └── SWAP-001-final.png
+├── browser-profile/             # Browser profile with wallet extension
+└── logs/                        # Execution logs (if enabled)
+```
+
+| File/Directory      | How to Use                                                                       |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `report.md`         | Open to see test results: each test case shows pass/fail status and failure details |
+| `screenshots/`      | View step-by-step screenshots to debug failures or verify UI behavior            |
+| `browser-profile/`  | Reused across runs to persist wallet setup (do not delete manually)             |
+
+**Reading the Report:**
+
+The `report.md` file contains a summary like:
+
+```markdown
+# Test Report
+
+## Summary
+- Total: 5
+- Passed: 4
+- Failed: 1
+
+## Results
+| Test ID   | Name              | Status |
+|-----------|-------------------|--------|
+| SWAP-001  | Basic Token Swap  | PASS   |
+| SWAP-002  | Swap with Error   | FAIL   |
+
+## Failures
+### SWAP-002: Swap with Error
+- **Step:** Click confirm button
+- **Expected:** Transaction confirmed
+- **Actual:** Button not found
+- **Screenshot:** screenshots/SWAP-002-step3.png
+```
+
 ## 5. Project Structure
 
 ```
