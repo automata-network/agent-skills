@@ -159,7 +159,7 @@ function runCommand(command, args = [], options = {}) {
 
 // Take screenshot and return path
 function takeScreenshot(name) {
-  const result = runCommand("vision-screenshot", [name]);
+  const result = runCommand("screenshot", [name]);
   return result.screenshot || `./test-output/screenshots/${name}`;
 }
 
@@ -269,7 +269,7 @@ function detectWalletConnectionNeeded() {
   return { needed: true, connected: false };
 }
 
-// Step 5: Try to click Connect Wallet button using selectors (more reliable than vision-click)
+// Step 5: Try to click Connect Wallet button using selectors
 function tryClickConnectButton() {
   console.log("[STEP 5] Trying to click Connect Wallet button using selectors...");
 
@@ -495,7 +495,7 @@ async function connectWalletWithRetry() {
       console.log("3. Approve connection in MetaMask wallet popup");
       console.log("4. If signature is required, approve it");
       console.log(
-        "\nUse click command with text selector first, fallback to vision-click if needed."
+        "\nUse click command with text/css/id selector."
       );
       console.log(
         "Screenshot saved to: ./test-output/screenshots/\n"
@@ -509,7 +509,7 @@ async function connectWalletWithRetry() {
         instructions: [
           'Try: click \'button:has-text("Connect Wallet")\'',
           'Try: click \'button:has-text("Connect")\'',
-          "If selectors fail, use vision-screenshot and vision-click",
+          "Take screenshot to analyze page if needed",
           "Use wallet-approve for MetaMask popup",
           "Run: node wallet-connect-flow.js --skip-setup --skip-import <url> to verify",
         ],

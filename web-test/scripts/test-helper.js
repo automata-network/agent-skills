@@ -80,17 +80,11 @@ Login Detection Commands:
   detect-login-required     Detect if login/auth is required (checks for modals, forms)
   wait-for-login            Wait for manual login (auto-switches to headed mode)
 
-Vision-Based Commands (AI Agent Visual Analysis):
-  vision-screenshot [name]  Take screenshot for AI to analyze
-  vision-click <x> <y>      Click at coordinates
-  vision-double-click <x> <y>  Double-click at coordinates
-  vision-type <text>        Type text at current cursor position
-  vision-press-key <key>    Press keyboard key (Enter, Tab, Escape, etc.)
-  vision-scroll <dir> [amt] Scroll page (dir: up/down/left/right, amt: pixels)
-  vision-hover <x> <y>      Move mouse to coordinates
-  vision-drag <x1> <y1> <x2> <y2>  Drag from one point to another
-  vision-wait-stable [ms]   Wait for page to stabilize, then screenshot
-  vision-get-page-info      Get page info and screenshot for AI analysis
+Utility Commands:
+  press-key <key>           Press keyboard key globally (Enter, Tab, Escape, etc.)
+  scroll <dir> [amount]     Scroll page (dir: up/down/left/right, amount: pixels)
+  wait-stable [ms]          Wait for page to stabilize (network idle)
+  get-page-info             Get page info and screenshot for AI analysis
 
 Browser Lifecycle Commands:
   browser-open              Open browser and keep it running

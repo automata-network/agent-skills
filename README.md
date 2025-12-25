@@ -283,8 +283,8 @@ test_cases:
     steps:
       - action: navigate
         url: /swap
-      - action: vision-click
-        target: Token input field
+      - action: click
+        selector: text=Token input field
     expected:
       - Swap completed successfully
 ```
@@ -483,8 +483,8 @@ test_cases:
     steps:
       - action: navigate
         url: /
-      - action: vision-click
-        target: Connect Wallet button
+      - action: click
+        selector: text=Connect Wallet
       - action: wallet-approve
     expected:
       - Wallet address displayed
@@ -545,7 +545,7 @@ These skills are called automatically by user-facing skills. Do not invoke direc
 | Skill                       | Key Responsibilities                                                                                          |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | **web-test-case-gen**       | Run research, generate YAML test cases, or add single test case interactively with browser exploration        |
-| **web-test**                | Load test cases, orchestrate full test flow, execute vision-based tests                                       |
+| **web-test**                | Load test cases, orchestrate full test flow, execute tests using selectors                                    |
 | **web-test-research**       | Read package.json, WebSearch dependencies, read code, start dev server, take UI screenshots, analyze features |
 | **web-test-cleanup**        | Kill Chromium/Chrome processes, stop dev servers, free ports (3000, 5173, 8080), remove test-output           |
 | **web-test-wallet-setup**   | Download MetaMask wallet, import private key, initialize and unlock wallet                                    |

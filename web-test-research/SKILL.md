@@ -169,15 +169,15 @@ Use the web-test skill's test-helper.js to capture UI:
 ```bash
 # Navigate to homepage and take screenshot
 node $SKILL_DIR/../web-test/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
-node $SKILL_DIR/../web-test/scripts/test-helper.js vision-screenshot research-home.jpg --headed --keep-open
+node $SKILL_DIR/../web-test/scripts/test-helper.js screenshot research-home.jpg --headed --keep-open
 
 # Navigate to other discovered routes and screenshot each
 node $SKILL_DIR/../web-test/scripts/test-helper.js navigate "http://localhost:3000/swap" --headed --keep-open
-node $SKILL_DIR/../web-test/scripts/test-helper.js vision-screenshot research-swap.jpg --headed --keep-open
+node $SKILL_DIR/../web-test/scripts/test-helper.js screenshot research-swap.jpg --headed --keep-open
 
 # Scroll down to see more content
-node $SKILL_DIR/../web-test/scripts/test-helper.js vision-scroll down 500 --headed --keep-open
-node $SKILL_DIR/../web-test/scripts/test-helper.js vision-screenshot research-scroll.jpg --headed --keep-open
+node $SKILL_DIR/../web-test/scripts/test-helper.js scroll down 500 --headed --keep-open
+node $SKILL_DIR/../web-test/scripts/test-helper.js screenshot research-scroll.jpg --headed --keep-open
 ```
 
 ### 5.3 Discover Routes to Screenshot

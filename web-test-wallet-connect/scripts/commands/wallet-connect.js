@@ -387,7 +387,7 @@ const commands = {
   },
 
   /**
-   * Start listening for popup before clicking (call this before vision-click on Connect button)
+   * Start listening for popup before clicking (call this before dapp-click on Connect button)
    */
   async 'wallet-listen'(args, options) {
     const context = getContext();
@@ -669,8 +669,8 @@ const commands = {
     }
   },
 
-  // Vision commands for AI-guided interaction
-  async 'vision-screenshot'(args, options) {
+  // Screenshot command for AI-guided interaction
+  async 'screenshot'(args, options) {
     await ensureBrowser(options);
     const page = getPage();
 
@@ -799,7 +799,7 @@ const commands = {
         }
       }
 
-      // Strategy 3: Fallback to coordinates (vision-click)
+      // Strategy 3: Fallback to coordinates
       if (!clicked && !isNaN(fallbackX) && !isNaN(fallbackY)) {
         console.log(JSON.stringify({ status: 'info', message: `Selector not found, falling back to coordinates (${fallbackX}, ${fallbackY})` }));
         await page.mouse.click(fallbackX, fallbackY);
@@ -832,91 +832,6 @@ const commands = {
       console.log(JSON.stringify({
         success: false,
         error: `Failed to click: ${error.message}`
-      }));
-    }
-  },
-
-  async 'vision-click'(args, options) {
-    await ensureBrowser(options);
-    const page = getPage();
-
-    if (!page) {
-      console.log(JSON.stringify({
-        success: false,
-        error: 'No page open. Run wallet-navigate first.'
-      }));
-      return;
-    }
-
-    const x = parseInt(args[0]);
-    const y = parseInt(args[1]);
-
-    if (isNaN(x) || isNaN(y)) {
-      console.log(JSON.stringify({
-        success: false,
-        error: 'Invalid coordinates. Usage: vision-click <x> <y>'
-      }));
-      return;
-    }
-
-    // Start listening for popup before click (in case it triggers wallet)
-    startPopupListener();
-
-    try {
-      await page.mouse.click(x, y);
-      await page.waitForTimeout(500);
-
-      const screenshotPath = path.join(SCREENSHOTS_DIR, `after-click-${x}-${y}.jpg`);
-      await page.screenshot({ path: screenshotPath, type: 'jpeg', quality: 60 });
-
-      console.log(JSON.stringify({
-        success: true,
-        message: `Clicked at (${x}, ${y})`,
-        coordinates: { x, y },
-        screenshot: `after-click-${x}-${y}.jpg`,
-        hint: 'If this triggered a wallet popup, run wallet-approve next'
-      }));
-    } catch (error) {
-      console.log(JSON.stringify({
-        success: false,
-        error: `Failed to click: ${error.message}`
-      }));
-    }
-  },
-
-  async 'vision-type'(args, options) {
-    await ensureBrowser(options);
-    const page = getPage();
-
-    if (!page) {
-      console.log(JSON.stringify({
-        success: false,
-        error: 'No page open. Run wallet-navigate first.'
-      }));
-      return;
-    }
-
-    const text = args.join(' ');
-    if (!text) {
-      console.log(JSON.stringify({
-        success: false,
-        error: 'No text provided. Usage: vision-type <text>'
-      }));
-      return;
-    }
-
-    try {
-      await page.keyboard.type(text);
-      await page.waitForTimeout(300);
-
-      console.log(JSON.stringify({
-        success: true,
-        message: `Typed: "${text}"`
-      }));
-    } catch (error) {
-      console.log(JSON.stringify({
-        success: false,
-        error: `Failed to type: ${error.message}`
       }));
     }
   },

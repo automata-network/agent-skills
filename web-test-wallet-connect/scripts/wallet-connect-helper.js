@@ -7,8 +7,8 @@
  *   wallet-approve           - Approve wallet popup (connect/sign/confirm)
  *   wallet-switch-network    - Switch to specified network
  *   wallet-get-address       - Get current wallet address
- *   vision-screenshot        - Take screenshot for AI analysis
- *   vision-click             - Click at coordinates
+ *   screenshot        - Take screenshot for AI analysis
+ *   dapp-click <selector>    - Click using text/css/id selector (preferred)
  *
  * Usage:
  *   node wallet-connect-helper.js wallet-navigate "http://localhost:3000" --wallet --headed --keep-open
@@ -31,10 +31,8 @@ Commands:
   wallet-approve            Approve wallet popup (connect/sign/confirm)
   wallet-switch-network <n> Switch network (ethereum, polygon, arbitrum, etc.)
   wallet-get-address        Get current wallet address
-  dapp-click <selector>     Click using text/css selector (preferred over vision-click)
-  vision-screenshot [name]  Take screenshot for AI analysis
-  vision-click <x> <y>      Click at coordinates (fallback method)
-  vision-type <text>        Type text at cursor
+  dapp-click <selector>     Click using text/css/id selector (preferred)
+  screenshot [name]  Take screenshot for AI analysis
   wait <ms>                 Wait milliseconds
 
 Options:

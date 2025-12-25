@@ -173,7 +173,7 @@ wait_times:
 ║  WHEN TO MODIFY a test case during execution:                  ║
 ║                                                                ║
 ║  1. Step targets incorrect element                             ║
-║     - vision-click target description doesn't match UI         ║
+║     - click target selector doesn't match UI                   ║
 ║     - Selector points to wrong or non-existent element         ║
 ║                                                                ║
 ║  2. Steps are missing or in wrong order                        ║
@@ -214,7 +214,7 @@ wait_times:
 During TEST: SWAP-001
 
 Problem detected:
-  Step 3: vision-click "Swap Now button"
+  Step 3: click "Swap Now"
   Error: Button text is actually "Execute Swap" not "Swap Now"
 
 Action taken:
@@ -603,10 +603,10 @@ test_cases:
     steps: # Actions to execute
       - action: navigate
         url: /
-      - action: vision-screenshot
+      - action: screenshot
         name: before-connect
-      - action: vision-click
-        target: Connect Wallet button
+      - action: click
+        selector: text=Connect Wallet
       - action: wallet-approve
     expected: # What to verify after steps
       - Wallet address displayed in header
@@ -711,9 +711,9 @@ For each test ID in `execution_order` (SEQUENTIALLY, ONE AT A TIME):
 | ------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `set-viewport`      | `width`, `height`, `isMobile`   | `node $SKILL_DIR/scripts/test-helper.js set-viewport [width] [height] --mobile --headed --keep-open` |
 | `navigate`          | `url`                           | `node $SKILL_DIR/scripts/test-helper.js navigate [project.url + step.url] --headed --keep-open` |
-| `vision-screenshot` | `name`                          | `node $SKILL_DIR/scripts/test-helper.js vision-screenshot [step.name].jpg --headed --keep-open` |
-| `vision-click`      | `target`                        | 1. Take screenshot 2. AI analyzes to find `step.target` coordinates 3. `vision-click x y`       |
-| `vision-type`       | `target`, `value`               | 1. Click on target field 2. `node ... vision-type "[step.value]" --headed --keep-open`          |
+| `screenshot` | `name`                          | `node $SKILL_DIR/scripts/test-helper.js screenshot [step.name].jpg --headed --keep-open` |
+| `click`             | `selector`                      | `node $SKILL_DIR/scripts/test-helper.js click "[step.selector]" --headed --keep-open`           |
+| `fill`              | `selector`, `value`             | `node $SKILL_DIR/scripts/test-helper.js fill "[step.selector]" "[step.value]" --headed --keep-open` |
 | `wait`              | `ms`, `reason`                  | `node $SKILL_DIR/scripts/test-helper.js wait [step.ms] --headed --keep-open`                    |
 | `wallet-approve`    | `note`                          | Use `skill web-test-wallet-sign` with approve action                                            |
 | `wallet-reject`     | `note`                          | Use `skill web-test-wallet-sign` with reject action                                             |
@@ -728,7 +728,7 @@ After executing all steps, verify each item in `test.expected`:
 
 ### Automatic Wallet Sign Detection
 
-After each `click` or `vision-click` action in wallet mode, the system automatically detects MetaMask popups and handles them. Use the `walletAction` field to control the behavior:
+After each `click` action in wallet mode, the system automatically detects MetaMask popups and handles them. Use the `walletAction` field to control the behavior:
 
 | walletAction        | Behavior                                                       |
 | ------------------- | -------------------------------------------------------------- |
@@ -804,22 +804,23 @@ SKILL_DIR="/Users/duxiaofeng/code/agent-skills/web-test"
 node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
 
 # Take screenshot for AI analysis
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot before-test --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot before-test --headed --keep-open
 
-# Click at coordinates (after AI analyzes screenshot)
-node $SKILL_DIR/scripts/test-helper.js vision-click 500 300 --headed --keep-open
+# Click element using selector (text, css, or id)
+node $SKILL_DIR/scripts/test-helper.js click "text=Submit" --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js click "#submit-btn" --headed --keep-open
 
-# Type text
-node $SKILL_DIR/scripts/test-helper.js vision-type "Hello World" --headed --keep-open
+# Fill input field
+node $SKILL_DIR/scripts/test-helper.js fill "#email" "test@example.com" --headed --keep-open
 
 # Press key
-node $SKILL_DIR/scripts/test-helper.js vision-press-key Enter --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js press-key Enter --headed --keep-open
 
 # Wait for milliseconds
 node $SKILL_DIR/scripts/test-helper.js wait 2000 --headed --keep-open
 
 # Scroll page
-node $SKILL_DIR/scripts/test-helper.js vision-scroll down 500 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js scroll down 500 --headed --keep-open
 
 # Set mobile viewport
 node $SKILL_DIR/scripts/test-helper.js set-viewport 375 667 --mobile --headed --keep-open
@@ -920,54 +921,36 @@ node $SKILL_DIR/scripts/test-helper.js text "#balance" --headed --keep-open
 
 ---
 
-#### Vision Commands (Coordinate-based, for AI Agent)
+#### Utility Commands
 
 | Command | Args | Description |
 |---------|------|-------------|
-| `vision-screenshot` | `[name]` | Take screenshot for AI to analyze |
-| `vision-click` | `<x> <y>` | Click at coordinates |
-| `vision-double-click` | `<x> <y>` | Double-click at coordinates |
-| `vision-type` | `<text>` | Type text at current cursor position |
-| `vision-press-key` | `<key>` | Press keyboard key (Enter, Tab, Escape, etc.) |
-| `vision-scroll` | `<dir> [amount]` | Scroll page (dir: up/down/left/right) |
-| `vision-hover` | `<x> <y>` | Move mouse to coordinates |
-| `vision-drag` | `<x1> <y1> <x2> <y2>` | Drag from one point to another |
-| `vision-wait-stable` | `[ms]` | Wait for page to stabilize, then screenshot |
-| `vision-get-page-info` | - | Get page info and screenshot for AI analysis |
+| `screenshot` | `[name]` | Take screenshot |
+| `press-key` | `<key>` | Press keyboard key globally (Enter, Tab, Escape, etc.) |
+| `scroll` | `<dir> [amount]` | Scroll page (dir: up/down/left/right) |
+| `wait-stable` | `[ms]` | Wait for page to stabilize (network idle) |
+| `get-page-info` | - | Get page info and screenshot |
+
+**NOTE:** Use `click`, `fill`, `hover` commands with text/css/id selectors for element interactions.
 
 ```bash
-# Take screenshot for AI analysis
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot before-click --headed --keep-open
-
-# Click at coordinates (AI determines from screenshot)
-node $SKILL_DIR/scripts/test-helper.js vision-click 500 300 --headed --keep-open
-
-# Double-click at coordinates
-node $SKILL_DIR/scripts/test-helper.js vision-double-click 500 300 --headed --keep-open
-
-# Type text at current cursor
-node $SKILL_DIR/scripts/test-helper.js vision-type "Hello World" --headed --keep-open
+# Take screenshot
+node $SKILL_DIR/scripts/test-helper.js screenshot before-click --headed --keep-open
 
 # Press keyboard key
-node $SKILL_DIR/scripts/test-helper.js vision-press-key Enter --headed --keep-open
-node $SKILL_DIR/scripts/test-helper.js vision-press-key Tab --headed --keep-open
-node $SKILL_DIR/scripts/test-helper.js vision-press-key Escape --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js press-key Enter --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js press-key Tab --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js press-key Escape --headed --keep-open
 
 # Scroll page
-node $SKILL_DIR/scripts/test-helper.js vision-scroll down 500 --headed --keep-open
-node $SKILL_DIR/scripts/test-helper.js vision-scroll up 300 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js scroll down 500 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js scroll up 300 --headed --keep-open
 
-# Hover at coordinates
-node $SKILL_DIR/scripts/test-helper.js vision-hover 400 200 --headed --keep-open
-
-# Drag from point to point
-node $SKILL_DIR/scripts/test-helper.js vision-drag 100 100 300 300 --headed --keep-open
-
-# Wait for page stability then screenshot
-node $SKILL_DIR/scripts/test-helper.js vision-wait-stable 5000 --headed --keep-open
+# Wait for page stability
+node $SKILL_DIR/scripts/test-helper.js wait-stable 5000 --headed --keep-open
 
 # Get full page info for AI
-node $SKILL_DIR/scripts/test-helper.js vision-get-page-info --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js get-page-info --headed --keep-open
 ```
 
 ---
@@ -1101,13 +1084,11 @@ execution_order:
    └──────────────────────────────────────────────────────────────┘
    ├─ [This test uses web-test-wallet-connect skill]
    ├─ navigate /
-   ├─ vision-screenshot before-connect.jpg
-   ├─ [AI analyzes screenshot, finds Connect button at 850, 45]
-   ├─ vision-click 850 45
-   ├─ [AI analyzes screenshot, finds MetaMask option at 400, 300]
-   ├─ vision-click 400 300
+   ├─ screenshot before-connect.jpg
+   ├─ click "text=Connect Wallet"
+   ├─ click "text=MetaMask"
    ├─ wallet-approve
-   ├─ vision-screenshot after-connect.jpg
+   ├─ screenshot after-connect.jpg
    └─ ✅ PASS - Wallet address displayed
 
    ⏳ WAITING for WALLET-001 to complete before next test...
@@ -1195,6 +1176,6 @@ When a test fails or times out:
 ## Notes
 
 - Test cases are read from `./tests/` in the project being tested
-- Always use `--headed --keep-open` for vision-based testing
-- AI analyzes screenshots to determine click coordinates
+- Always use `--headed --keep-open` for interactive testing
+- Use text/css/id selectors for stable element interactions
 - For Web3 testing, wallet skills handle all wallet interactions

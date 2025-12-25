@@ -213,7 +213,7 @@ SKILL_DIR="<path-to-web-test-skill>"
 node $SKILL_DIR/scripts/test-helper.js navigate [project-url] --headed --keep-open
 
 # Take screenshot for analysis
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot explore-feature.jpg --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot explore-feature.jpg --headed --keep-open
 
 # Use Read tool to view screenshot and identify elements
 ```
@@ -241,15 +241,15 @@ Create test case based on exploration:
   steps:
     - action: navigate
       url: /rewards
-    - action: vision-screenshot
+    - action: screenshot
       name: before-claim
-    - action: vision-click
-      target: Claim Rewards button
+    - action: click
+      selector: Claim Rewards button
     - action: wallet-approve
     - action: wait
       ms: 3000
       reason: Wait for transaction confirmation
-    - action: vision-screenshot
+    - action: screenshot
       name: after-claim
   expected:
     - Success message displayed
@@ -499,14 +499,14 @@ test_cases:
     steps:
       - action: navigate
         url: /
-      - action: vision-screenshot
+      - action: screenshot
         name: before-connect
-      - action: vision-click
-        target: Connect Wallet button
-      - action: vision-click
-        target: MetaMask option in modal
+      - action: click
+        selector: Connect Wallet button
+      - action: click
+        selector: MetaMask option in modal
       - action: wallet-approve
-      - action: vision-screenshot
+      - action: screenshot
         name: after-connect
     expected:
       - Wallet address displayed in header
@@ -538,29 +538,29 @@ test_cases:
     steps:
       - action: navigate
         url: /swap
-      - action: vision-click
-        target: source token dropdown
-      - action: vision-click
-        target: ETH option
-      - action: vision-type
-        target: amount input
+      - action: click
+        selector: source token dropdown
+      - action: click
+        selector: ETH option
+      - action: fill
+        selector: amount input
         value: "0.1"
-      - action: vision-click
-        target: destination token dropdown
-      - action: vision-click
-        target: USDC option
+      - action: click
+        selector: destination token dropdown
+      - action: click
+        selector: USDC option
       - action: wait
         ms: 2000
         reason: Wait for quote
-      - action: vision-screenshot
+      - action: screenshot
         name: before-swap
-      - action: vision-click
-        target: Swap button
+      - action: click
+        selector: Swap button
       - action: wallet-approve
       - action: wait
         ms: 3000
         reason: Wait for transaction
-      - action: vision-screenshot
+      - action: screenshot
         name: after-swap
     expected:
       - Success message displayed
@@ -589,22 +589,22 @@ test_cases:
     steps:
       - action: navigate
         url: /swap
-      - action: vision-click
-        target: source token dropdown
-      - action: vision-click
-        target: USDC option
-      - action: vision-type
-        target: amount input
+      - action: click
+        selector: source token dropdown
+      - action: click
+        selector: USDC option
+      - action: fill
+        selector: amount input
         value: "10"
-      - action: vision-click
-        target: destination token dropdown
-      - action: vision-click
-        target: ETH option
+      - action: click
+        selector: destination token dropdown
+      - action: click
+        selector: ETH option
       - action: wait
         ms: 2000
         reason: Wait for quote
-      - action: vision-click
-        target: Swap button
+      - action: click
+        selector: Swap button
       - action: wallet-approve
         note: Token approval popup
       - action: wallet-approve
@@ -612,7 +612,7 @@ test_cases:
       - action: wait
         ms: 3000
         reason: Wait for transaction
-      - action: vision-screenshot
+      - action: screenshot
         name: swap-complete
     expected:
       - Two wallet popups handled
@@ -639,10 +639,10 @@ test_cases:
     steps:
       - action: navigate
         url: /swap
-      - action: vision-type
-        target: amount input
+      - action: fill
+        selector: amount input
         value: "999999"
-      - action: vision-screenshot
+      - action: screenshot
         name: insufficient-balance
     expected:
       - Error message shown
@@ -675,7 +675,7 @@ test_cases:
     steps:
       - action: navigate
         url: /
-      - action: vision-screenshot
+      - action: screenshot
         name: disconnected-state
     expected:
       - Connect button visible with text "Connect" or "Connect Wallet" or "连接钱包"
@@ -703,10 +703,10 @@ test_cases:
     steps:
       - action: navigate
         url: /swap
-      - action: vision-screenshot
+      - action: screenshot
         name: swap-disconnected
-      - action: vision-click
-        target: Swap button (if visible)
+      - action: click
+        selector: Swap button (if visible)
     expected:
       - Swap button disabled OR shows "Connect Wallet" text
       - Error message or prompt to connect wallet
@@ -735,14 +735,14 @@ test_cases:
     steps:
       - action: navigate
         url: /swap
-      - action: vision-type
-        target: amount input
+      - action: fill
+        selector: amount input
         value: "0.1"
-      - action: vision-click
-        target: Swap button
+      - action: click
+        selector: Swap button
       - action: wallet-reject
         note: User rejects transaction in wallet
-      - action: vision-screenshot
+      - action: screenshot
         name: swap-rejected
     expected:
       - Error message displayed (e.g., "Transaction rejected", "User denied", "取消交易")
@@ -769,12 +769,12 @@ test_cases:
     steps:
       - action: navigate
         url: /form-page
-      - action: vision-type
-        target: email input
+      - action: fill
+        selector: email input
         value: "invalid-email"
-      - action: vision-click
-        target: Submit button
-      - action: vision-screenshot
+      - action: click
+        selector: Submit button
+      - action: screenshot
         name: form-validation-error
     expected:
       - Inline error message visible (e.g., "Invalid email", "请输入有效邮箱")
@@ -804,7 +804,7 @@ test_cases:
       - action: mock-api-error
         endpoint: /api/data
         status: 500
-      - action: vision-screenshot
+      - action: screenshot
         name: api-error-state
     expected:
       - Error UI displayed (toast, alert, error message)
@@ -1208,7 +1208,7 @@ Next steps:
 ║         --headed --keep-open                                   ║
 ║                                                                ║
 ║    # Take screenshot of mobile UI                              ║
-║    node $SKILL_DIR/scripts/test-helper.js vision-screenshot \  ║
+║    node $SKILL_DIR/scripts/test-helper.js screenshot \  ║
 ║         mobile-home --headed --keep-open                       ║
 ║                                                                ║
 ║    # Analyze screenshot to identify:                           ║
@@ -1240,18 +1240,18 @@ node $SKILL_DIR/scripts/test-helper.js set-viewport 375 667 --mobile --headed --
 node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
 
 # 3. Take screenshot of mobile homepage
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot mobile-home --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot mobile-home --headed --keep-open
 
 # 4. Use Read tool to view screenshot and identify mobile UI elements
 # Look for: hamburger menu, mobile nav, bottom sheets, touch targets
 
 # 5. Navigate to other pages and screenshot
 node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000/swap" --headed --keep-open
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot mobile-swap --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot mobile-swap --headed --keep-open
 
 # 6. Test mobile interactions (click hamburger menu, etc.)
-node $SKILL_DIR/scripts/test-helper.js vision-click 30 30 --headed --keep-open  # Click hamburger
-node $SKILL_DIR/scripts/test-helper.js vision-screenshot mobile-nav-open --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js click "[aria-label='Menu']" --headed --keep-open  # Click hamburger
+node $SKILL_DIR/scripts/test-helper.js screenshot mobile-nav-open --headed --keep-open
 ```
 
 **⚠️ IMPORTANT: Generate accurate test cases based on actual mobile UI, NOT assumptions!**
@@ -1288,18 +1288,18 @@ node $SKILL_DIR/scripts/test-helper.js vision-screenshot mobile-nav-open --heade
       isMobile: true
     - action: navigate
       url: /
-    - action: vision-screenshot
+    - action: screenshot
       name: mobile-initial
-    - action: vision-click
-      target: hamburger menu icon (three horizontal lines)
+    - action: click
+      selector: hamburger menu icon (three horizontal lines)
     - action: wait
       ms: 500
       reason: Wait for menu animation
-    - action: vision-screenshot
+    - action: screenshot
       name: mobile-nav-open
-    - action: vision-click
-      target: close button or outside menu area
-    - action: vision-screenshot
+    - action: click
+      selector: close button or outside menu area
+    - action: screenshot
       name: mobile-nav-closed
   expected:
     - Desktop navigation hidden
@@ -1332,12 +1332,12 @@ node $SKILL_DIR/scripts/test-helper.js vision-screenshot mobile-nav-open --heade
       isMobile: true
     - action: navigate
       url: /
-    - action: vision-click
-      target: button that opens modal (e.g., Connect Wallet)
+    - action: click
+      selector: button that opens modal (e.g., Connect Wallet)
     - action: wait
       ms: 500
       reason: Wait for modal animation
-    - action: vision-screenshot
+    - action: screenshot
       name: mobile-modal-open
   expected:
     - Modal fills screen or shows as bottom sheet
@@ -1369,7 +1369,7 @@ node $SKILL_DIR/scripts/test-helper.js vision-screenshot mobile-nav-open --heade
       isMobile: true
     - action: navigate
       url: /
-    - action: vision-screenshot
+    - action: screenshot
       name: mobile-components
   expected:
     - Mobile-only components visible
@@ -1443,36 +1443,36 @@ Generate complete end-to-end tests for the main user journey:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-screenshot
+    - action: screenshot
       name: swap-initial
-    - action: vision-click
-      target: source token dropdown
-    - action: vision-screenshot
+    - action: click
+      selector: source token dropdown
+    - action: screenshot
       name: token-selector-open
-    - action: vision-click
-      target: ETH option
-    - action: vision-type
-      target: amount input
+    - action: click
+      selector: ETH option
+    - action: fill
+      selector: amount input
       value: "0.1"
     - action: wait
       ms: 1000
       reason: Wait for balance validation
-    - action: vision-click
-      target: destination token dropdown
-    - action: vision-click
-      target: USDC option
+    - action: click
+      selector: destination token dropdown
+    - action: click
+      selector: USDC option
     - action: wait
       ms: 2000
       reason: Wait for quote to load
-    - action: vision-screenshot
+    - action: screenshot
       name: quote-ready
-    - action: vision-click
-      target: Swap button
+    - action: click
+      selector: Swap button
     - action: wallet-approve
     - action: wait
       ms: 3000
       reason: Wait for transaction
-    - action: vision-screenshot
+    - action: screenshot
       name: swap-complete
   expected:
     - Token selector shows available tokens with balances
@@ -1502,7 +1502,7 @@ Generate tests for EVERY validation rule found in code:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-screenshot
+    - action: screenshot
       name: empty-amount-state
   expected:
     - Swap button disabled or shows "Enter an amount"
@@ -1524,13 +1524,13 @@ Generate tests for EVERY validation rule found in code:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-type
-      target: amount input
+    - action: fill
+      selector: amount input
       value: "999999999"
     - action: wait
       ms: 1000
       reason: Wait for validation
-    - action: vision-screenshot
+    - action: screenshot
       name: insufficient-balance-error
   expected:
     - Error message "Insufficient balance" or similar
@@ -1552,10 +1552,10 @@ Generate tests for EVERY validation rule found in code:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-type
-      target: amount input
+    - action: fill
+      selector: amount input
       value: "abc"
-    - action: vision-screenshot
+    - action: screenshot
       name: invalid-input-state
   expected:
     - Input rejected or shows error
@@ -1582,19 +1582,19 @@ Generate tests for each error scenario:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-type
-      target: amount input
+    - action: fill
+      selector: amount input
       value: "0.01"
     - action: wait
       ms: 2000
       reason: Wait for quote
-    - action: vision-click
-      target: Swap button
+    - action: click
+      selector: Swap button
     - action: wallet-reject
     - action: wait
       ms: 1000
       reason: Wait for error handling
-    - action: vision-screenshot
+    - action: screenshot
       name: rejection-handled
   expected:
     - Error message displayed (e.g., "Transaction rejected")
@@ -1619,13 +1619,13 @@ Generate tests for each error scenario:
       url: /swap
     - action: mock-network-error
       trigger: quote-fetch
-    - action: vision-type
-      target: amount input
+    - action: fill
+      selector: amount input
       value: "0.1"
     - action: wait
       ms: 3000
       reason: Wait for error state
-    - action: vision-screenshot
+    - action: screenshot
       name: quote-error-state
   expected:
     - Error message shown (not raw error)
@@ -1653,12 +1653,12 @@ Generate tests for boundary conditions and unusual scenarios:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-click
-      target: MAX button or balance display
+    - action: click
+      selector: MAX button or balance display
     - action: wait
       ms: 1000
       reason: Wait for amount to populate
-    - action: vision-screenshot
+    - action: screenshot
       name: max-amount-set
   expected:
     - Max amount correctly filled
@@ -1680,15 +1680,15 @@ Generate tests for boundary conditions and unusual scenarios:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-click
-      target: source token dropdown
-    - action: vision-click
-      target: ETH option
-    - action: vision-click
-      target: destination token dropdown
-    - action: vision-click
-      target: ETH option
-    - action: vision-screenshot
+    - action: click
+      selector: source token dropdown
+    - action: click
+      selector: ETH option
+    - action: click
+      selector: destination token dropdown
+    - action: click
+      selector: ETH option
+    - action: screenshot
       name: same-token-state
   expected:
     - Token automatically switched OR
@@ -1710,14 +1710,14 @@ Generate tests for boundary conditions and unusual scenarios:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-click
-      target: destination token dropdown
-    - action: vision-click
-      target: USDC option (6 decimals)
-    - action: vision-type
-      target: amount input
+    - action: click
+      selector: destination token dropdown
+    - action: click
+      selector: USDC option (6 decimals)
+    - action: fill
+      selector: amount input
       value: "0.0000001"
-    - action: vision-screenshot
+    - action: screenshot
       name: decimal-precision
   expected:
     - Input rounded or truncated appropriately
@@ -1745,21 +1745,21 @@ Generate tests to verify state changes:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-type
-      target: amount input
+    - action: fill
+      selector: amount input
       value: "0.1"
     - action: wait
       ms: 2000
       reason: Wait for initial quote
-    - action: vision-screenshot
+    - action: screenshot
       name: quote-v1
-    - action: vision-type
-      target: amount input
+    - action: fill
+      selector: amount input
       value: "0.5"
     - action: wait
       ms: 2000
       reason: Wait for updated quote
-    - action: vision-screenshot
+    - action: screenshot
       name: quote-v2
   expected:
     - Quote changes when amount changes
@@ -1781,14 +1781,14 @@ Generate tests to verify state changes:
   steps:
     - action: navigate
       url: /swap
-    - action: vision-type
-      target: amount input
+    - action: fill
+      selector: amount input
       value: "0.1"
     - action: wait
       ms: 2000
       reason: Wait for quote
     - action: wallet-disconnect
-    - action: vision-screenshot
+    - action: screenshot
       name: disconnected-state
   expected:
     - Connect wallet button appears
@@ -2064,7 +2064,7 @@ The agent MUST analyze the project during web-test-research and determine:
 - action: wait
   ms: 3000
   reason: Wait for transaction
-- action: vision-screenshot
+- action: screenshot
   name: verify-result
 # AI verifies expected result in screenshot
 ```
@@ -2074,9 +2074,9 @@ The agent MUST analyze the project during web-test-research and determine:
 | Action | Parameters | Description | Timeout |
 |--------|------------|-------------|---------|
 | `navigate` | `url` | Go to URL | 30s max |
-| `vision-screenshot` | `name` | Take screenshot | 10s max |
-| `vision-click` | `target` | Click on element (AI determines coordinates) | 30s max |
-| `vision-type` | `target`, `value` | Type text | 10s max |
+| `screenshot` | `name` | Take screenshot | 10s max |
+| `click` | `selector` | Click on element using text/css/id selector | 30s max |
+| `fill` | `selector`, `value` | Type text into input field | 10s max |
 | `wait` | `ms`, `reason` | Wait for condition | 5s max recommended |
 | `wallet-approve` | `note` | Handle wallet popup (approve) | 30s max |
 | `wallet-reject` | `note` | Reject wallet popup (for negative tests) | 30s max |

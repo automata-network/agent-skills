@@ -13,27 +13,24 @@ allowed-tools: Bash Read
 
 Connect MetaMask wallet to a Web3 DApp.
 
-## CRITICAL RULE - USE dapp-click, NOT vision-click
+## CRITICAL RULE - USE dapp-click WITH SELECTORS
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │  ALWAYS USE dapp-click COMMAND FOR CLICKING BUTTONS!               │
 │                                                                    │
-│  ✅ CORRECT (Primary Method):                                      │
+│  ✅ CORRECT (Use text/css/id selectors):                           │
 │     dapp-click "Connect Wallet" --wallet --headed --keep-open      │
 │     dapp-click "MetaMask" --wallet --headed --keep-open            │
 │     dapp-click --css "button[data-testid='connect']"               │
+│     dapp-click --id "connect-btn" --wallet --headed --keep-open    │
 │                                                                    │
-│  ❌ WRONG (Do NOT use directly):                                   │
-│     vision-click 900 50 --wallet --headed --keep-open              │
-│                                                                    │
-│  dapp-click uses text/CSS selectors which are MORE RELIABLE        │
-│  than coordinate-based clicking. It will:                          │
+│  dapp-click uses text/CSS/ID selectors which are RELIABLE.         │
+│  It will:                                                          │
 │  1. Try text selector first (e.g., "Connect Wallet")               │
 │  2. Try CSS selector (e.g., "button.connect-btn")                  │
-│  3. Fall back to coordinates ONLY if selectors fail                │
+│  3. Try ID selector (e.g., "#connect-btn")                         │
 │                                                                    │
-│  Use vision-click ONLY as fallback with --fallback-x/--fallback-y  │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -77,7 +74,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js dapp-click "MetaMask" --wallet 
 node $SKILL_DIR/scripts/wallet-connect-helper.js wallet-approve --wallet --headed --keep-open
 
 # Verify connection
-node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot after-connect.jpg --wallet --headed --keep-open
+node $SKILL_DIR/scripts/wallet-connect-helper.js screenshot after-connect.jpg --wallet --headed --keep-open
 ```
 
 ## Instructions
@@ -134,7 +131,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js dapp-click --css ".connect-butt
 **ONLY as last resort - use coordinates with fallback:**
 ```bash
 # Take screenshot first to find coordinates
-node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot before-connect.jpg --wallet --headed --keep-open
+node $SKILL_DIR/scripts/wallet-connect-helper.js screenshot before-connect.jpg --wallet --headed --keep-open
 
 # Then use dapp-click with fallback coordinates
 node $SKILL_DIR/scripts/wallet-connect-helper.js dapp-click "Connect Wallet" --fallback-x 900 --fallback-y 50 --wallet --headed --keep-open
@@ -168,7 +165,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js dapp-click "MetaMask" --wallet 
 **If text selector fails, use fallback coordinates:**
 ```bash
 # Take screenshot to find coordinates
-node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot wallet-modal.jpg --wallet --headed --keep-open
+node $SKILL_DIR/scripts/wallet-connect-helper.js screenshot wallet-modal.jpg --wallet --headed --keep-open
 
 # Use dapp-click with fallback
 node $SKILL_DIR/scripts/wallet-connect-helper.js dapp-click "MetaMask" --fallback-x 400 --fallback-y 300 --wallet --headed --keep-open
@@ -195,7 +192,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js wallet-approve --wallet --heade
 SKILL_DIR="<path-to-this-skill>"
 
 # Take screenshot to verify wallet is connected
-node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot after-connect.jpg --wallet --headed --keep-open
+node $SKILL_DIR/scripts/wallet-connect-helper.js screenshot after-connect.jpg --wallet --headed --keep-open
 ```
 
 **Verification Criteria:**
@@ -237,7 +234,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js dapp-click "MetaMask" --wallet 
 node $SKILL_DIR/scripts/wallet-connect-helper.js wallet-approve --wallet --headed --keep-open
 
 # 5. Verify connection
-node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot connected.jpg --wallet --headed --keep-open
+node $SKILL_DIR/scripts/wallet-connect-helper.js screenshot connected.jpg --wallet --headed --keep-open
 # AI verifies: "Wallet address 0x1234...abcd visible - SUCCESS"
 ```
 
@@ -245,7 +242,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot connected.jpg
 
 ```bash
 # If dapp-click "Connect Wallet" fails, use fallback coordinates:
-node $SKILL_DIR/scripts/wallet-connect-helper.js vision-screenshot find-button.jpg --wallet --headed --keep-open
+node $SKILL_DIR/scripts/wallet-connect-helper.js screenshot find-button.jpg --wallet --headed --keep-open
 # AI analyzes screenshot: "Connect button at x=900, y=50"
 
 node $SKILL_DIR/scripts/wallet-connect-helper.js dapp-click "Connect Wallet" --fallback-x 900 --fallback-y 50 --wallet --headed --keep-open
@@ -269,9 +266,7 @@ node $SKILL_DIR/scripts/wallet-connect-helper.js dapp-click "Connect Wallet" --f
 |---------|-------------|
 | `wallet-switch-network <name>` | Switch network |
 | `wallet-get-address` | Get connected address |
-| `vision-screenshot [name]` | Take screenshot for AI analysis |
-| `vision-click <x> <y>` | Click at coordinates (USE ONLY as last resort) |
-| `vision-type <text>` | Type text |
+| `screenshot [name]` | Take screenshot for AI analysis |
 | `wait <ms>` | Wait milliseconds |
 
 ### dapp-click Examples
