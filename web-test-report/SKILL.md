@@ -32,10 +32,12 @@ Generate a clear, visually scannable test report.
 ```markdown
 # Test Report
 
-📅 **Date:** 2024-01-15 14:30
+📅 **Executed:** 2024-01-15 14:30:25
+⏱️ **Duration:** 8m 32s
 🌐 **Project:** [Project Name]
 🔗 **URL:** http://localhost:3000
 🔗 **Is Web3:** Yes / No
+📄 **Report File:** test-report-20240115-143025.md
 
 ---
 
@@ -184,10 +186,12 @@ Generate a clear, visually scannable test report.
 ```markdown
 # Test Report
 
-📅 **Date:** 2024-01-15 14:30
+📅 **Executed:** 2024-01-15 14:30:25
+⏱️ **Duration:** 12m 45s
 🌐 **Project:** MyShop
 🔗 **URL:** http://localhost:3000
 🔗 **Is Web3:** No
+📄 **Report File:** test-report-20240115-143025.md
 
 ---
 
@@ -283,13 +287,16 @@ Payment API not responding.
 
 ## Instructions
 
-1. **Read test cases** - Load test case IDs from `./tests/test-cases.yaml`
-2. **Collect results** - Match results to test case IDs
-3. **Use symbols** - ✅ ❌ ⏭️ for every test status
-4. **Create table** - Summary table with counts
-5. **Detail failures** - Each failed test with screenshots and steps
-6. **List issues** - With severity indicators
-7. **Add recommendations** - Prioritized action items
+1. **Generate timestamped filename** - Use `test-report-$(date +%Y%m%d-%H%M%S).md`
+2. **Record execution time** - Include start time and duration in header
+3. **Read test cases** - Load test case IDs from `./tests/test-cases.yaml`
+4. **Collect results** - Match results to test case IDs
+5. **Use symbols** - ✅ ❌ ⏭️ for every test status
+6. **Create table** - Summary table with counts
+7. **Detail failures** - Each failed test with screenshots and steps
+8. **List issues** - With severity indicators
+9. **Add recommendations** - Prioritized action items
+10. **Report file location** - Tell user where the report was saved
 
 ## Input
 
@@ -299,7 +306,32 @@ Read test case definitions from:
 
 ## Output
 
-Save to: `./test-output/test-report.md`
+**File naming with timestamp (IMPORTANT):**
+
+Each test run generates a NEW report file with timestamp to preserve history:
+
+```
+./test-output/test-report-YYYYMMDD-HHMMSS.md
+```
+
+**Example:**
+```
+./test-output/test-report-20241215-143025.md
+./test-output/test-report-20241215-160512.md
+./test-output/test-report-20241216-091030.md
+```
+
+**Generate filename:**
+```bash
+REPORT_FILE="./test-output/test-report-$(date +%Y%m%d-%H%M%S).md"
+echo "Report will be saved to: $REPORT_FILE"
+```
+
+**Why timestamped files:**
+- Preserves test history across multiple runs
+- User can compare results between runs
+- Avoids overwriting previous test results
+- Allows tracking of test improvements over time
 
 ## Related Skills
 

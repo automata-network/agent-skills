@@ -151,7 +151,7 @@ All test artifacts are saved to `./test-output/` in the current working director
 |------|-------------|
 | `screenshots/` | All captured screenshots |
 | `test-plan.md` | Generated test plan |
-| `test-results.md` | Final test report |
+| `test-report-YYYYMMDD-HHMMSS.md` | Final test report (timestamped, new file each run) |
 | `console-logs.txt` | Browser console output |
 | `elements.json` | Interactive elements discovered |
 | `page-content.html` | Page HTML content |

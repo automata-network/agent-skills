@@ -779,7 +779,7 @@ All test artifacts in project directory:
     ├── screenshots/      # Test screenshots
     ├── chrome-profile/   # Browser state
     ├── console-logs.txt  # Browser console
-    └── test-report.md    # Generated report
+    └── test-report-YYYYMMDD-HHMMSS.md  # Timestamped report (new file each run)
 ```
 
 ## Related Skills

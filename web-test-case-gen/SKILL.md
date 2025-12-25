@@ -22,11 +22,39 @@ Generate persistent test cases that can be committed to version control for repe
 4. **Ready for git commit** - Test cases persist across sessions
 
 ### Add Single Test Case Mode (Interactive)
+
+**IMPORTANT: Must execute FULL workflow - DO NOT skip any steps!**
+
 1. **Parse user description** - Extract feature, actions, expected outcomes
-2. **Read source code** - Search codebase for related components
-3. **Explore in browser** - Launch browser, navigate, take screenshots
+2. **Read source code** - Search codebase for related components (Grep/Glob)
+3. **Explore in browser** - Launch browser, navigate, take screenshots (REQUIRED)
 4. **Generate test case** - Create YAML based on code + visual analysis
-5. **Append to existing** - Add to test-cases.yaml and update execution_order
+5. **Append to existing** - Add to test-cases.yaml, case-summary.md, README.md, and config.yaml
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  ⚠️  MANDATORY STEPS - NEVER SKIP                              ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Step 2 (Read source code):                                    ║
+║  - Use Grep to find related components/functions               ║
+║  - Read the actual implementation code                         ║
+║  - Understand how the feature works                            ║
+║                                                                ║
+║  Step 3 (Explore in browser):                                  ║
+║  - Launch browser with --headed --keep-open                    ║
+║  - Navigate to the feature page                                ║
+║  - Take screenshots to see actual UI elements                  ║
+║  - Identify button text, input fields, layout                  ║
+║                                                                ║
+║  ❌ DO NOT generate test cases without:                        ║
+║     - Reading the source code                                  ║
+║     - Taking browser screenshots                               ║
+║                                                                ║
+║  Test cases generated without exploration are INACCURATE!      ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
 
 ## Quick Start
 
@@ -83,6 +111,8 @@ Add a test case for: user can stake tokens and see updated balance
 
 When user provides a specific test case description, follow this workflow:
 
+**⚠️ ALL STEPS ARE MANDATORY - Especially Step 3 (code) and Step 4 (browser)!**
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  web-test-case-gen (Add Single Test Case)                       │
@@ -98,13 +128,13 @@ When user provides a specific test case description, follow this workflow:
 │          ├─ NO  → Run web-test-research first                   │
 │          └─ YES → Read existing config                          │
 │          ↓                                                      │
-│  Step 3: Read related source code                               │
+│  Step 3: Read related source code ⚠️ REQUIRED                   │
 │          ↓                                                      │
 │          - Search for feature in codebase (Grep/Glob)           │
 │          - Read relevant component/function code                │
 │          - Understand the implementation                        │
 │          ↓                                                      │
-│  Step 4: Launch browser and explore feature                     │
+│  Step 4: Launch browser and explore feature ⚠️ REQUIRED         │
 │          ↓                                                      │
 │          - Use skill web-test-cleanup                           │
 │          - If Web3 DApp, use skill web-test-wallet-setup        │
@@ -118,9 +148,11 @@ When user provides a specific test case description, follow this workflow:
 │          - Define steps based on exploration                    │
 │          - Add expected outcomes                                │
 │          ↓                                                      │
-│  Step 6: Append to test-cases.yaml                              │
+│  Step 6: Update all test files                                  │
 │          ↓                                                      │
-│          - Add test case to existing file                       │
+│          - Append test case to test-cases.yaml                  │
+│          - Append test case to case-summary.md                  │
+│          - Update test table in README.md                       │
 │          - Update execution_order in config.yaml                │
 │          ↓                                                      │
 │  Step 7: Cleanup browser                                        │
@@ -223,9 +255,11 @@ Create test case based on exploration:
     - Rewards balance updated
 ```
 
-#### Step 6: Append to Existing Files
+#### Step 6: Update All Test Files
 
-Read current test-cases.yaml:
+**Must update ALL four files:**
+
+1. **Read and append to test-cases.yaml:**
 ```bash
 cat ./tests/test-cases.yaml
 ```
@@ -240,7 +274,53 @@ cat >> ./tests/test-cases.yaml << 'EOF'
 EOF
 ```
 
-Update config.yaml execution_order:
+2. **Read and append to case-summary.md:**
+```bash
+cat ./tests/case-summary.md
+```
+
+Append new test case summary:
+```bash
+cat >> ./tests/case-summary.md << 'EOF'
+
+---
+
+### REWARD-001: Claim Rewards Success
+
+| Field | Value |
+|-------|-------|
+| **Purpose** | Verify user can claim rewards successfully |
+| **Feature** | Rewards |
+| **Priority** | High |
+| **Type** | Positive |
+| **Steps** | 6 |
+| **Depends On** | WALLET-001 |
+
+**Steps:**
+1. Navigate to /rewards
+2. Take screenshot (before-claim)
+3. Click "Claim Rewards" button
+4. Approve transaction in wallet
+5. Wait for confirmation
+6. Take screenshot (after-claim)
+
+**Expected Results:**
+- Success message displayed
+- Rewards balance updated
+EOF
+```
+
+3. **Read and update README.md test table:**
+```bash
+cat ./tests/README.md
+```
+
+Add new row to Test Summary table:
+```markdown
+| REWARD-001 | Claim Rewards Success | High | Yes | 1 | Positive |
+```
+
+4. **Update config.yaml execution_order:**
 ```bash
 # Add new test ID to execution_order
 ```
@@ -259,7 +339,12 @@ Report to user:
 New test case:
 - ID: REWARD-001
 - Name: Claim Rewards Success
-- File: tests/test-cases.yaml
+
+Files updated:
+- tests/test-cases.yaml   (added test case YAML)
+- tests/case-summary.md   (added human-readable summary)
+- tests/README.md         (added row to test table)
+- tests/config.yaml       (updated execution_order)
 
 Next steps:
 1. Review the generated test case
@@ -312,6 +397,37 @@ generated:
   date: 2024-01-15T14:30:00Z
   by: web-test-case-gen
 
+# ============================================
+# CATEGORIES & MODULES
+# Users can run tests by category or module:
+#   skill web-test --category=core
+#   skill web-test --module=swap
+# ============================================
+categories:
+  - id: core
+    name: Core Functionality
+    description: Essential features that must work
+  - id: transaction
+    name: Transactions
+    description: Blockchain transaction tests
+  - id: error-handling
+    name: Error Handling
+    description: Negative tests and error scenarios
+
+modules:
+  - id: wallet
+    name: Wallet
+    description: Wallet connection and management
+    category: core
+  - id: swap
+    name: Token Swap
+    description: Token swap functionality
+    category: transaction
+  - id: stake
+    name: Staking
+    description: Token staking functionality
+    category: transaction
+
 features:
   - name: Token Swap
     code: src/features/swap/
@@ -346,6 +462,8 @@ test_cases:
   # ============================================
   - id: WALLET-001
     name: Connect Wallet
+    category: core              # Category for grouping (core, transaction, error-handling)
+    module: wallet              # Module within category (wallet, swap, stake, etc.)
     feature: Wallet Connection
     priority: critical
     web3: true
