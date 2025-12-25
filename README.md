@@ -102,7 +102,32 @@ This will:
 3. Generate a test case based on code + visual analysis
 4. Append to existing `./tests/test-cases.yaml`
 
+### Add Multiple Test Cases
+
+You can add several test cases at once by describing them:
+
+```
+"Add test cases for:
+1. User login with valid credentials
+2. User login with invalid password
+3. Password reset flow"
+```
+
+or specify a feature to generate comprehensive tests:
+
+```
+"Add comprehensive test cases for the swap feature, including validation and error handling"
+```
+
+This will generate multiple test cases covering:
+- Happy path (complete user journey)
+- Input validation (all rules)
+- Error handling (all error states)
+- Edge cases (boundary conditions)
+
 ### Execute Tests
+
+**Run all tests:**
 
 ```
 "Run the tests for this project"
@@ -126,6 +151,75 @@ This will:
 2. Set up browser and wallet (if Web3)
 3. Execute all tests
 4. Generate a report in `./test-output/`
+
+### Run Specific Test Case
+
+Run a single test case by ID:
+
+```
+"Run test case SWAP-001"
+```
+
+or
+
+```
+"Run only the SWAP-HP-001 test"
+```
+
+or run multiple specific tests:
+
+```
+"Run test cases SWAP-001, SWAP-002, and SWAP-003"
+```
+
+### Run Tests by Module
+
+Run all tests in a specific module:
+
+```
+"Run the swap module tests"
+```
+
+or
+
+```
+"Run all tests in the wallet module"
+```
+
+or
+
+```
+"Run stake module"
+```
+
+Available modules are defined in `tests/config.yaml`:
+
+```yaml
+modules:
+  - id: wallet
+    name: Wallet
+    description: Wallet connection tests
+  - id: swap
+    name: Token Swap
+    description: Token swap functionality tests
+  - id: stake
+    name: Staking
+    description: Token staking tests
+```
+
+### Run Tests by Priority
+
+Run tests filtered by priority:
+
+```
+"Run all critical priority tests"
+```
+
+or
+
+```
+"Run high priority tests only"
+```
 
 ### Git Configuration
 
