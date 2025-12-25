@@ -64,11 +64,14 @@ Execute tests from persistent test cases in `./tests/` directory.
 ║     - "Will test later"                                        ║
 ║     - "Not enough time"                                        ║
 ║                                                                ║
-║  ✅ ONLY these reasons can skip a test:                        ║
+║  ✅ VALID reasons to skip a test:                              ║
+║     - User requested specific tests (see Selective Execution)  ║
+║       Example: "Run only SWAP-001" → skip other tests          ║
+║     - User requested specific feature/category                 ║
+║       Example: "Run wallet tests" → skip non-wallet tests      ║
+║     - Blocking dependency failed (depends_on test failed)      ║
 ║     - Feature does not exist in the project                    ║
 ║     - Test case is explicitly deprecated                       ║
-║     - Required permissions unavailable (admin-only, paid tier) ║
-║     - Blocking dependency failed (wallet setup failed)         ║
 ║                                                                ║
 ║  ⚠️  IF YOU SKIP A TEST FOR "TIME CONSTRAINTS":                ║
 ║      → The test run is considered INCOMPLETE                   ║
@@ -150,6 +153,145 @@ If no test cases found, this skill will:
 ```
 Run the tests for this project
 ```
+
+## Selective Test Execution
+
+Users can request to run specific tests instead of all tests. **This is the ONLY valid reason to skip tests.**
+
+### Execution Modes
+
+| Mode | User Request Example | What to Execute |
+|------|---------------------|-----------------|
+| **All Tests** | "Run all tests" | All tests in `execution_order` |
+| **By Feature** | "Run Wallet tests" / "Test the swap feature" | Tests where `feature` matches |
+| **By Category** | "Run negative tests" / "Run critical tests" | Tests matching priority or type |
+| **Single Test** | "Run SWAP-001" / "Run the insufficient balance test" | Only the specified test |
+
+### Filter Logic
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  SELECTIVE EXECUTION - HOW TO FILTER TESTS                     ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  1. Parse user request to determine filter:                    ║
+║                                                                ║
+║     "Run swap tests"        → filter by feature: "Token Swap"  ║
+║     "Run WALLET-001"        → filter by id: "WALLET-001"       ║
+║     "Run critical tests"    → filter by priority: "critical"   ║
+║     "Run negative tests"    → filter by type (from description)║
+║                                                                ║
+║  2. Build filtered execution list:                             ║
+║                                                                ║
+║     filtered_tests = []                                        ║
+║     for test_id in execution_order:                            ║
+║         test = find_test(test_id)                              ║
+║         if matches_filter(test, user_filter):                  ║
+║             filtered_tests.append(test_id)                     ║
+║                                                                ║
+║  3. IMPORTANT: Include dependencies!                           ║
+║                                                                ║
+║     If user requests "Run SWAP-001":                           ║
+║       - SWAP-001 depends_on: [WALLET-001]                      ║
+║       - Must run WALLET-001 first (as dependency)              ║
+║       - Final list: [WALLET-001, SWAP-001]                     ║
+║                                                                ║
+║  4. Report what will be executed:                              ║
+║                                                                ║
+║     "Running 2 tests (1 requested + 1 dependency):             ║
+║      - WALLET-001 (dependency of SWAP-001)                     ║
+║      - SWAP-001 (requested)"                                   ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+### Filter by Feature
+
+Match tests where `test.feature` contains the keyword:
+
+```yaml
+# User: "Run wallet tests"
+# Matches tests with feature containing "Wallet":
+- id: WALLET-001
+  feature: Wallet Connection  # ✓ Match
+- id: WALLET-DISCONNECT-001
+  feature: Wallet Connection  # ✓ Match
+- id: SWAP-001
+  feature: Token Swap         # ✗ No match
+```
+
+### Filter by Test ID
+
+Match exact test ID or partial match:
+
+```yaml
+# User: "Run SWAP-001"
+# Exact match: only SWAP-001
+
+# User: "Run SWAP tests"
+# Partial match: SWAP-001, SWAP-002, SWAP-003, SWAP-FAIL-001
+```
+
+### Filter by Priority
+
+Match tests where `test.priority` equals the keyword:
+
+```yaml
+# User: "Run critical tests"
+# Matches: priority: critical
+
+# User: "Run high priority tests"
+# Matches: priority: high
+```
+
+### Filter by Type (Positive/Negative)
+
+Determine from test description or naming:
+
+```yaml
+# User: "Run negative tests"
+# Match tests where:
+#   - description.notes contains "NEGATIVE test case"
+#   - OR id contains "FAIL" or "DISCONNECT" or "ERROR"
+
+# User: "Run positive tests" / "Run happy path tests"
+# Match tests that are NOT negative tests
+```
+
+### Dependency Resolution
+
+**CRITICAL:** When running filtered tests, always include required dependencies:
+
+```
+User requests: "Run SWAP-002"
+
+SWAP-002:
+  depends_on: [WALLET-001, SWAP-001]
+
+Resolution:
+  1. SWAP-002 needs WALLET-001 → add WALLET-001
+  2. SWAP-002 needs SWAP-001 → add SWAP-001
+  3. SWAP-001 needs WALLET-001 → already added
+
+Final execution order: [WALLET-001, SWAP-001, SWAP-002]
+
+Report to user:
+  "Running 3 tests:
+   - WALLET-001 (dependency)
+   - SWAP-001 (dependency)
+   - SWAP-002 (requested)"
+```
+
+### Example Prompts
+
+| User Says | Filter Applied | Tests Executed |
+|-----------|---------------|----------------|
+| "Run all tests" | None | All in execution_order |
+| "Run WALLET-001" | id = WALLET-001 | WALLET-001 |
+| "Run swap feature tests" | feature contains "Swap" | SWAP-001, SWAP-002, SWAP-003 + dependencies |
+| "Run critical tests only" | priority = critical | WALLET-001, SWAP-001, SWAP-002 |
+| "Run negative tests" | type = negative | SWAP-003, WALLET-DISCONNECT-*, SWAP-FAIL-001 + dependencies |
+| "Run the insufficient balance test" | name/id match | SWAP-003 + WALLET-001 (dependency) |
 
 ## Workflow
 
