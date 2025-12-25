@@ -45,29 +45,41 @@ Execute tests from persistent test cases in `./tests/` directory.
 ### Rule 2: NEVER Skip Tests Due to Time Constraints
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│  ❌ INVALID reasons to skip a test case:                       │
-│     - "Time constraints"                                       │
-│     - "To save time"                                           │
-│     - "Already running too long"                               │
-│     - "Similar to another test"                                │
-│                                                                │
-│  ✅ VALID reasons to skip a test case:                         │
-│     - Feature no longer exists in the project                  │
-│     - Test case is outdated/deprecated                         │
-│     - User level/permissions don't allow testing               │
-│       (e.g., admin-only feature, paid tier required)           │
-│     - Explicit dependency failed (e.g., wallet not connected)  │
-│                                                                │
-│  YOU MUST execute ALL test cases unless a VALID reason applies │
-└────────────────────────────────────────────────────────────────┘
+╔════════════════════════════════════════════════════════════════╗
+║                    ⛔ CRITICAL RULE ⛔                          ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  "Time constraints" is NEVER a valid reason to skip tests!     ║
+║                                                                ║
+║  ❌ FORBIDDEN - These excuses are NOT allowed:                 ║
+║     - "Time constraints"                                       ║
+║     - "To save time"                                           ║
+║     - "Already running too long"                               ║
+║     - "Similar to another test"                                ║
+║     - "Will test later"                                        ║
+║     - "Not enough time"                                        ║
+║                                                                ║
+║  ✅ ONLY these reasons can skip a test:                        ║
+║     - Feature does not exist in the project                    ║
+│     - Test case is explicitly deprecated                       ║
+║     - Required permissions unavailable (admin-only, paid tier) ║
+║     - Blocking dependency failed (wallet setup failed)         ║
+║                                                                ║
+║  ⚠️  IF YOU SKIP A TEST FOR "TIME CONSTRAINTS":                ║
+║      → The test run is considered INCOMPLETE                   ║
+║      → User will NOT accept the results                        ║
+║      → You MUST re-run the skipped tests                       ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
 ```
 
 **Why this matters:**
-- Every test case exists for a reason
-- Skipping tests defeats the purpose of testing
+- Every test case exists for a reason - skipping means missing bugs
+- Skipping tests defeats the entire purpose of testing
 - Users expect ALL their test cases to be executed
-- If a test is truly unnecessary, it should be removed from the test suite, not skipped
+- "Time constraints" is an excuse, not a valid technical reason
+- If a test takes too long, WAIT for it - do NOT skip it
+- If a test is truly unnecessary, it should be REMOVED from the test suite by the user, not skipped by you
 
 ### Rule 3: Follow Execution Order
 
@@ -201,6 +213,8 @@ Use skill web-test-wallet-connect
 
 ### Step 6: Execute Test Cases
 
+**⚠️ EXECUTE EVERY TEST - NO EXCEPTIONS FOR "TIME CONSTRAINTS" ⚠️**
+
 For each test ID in `execution_order`:
 
 1. Find the test case in `test-cases.yaml`
@@ -208,6 +222,24 @@ For each test ID in `execution_order`:
 3. Execute each step
 4. Verify expected results
 5. Record pass/fail
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  REMINDER: You MUST execute ALL tests in execution_order.       │
+│                                                                 │
+│  ❌ DO NOT skip any test because:                               │
+│     - "Time constraints" / "To save time"                       │
+│     - "Similar to previous test"                                │
+│     - "Already tested enough"                                   │
+│                                                                 │
+│  ✅ Continue executing even if:                                 │
+│     - Tests are taking a long time                              │
+│     - You've already run many tests                             │
+│     - Some tests seem redundant to you                          │
+│                                                                 │
+│  The user created these tests for a reason. Execute them ALL.   │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 **Executing Steps:**
 
@@ -377,9 +409,18 @@ All test artifacts in project directory:
 | Scenario | Action |
 |----------|--------|
 | No tests/ directory | Prompt user, wait 2 min, fail if no response |
-| Test case fails | Record failure, continue to next test |
-| Wallet popup timeout | Mark test as failed, continue |
-| Page load timeout | Mark test as failed, continue |
+| Test case fails | Record failure, **continue to next test** |
+| Wallet popup timeout | Mark test as failed, **continue to next test** |
+| Page load timeout | Mark test as failed, **continue to next test** |
+| Test takes long time | **WAIT for it** - do NOT skip |
+
+**⚠️ IMPORTANT: Errors are NOT a reason to skip remaining tests!**
+
+When a test fails or times out:
+1. Record the failure with details
+2. Take a screenshot if possible
+3. **Continue to the next test** - do NOT stop or skip remaining tests
+4. **NEVER use "time constraints" as a reason** - this is invalid
 
 ## Notes
 
