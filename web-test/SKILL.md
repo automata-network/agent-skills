@@ -41,6 +41,7 @@ Execute tests from persistent test cases in `./tests/` directory.
 ```
 
 **Why this matters:**
+
 - Wallet **setup** prepares the extension (download, import key)
 - Wallet **connect** is now a testable feature (WALLET-001)
 - Other tests depend on WALLET-001 via preconditions
@@ -78,6 +79,7 @@ Execute tests from persistent test cases in `./tests/` directory.
 ```
 
 **Why this matters:**
+
 - **This is AUTOMATED testing** - the user does NOT care how long it takes
 - Users explicitly want ALL test cases executed, regardless of time
 - Every test case exists for a reason - skipping means missing bugs
@@ -89,6 +91,7 @@ Execute tests from persistent test cases in `./tests/` directory.
 ### Rule 3: Follow Execution Order
 
 Always execute in this exact order:
+
 1. Check for test cases
 2. `web-test-cleanup` - Clean previous session
 3. Read config.yaml
@@ -137,6 +140,7 @@ It is invoked when executing WALLET-001 test case or as a precondition check.
 **Test cases must exist in `./tests/` directory.**
 
 If no test cases found, this skill will:
+
 1. Prompt: "No test cases found. Run `skill web-test-case-gen` to generate them?"
 2. Wait up to 2 minutes for user response
 3. If timeout or user declines → Exit with failure
@@ -193,6 +197,7 @@ ls -la ./tests/config.yaml ./tests/test-cases.yaml
 ```
 
 **If files don't exist:**
+
 ```
 No test cases found in ./tests/ directory.
 
@@ -203,6 +208,7 @@ Waiting for response (2 minute timeout)...
 ```
 
 If user doesn't respond within 2 minutes or says no, exit with:
+
 ```
 Test execution cancelled. No test cases available.
 To generate test cases, run: skill web-test-case-gen
@@ -217,19 +223,97 @@ Use skill web-test-cleanup
 ### Step 3: Parse Config and Load Test Cases
 
 Read `./tests/config.yaml`:
+
 ```bash
 cat ./tests/config.yaml
 ```
 
-Extract:
-- `project.url` - Base URL for testing
-- `web3.enabled` - Whether to set up wallet
-- `execution_order` - Order to run tests
+**config.yaml Structure:**
+
+```yaml
+project:
+  name: MyDApp # Project name (for reports)
+  url: http://localhost:3000 # Base URL for testing
+  framework: React # Framework (informational)
+
+web3:
+  enabled: true # true = Web3 DApp, false = regular web app
+  wallet: metamask # Wallet type
+  network: ethereum # Network name
+
+generated:
+  date: 2024-01-15T14:30:00Z
+  by: web-test-case-gen
+
+features: # Features detected (informational)
+  - name: Token Swap
+    code: src/features/swap/
+
+execution_order: # CRITICAL: Test execution order
+  - WALLET-001 # Execute tests in THIS ORDER
+  - SWAP-001
+  - SWAP-002
+```
+
+**Fields to Extract from config.yaml:**
+| Field | Usage |
+|-------|-------|
+| `project.url` | Base URL - prepend to relative URLs in steps |
+| `web3.enabled` | If `true`, run `web-test-wallet-setup` before tests |
+| `execution_order` | Array of test IDs - execute in this exact order |
+
+---
 
 Read `./tests/test-cases.yaml`:
+
 ```bash
 cat ./tests/test-cases.yaml
 ```
+
+**test-cases.yaml Structure:**
+
+```yaml
+test_cases:
+  - id: WALLET-001 # Unique test ID (matches execution_order)
+    name: Connect Wallet # Human-readable name
+    feature: Wallet Connection
+    priority: critical # critical/high/medium/low
+    web3: true # Requires wallet interaction
+    wallet_popups: 1 # Expected number of wallet popups
+    depends_on: [] # Test case dependencies (IDs only)
+    preconditions: [] # Other requirements (not test IDs)
+    description:
+      purpose: | # Why this test exists
+        Verify user can connect wallet...
+      notes: # Important points to remember
+        - Must run first
+        - Check wallet address displayed
+    uses_skill: web-test-wallet-connect # Optional: skill to use
+    steps: # Actions to execute
+      - action: navigate
+        url: /
+      - action: vision-screenshot
+        name: before-connect
+      - action: vision-click
+        target: Connect Wallet button
+      - action: wallet-approve
+    expected: # What to verify after steps
+      - Wallet address displayed in header
+      - Connection modal closed
+```
+
+**Test Case Fields Reference:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier (e.g., WALLET-001) |
+| `name` | string | Human-readable test name |
+| `depends_on` | array | Test IDs that must pass first |
+| `preconditions` | array | Other requirements (NOT test IDs) |
+| `description.purpose` | string | What this test verifies |
+| `description.notes` | array | Important execution notes |
+| `uses_skill` | string | Optional skill to invoke |
+| `steps` | array | Actions to execute |
+| `expected` | array | Expected outcomes to verify |
 
 ### Step 4: Wallet Setup (if Web3)
 
@@ -294,28 +378,52 @@ For each test ID in `execution_order` (SEQUENTIALLY, ONE AT A TIME):
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Executing Steps:**
+**Executing Steps - Detailed Guide:**
 
-| Action | How to Execute |
-|--------|----------------|
-| `navigate` | `node $SKILL_DIR/scripts/test-helper.js navigate [url] --headed --keep-open` |
-| `vision-screenshot` | `node $SKILL_DIR/scripts/test-helper.js vision-screenshot [name].jpg --headed --keep-open` |
-| `vision-click` | Take screenshot → AI determines coordinates → `vision-click x y` |
-| `vision-type` | `node $SKILL_DIR/scripts/test-helper.js vision-type [value] --headed --keep-open` |
-| `wait` | `node $SKILL_DIR/scripts/test-helper.js wait [ms] --headed --keep-open` |
-| `wallet-approve` | Use `wallet-approve` from web-test-wallet-connect skill |
+```
+╔════════════════════════════════════════════════════════════════╗
+║  HOW TO EXECUTE EACH ACTION TYPE                               ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  For each step in test.steps array:                            ║
+║                                                                ║
+║  1. Read step.action to determine action type                  ║
+║  2. Execute using test-helper.js or skill                      ║
+║  3. Check for errors before proceeding to next step            ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+| Action              | Parameters        | How to Execute                                                                                  |
+| ------------------- | ----------------- | ----------------------------------------------------------------------------------------------- |
+| `navigate`          | `url`             | `node $SKILL_DIR/scripts/test-helper.js navigate [project.url + step.url] --headed --keep-open` |
+| `vision-screenshot` | `name`            | `node $SKILL_DIR/scripts/test-helper.js vision-screenshot [step.name].jpg --headed --keep-open` |
+| `vision-click`      | `target`          | 1. Take screenshot 2. AI analyzes to find `step.target` coordinates 3. `vision-click x y`       |
+| `vision-type`       | `target`, `value` | 1. Click on target field 2. `node ... vision-type "[step.value]" --headed --keep-open`          |
+| `wait`              | `ms`, `reason`    | `node $SKILL_DIR/scripts/test-helper.js wait [step.ms] --headed --keep-open`                    |
+| `wallet-approve`    | `note`            | Use `skill web-test-wallet-sign` with approve action                                            |
+| `wallet-reject`     | `note`            | Use `skill web-test-wallet-sign` with reject action                                             |
+
+**Handling `uses_skill` Field:**
+
+When a test case has `uses_skill` field, invoke that skill instead of executing steps manually:
+
+**Verifying Expected Results:**
+
+After executing all steps, verify each item in `test.expected`:
 
 ### Automatic Wallet Sign Detection
 
 After each `click` or `vision-click` action in wallet mode, the system automatically detects MetaMask popups and handles them. Use the `walletAction` field to control the behavior:
 
-| walletAction | Behavior |
-|--------------|----------|
+| walletAction        | Behavior                                                       |
+| ------------------- | -------------------------------------------------------------- |
 | `approve` (default) | Auto-approve signatures and transactions (reject if gas error) |
-| `reject` | Reject the signature/transaction (for testing rejection flows) |
-| `ignore` | Don't wait for popup, skip detection |
+| `reject`            | Reject the signature/transaction (for testing rejection flows) |
+| `ignore`            | Don't wait for popup, skip detection                           |
 
 **Example:**
+
 ```yaml
 steps:
   # Auto-approve (default behavior)
@@ -350,36 +458,41 @@ Use skill web-test-cleanup --keep-data
 **Location:** `scripts/test-helper.js`
 
 ### Navigation & Screenshots
-| Command | Description |
-|---------|-------------|
-| `navigate <url>` | Navigate to URL |
-| `vision-screenshot [name]` | Take screenshot for AI |
-| `vision-wait-stable` | Wait for page stability |
+
+| Command                    | Description             |
+| -------------------------- | ----------------------- |
+| `navigate <url>`           | Navigate to URL         |
+| `vision-screenshot [name]` | Take screenshot for AI  |
+| `vision-wait-stable`       | Wait for page stability |
 
 ### Vision Interactions
-| Command | Description |
-|---------|-------------|
-| `vision-click <x> <y>` | Click at coordinates |
-| `vision-type <text>` | Type text at cursor |
-| `vision-press-key <key>` | Press keyboard key |
-| `vision-scroll <dir> [px]` | Scroll page |
+
+| Command                    | Description          |
+| -------------------------- | -------------------- |
+| `vision-click <x> <y>`     | Click at coordinates |
+| `vision-type <text>`       | Type text at cursor  |
+| `vision-press-key <key>`   | Press keyboard key   |
+| `vision-scroll <dir> [px]` | Scroll page          |
 
 ### Utility Commands
-| Command | Description |
-|---------|-------------|
-| `wait <ms>` | Wait milliseconds |
-| `wait-for <selector>` | Wait for element |
+
+| Command               | Description       |
+| --------------------- | ----------------- |
+| `wait <ms>`           | Wait milliseconds |
+| `wait-for <selector>` | Wait for element  |
 
 ### Common Options
-| Option | Description |
-|--------|-------------|
-| `--headed` | Show browser window |
+
+| Option        | Description                     |
+| ------------- | ------------------------------- |
+| `--headed`    | Show browser window             |
 | `--keep-open` | Keep browser open after command |
-| `--wallet` | Load wallet extension |
+| `--wallet`    | Load wallet extension           |
 
 ## Example Test Execution
 
 **tests/config.yaml:**
+
 ```yaml
 project:
   name: MyDApp
@@ -389,9 +502,9 @@ web3:
   enabled: true
 
 execution_order:
-  - WALLET-001    # Connect wallet (uses web-test-wallet-connect)
-  - SWAP-001      # depends_on: [WALLET-001]
-  - SWAP-002      # depends_on: [WALLET-001, SWAP-001]
+  - WALLET-001 # Connect wallet (uses web-test-wallet-connect)
+  - SWAP-001 # depends_on: [WALLET-001]
+  - SWAP-002 # depends_on: [WALLET-001, SWAP-001]
 ```
 
 **Execution flow (SEQUENTIAL - ONE AT A TIME):**
@@ -475,27 +588,28 @@ All test artifacts in project directory:
 
 ## Related Skills
 
-| Skill | Usage |
-|-------|-------|
-| web-test-case-gen | Generates test cases (run first if no tests/) |
-| web-test-cleanup | Called at start and end |
-| web-test-wallet-setup | Called ONCE at start if `web3.enabled: true` |
+| Skill                   | Usage                                             |
+| ----------------------- | ------------------------------------------------- |
+| web-test-case-gen       | Generates test cases (run first if no tests/)     |
+| web-test-cleanup        | Called at start and end                           |
+| web-test-wallet-setup   | Called ONCE at start if `web3.enabled: true`      |
 | web-test-wallet-connect | Called by WALLET-001 test case or as precondition |
-| web-test-report | Called after test execution |
+| web-test-report         | Called after test execution                       |
 
 ## Error Handling
 
-| Scenario | Action |
-|----------|--------|
-| No tests/ directory | Prompt user, wait 2 min, fail if no response |
-| Test case fails | Record failure, **continue to next test** |
+| Scenario             | Action                                         |
+| -------------------- | ---------------------------------------------- |
+| No tests/ directory  | Prompt user, wait 2 min, fail if no response   |
+| Test case fails      | Record failure, **continue to next test**      |
 | Wallet popup timeout | Mark test as failed, **continue to next test** |
-| Page load timeout | Mark test as failed, **continue to next test** |
-| Test takes long time | **WAIT for it** - do NOT skip |
+| Page load timeout    | Mark test as failed, **continue to next test** |
+| Test takes long time | **WAIT for it** - do NOT skip                  |
 
 **⚠️ IMPORTANT: Errors are NOT a reason to skip remaining tests!**
 
 When a test fails or times out:
+
 1. Record the failure with details
 2. Take a screenshot if possible
 3. **Continue to the next test** - do NOT stop or skip remaining tests
