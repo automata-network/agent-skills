@@ -302,24 +302,24 @@ The `test-output/` directory is created during test execution and contains all r
 
 ```
 test-output/
-├── report.md                    # Test report with pass/fail results
-├── screenshots/                 # Test execution screenshots
-│   ├── SWAP-001-step1.png       # Screenshots named by test ID and step
+├── test-report-YYYYMMDD-HHMMSS.md   # Test report with timestamp (new file each run)
+├── screenshots/                      # Test execution screenshots
+│   ├── SWAP-001-step1.png            # Screenshots named by test ID and step
 │   ├── SWAP-001-step2.png
 │   └── SWAP-001-final.png
-├── browser-profile/             # Browser profile with wallet extension
-└── logs/                        # Execution logs (if enabled)
+├── browser-profile/                  # Browser profile with wallet extension
+└── logs/                             # Execution logs (if enabled)
 ```
 
-| File/Directory      | How to Use                                                                       |
-| ------------------- | -------------------------------------------------------------------------------- |
-| `report.md`         | Open to see test results: each test case shows pass/fail status and failure details |
-| `screenshots/`      | View step-by-step screenshots to debug failures or verify UI behavior            |
-| `browser-profile/`  | Reused across runs to persist wallet setup (do not delete manually)             |
+| File/Directory                   | How to Use                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------- |
+| `test-report-YYYYMMDD-HHMMSS.md` | Test report with timestamp; each run creates a new file to preserve history         |
+| `screenshots/`                   | View step-by-step screenshots to debug failures or verify UI behavior               |
+| `browser-profile/`               | Reused across runs to persist wallet setup (do not delete manually)                 |
 
 **Reading the Report:**
 
-The `report.md` file contains a summary like:
+Each test run generates a new report file like `test-report-20241215-143025.md`:
 
 ```markdown
 # Test Report

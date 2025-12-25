@@ -54,11 +54,11 @@ $SKILL_DIR/scripts/cleanup.sh --keep-data
 ### Files Removed (unless `--keep-data`)
 ```
 <project-root>/test-output/
-├── screenshots/      # Test screenshots
-├── chrome-profile/   # Browser state, wallet data
-├── extensions/       # Downloaded wallet extensions
-├── console-logs.txt  # Browser console output
-└── test-report.md    # Generated test report
+├── screenshots/                      # Test screenshots
+├── chrome-profile/                   # Browser state, wallet data
+├── extensions/                       # Downloaded wallet extensions
+├── console-logs.txt                  # Browser console output
+└── test-report-YYYYMMDD-HHMMSS.md    # Generated test report (timestamped)
 ```
 
 ## Instructions
