@@ -1186,9 +1186,8 @@ Next steps:
 ║    - Mobile-specific components: MobileNav, MobileMenu         ║
 ║    - useMediaQuery, useBreakpoint hooks                        ║
 ║                                                                ║
-║  STEP 2: If mobile layout detected, generate mobile test cases ║
+║  STEP 2: If mobile layout detected, add to config.yaml         ║
 ║                                                                ║
-║  Add to config.yaml:                                           ║
 ║    mobile:                                                     ║
 ║      enabled: true                                             ║
 ║      breakpoint: 375    # iPhone SE width                      ║
@@ -1196,7 +1195,29 @@ Next steps:
 ║        width: 375                                              ║
 ║        height: 667                                             ║
 ║                                                                ║
-║  STEP 3: Generate MOBILE-* test cases                          ║
+║  STEP 3: ⚠️ EXPLORE MOBILE UI BEFORE GENERATING TEST CASES     ║
+║                                                                ║
+║    MUST switch to mobile viewport and take screenshots:        ║
+║                                                                ║
+║    # Set mobile viewport first                                 ║
+║    node $SKILL_DIR/scripts/test-helper.js set-viewport 375 667 \
+║         --mobile --headed --keep-open                          ║
+║                                                                ║
+║    # Navigate to project                                       ║
+║    node $SKILL_DIR/scripts/test-helper.js navigate [url] \     ║
+║         --headed --keep-open                                   ║
+║                                                                ║
+║    # Take screenshot of mobile UI                              ║
+║    node $SKILL_DIR/scripts/test-helper.js vision-screenshot \  ║
+║         mobile-home --headed --keep-open                       ║
+║                                                                ║
+║    # Analyze screenshot to identify:                           ║
+║    - Hamburger menu / mobile nav                               ║
+║    - Mobile-specific buttons and their positions               ║
+║    - Bottom sheets / mobile modals                             ║
+║    - Touch targets and gestures                                ║
+║                                                                ║
+║  STEP 4: Generate MOBILE-* test cases based on screenshots     ║
 ║                                                                ║
 ║    For each feature with mobile layout differences:            ║
 ║    - MOBILE-NAV-001: Mobile navigation menu                    ║
@@ -1206,6 +1227,34 @@ Next steps:
 ║                                                                ║
 ╚════════════════════════════════════════════════════════════════╝
 ```
+
+**Mobile UI Exploration Workflow:**
+
+```bash
+SKILL_DIR="/Users/duxiaofeng/code/agent-skills/web-test"
+
+# 1. Set mobile viewport (iPhone SE size)
+node $SKILL_DIR/scripts/test-helper.js set-viewport 375 667 --mobile --headed --keep-open
+
+# 2. Navigate to project URL
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
+
+# 3. Take screenshot of mobile homepage
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot mobile-home --headed --keep-open
+
+# 4. Use Read tool to view screenshot and identify mobile UI elements
+# Look for: hamburger menu, mobile nav, bottom sheets, touch targets
+
+# 5. Navigate to other pages and screenshot
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000/swap" --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot mobile-swap --headed --keep-open
+
+# 6. Test mobile interactions (click hamburger menu, etc.)
+node $SKILL_DIR/scripts/test-helper.js vision-click 30 30 --headed --keep-open  # Click hamburger
+node $SKILL_DIR/scripts/test-helper.js vision-screenshot mobile-nav-open --headed --keep-open
+```
+
+**⚠️ IMPORTANT: Generate accurate test cases based on actual mobile UI, NOT assumptions!**
 
 **Mobile Test Case Examples:**
 

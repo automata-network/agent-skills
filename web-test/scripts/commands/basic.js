@@ -311,6 +311,66 @@ const commands = {
     }));
   },
 
+  async 'set-viewport'(args, options) {
+    await ensureBrowser(options);
+    const page = getPage();
+
+    const width = parseInt(args[0]);
+    const height = parseInt(args[1]);
+
+    if (isNaN(width) || isNaN(height)) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'Width and height required. Usage: set-viewport <width> <height> [--mobile]'
+      }));
+      return;
+    }
+
+    // Set viewport size
+    await page.setViewportSize({ width, height });
+
+    // If mobile mode, also emulate mobile device properties via CDP
+    if (options.mobile) {
+      const cdpSession = await page.context().newCDPSession(page);
+      await cdpSession.send('Emulation.setDeviceMetricsOverride', {
+        width,
+        height,
+        deviceScaleFactor: 2,
+        mobile: true,
+        screenWidth: width,
+        screenHeight: height,
+      });
+      await cdpSession.send('Emulation.setTouchEmulationEnabled', {
+        enabled: true,
+        maxTouchPoints: 5
+      });
+      await cdpSession.send('Emulation.setUserAgentOverride', {
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+      });
+    }
+
+    // Reload page to apply changes
+    try {
+      await page.reload({ waitUntil: 'networkidle', timeout: 10000 });
+    } catch (e) {
+      // Ignore reload errors
+    }
+
+    const actualViewport = await page.evaluate(() => ({
+      width: window.innerWidth,
+      height: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    }));
+
+    console.log(JSON.stringify({
+      success: true,
+      action: 'set-viewport',
+      requested: { width, height, mobile: !!options.mobile },
+      actual: actualViewport
+    }));
+  },
+
   async 'list-elements'(args, options) {
     await ensureBrowser(options);
     const page = getPage();
