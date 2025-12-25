@@ -452,6 +452,115 @@ test_cases:
       - Error message shown
       - Swap button disabled
       - No wallet popup triggered
+
+  # ============================================
+  # NEGATIVE TEST CASES (Conditional - based on detected features)
+  # ============================================
+
+  # Wallet Disconnection Tests (Only for Web3 DApps)
+  - id: WALLET-DISCONNECT-001
+    name: Wallet Disconnected State
+    feature: Wallet Connection
+    priority: high
+    web3: false
+    wallet_popups: 0
+    preconditions: []
+    steps:
+      - action: navigate
+        url: /
+      - action: vision-screenshot
+        name: disconnected-state
+    expected:
+      - Connect button visible with text "Connect" or "Connect Wallet" or "连接钱包"
+      - No wallet address displayed
+      - User prompted to connect wallet
+
+  - id: WALLET-DISCONNECT-002
+    name: Protected Feature Access When Disconnected
+    feature: Wallet Connection
+    priority: high
+    web3: false
+    wallet_popups: 0
+    preconditions: []
+    steps:
+      - action: navigate
+        url: /swap
+      - action: vision-screenshot
+        name: swap-disconnected
+      - action: vision-click
+        target: Swap button (if visible)
+    expected:
+      - Swap button disabled OR shows "Connect Wallet" text
+      - Error message or prompt to connect wallet
+      - Transaction cannot proceed without wallet
+
+  # Form/API Failure Tests (Only when forms/API/transactions detected)
+  - id: SWAP-FAIL-001
+    name: Swap Transaction Rejected
+    feature: Token Swap
+    priority: high
+    web3: true
+    wallet_popups: 1
+    preconditions:
+      - WALLET-001 passed
+    steps:
+      - action: navigate
+        url: /swap
+      - action: vision-type
+        target: amount input
+        value: "0.1"
+      - action: vision-click
+        target: Swap button
+      - action: wallet-reject
+        note: User rejects transaction in wallet
+      - action: vision-screenshot
+        name: swap-rejected
+    expected:
+      - Error message displayed (e.g., "Transaction rejected", "User denied", "取消交易")
+      - Form remains usable (can retry)
+      - No balance change
+
+  - id: FORM-FAIL-001
+    name: Form Validation Error
+    feature: Form Submission
+    priority: high
+    web3: false
+    wallet_popups: 0
+    preconditions: []
+    steps:
+      - action: navigate
+        url: /form-page
+      - action: vision-type
+        target: email input
+        value: "invalid-email"
+      - action: vision-click
+        target: Submit button
+      - action: vision-screenshot
+        name: form-validation-error
+    expected:
+      - Inline error message visible (e.g., "Invalid email", "请输入有效邮箱")
+      - Form NOT submitted
+      - Error styling on invalid field (red border, error icon)
+
+  - id: API-FAIL-001
+    name: API Error Handling
+    feature: API Integration
+    priority: high
+    web3: false
+    wallet_popups: 0
+    preconditions: []
+    steps:
+      - action: navigate
+        url: /api-dependent-page
+      - action: mock-api-error
+        endpoint: /api/data
+        status: 500
+      - action: vision-screenshot
+        name: api-error-state
+    expected:
+      - Error UI displayed (toast, alert, error message)
+      - Clear error message (e.g., "Failed to load", "服务器错误", "请稍后重试")
+      - Retry option available (retry button or refresh prompt)
 ```
 
 ### tests/README.md
@@ -470,12 +579,15 @@ skill web-test
 
 ## Test Summary
 
-| ID | Name | Priority | Web3 | Popups |
-|----|------|----------|------|--------|
-| WALLET-001 | Connect Wallet | Critical | Yes | 1 |
-| SWAP-001 | Swap Native Token | Critical | Yes | 1 |
-| SWAP-002 | Swap ERC20 (Approval) | Critical | Yes | 2 |
-| SWAP-003 | Insufficient Balance | High | Yes | 0 |
+| ID | Name | Priority | Web3 | Popups | Type |
+|----|------|----------|------|--------|------|
+| WALLET-001 | Connect Wallet | Critical | Yes | 1 | Positive |
+| SWAP-001 | Swap Native Token | Critical | Yes | 1 | Positive |
+| SWAP-002 | Swap ERC20 (Approval) | Critical | Yes | 2 | Positive |
+| SWAP-003 | Insufficient Balance | High | Yes | 0 | Negative |
+| WALLET-DISCONNECT-001 | Wallet Disconnected State | High | No | 0 | Negative |
+| WALLET-DISCONNECT-002 | Protected Feature Access | High | No | 0 | Negative |
+| SWAP-FAIL-001 | Swap Transaction Rejected | High | Yes | 1 | Negative |
 
 ## Regenerate Test Cases
 
@@ -587,6 +699,42 @@ Next steps:
 | Wallet interaction | Test with wallet_popups count |
 | External protocol | Research-based test scenarios |
 
+### Negative Test Cases (Conditional)
+
+Generate negative/failure test cases **based on detected project features**. Only add these when the corresponding feature exists.
+
+#### Wallet Disconnection Tests (Only for Web3 DApps)
+
+**Condition:** Only generate when `web3.enabled: true` in config.
+
+When wallet is disconnected, verify the UI shows appropriate prompts:
+
+| Element to Check | Expected Text (any of) |
+|------------------|------------------------|
+| Connect button | "Connect", "Connect Wallet", "连接钱包" |
+| Login prompt | "未登录", "Not Logged In", "Sign In" |
+| Status indicator | "Disconnected", "Not Connected" |
+
+**Generate these tests when Web3 detected:**
+- `WALLET-DISCONNECT-001`: After disconnect, UI shows connect button
+- `WALLET-DISCONNECT-002`: Protected features inaccessible when disconnected
+
+#### Form/API Failure Tests (Only when forms/API detected)
+
+**Condition:** Only generate when project has form submissions or API calls.
+
+| If Feature Detected | Generate Failure Cases |
+|---------------------|------------------------|
+| Form submission | Form validation error, submission error with message |
+| Wallet transactions | Transaction rejected, Transaction failed, Insufficient balance |
+| Login/Auth | Invalid credentials, Account locked |
+| Search functionality | No results, Invalid input |
+
+**Failure cases should verify:**
+1. Clear error message is displayed (not just console log)
+2. Error UI is visible (toast, alert, inline error, etc.)
+3. User can recover (retry button, form reset, etc.)
+
 ### Priority Assignment
 
 | Feature Type | Priority |
@@ -606,7 +754,11 @@ Next steps:
 | `vision-click` | `target` | Click on element (AI determines coordinates) |
 | `vision-type` | `target`, `value` | Type text |
 | `wait` | `ms`, `reason` | Wait for condition |
-| `wallet-approve` | `note` | Handle wallet popup |
+| `wallet-approve` | `note` | Handle wallet popup (approve) |
+| `wallet-reject` | `note` | Reject wallet popup (for negative tests) |
+| `mock-api-error` | `endpoint`, `status` | Simulate API failure |
+| `check-text-visible` | `text` | Verify text is visible on page |
+| `check-element-disabled` | `target` | Verify element is disabled |
 
 ## Related Skills
 
