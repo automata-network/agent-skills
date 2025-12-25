@@ -317,13 +317,21 @@ features:
     code: src/hooks/useConnect.ts
 
 execution_order:
-  # CRITICAL: Tests execute SEQUENTIALLY in this exact order
-  # Each test waits for the previous one to complete
-  # Dependencies are enforced via preconditions
+  # ╔════════════════════════════════════════════════════════════════╗
+  # ║  CRITICAL: SEQUENTIAL EXECUTION ONLY - NO PARALLEL TESTS       ║
+  # ╠════════════════════════════════════════════════════════════════╣
+  # ║                                                                ║
+  # ║  1. Tests execute ONE AT A TIME in this exact order            ║
+  # ║  2. Each test MUST complete before the next one starts         ║
+  # ║  3. NEVER run tests in parallel (screenshots will conflict)    ║
+  # ║  4. Dependencies are enforced via depends_on field             ║
+  # ║  5. Order is determined by agent during project exploration    ║
+  # ║                                                                ║
+  # ╚════════════════════════════════════════════════════════════════╝
   - WALLET-001    # No dependencies, runs first
-  - SWAP-001      # Depends on: WALLET-001
-  - SWAP-002      # Depends on: WALLET-001
-  - SWAP-003      # Depends on: WALLET-001
+  - SWAP-001      # depends_on: [WALLET-001]
+  - SWAP-002      # depends_on: [WALLET-001, SWAP-001] (needs approval from SWAP-001)
+  - SWAP-003      # depends_on: [WALLET-001]
 ```
 
 ### tests/test-cases.yaml
@@ -340,6 +348,7 @@ test_cases:
     priority: critical
     web3: true
     wallet_popups: 1
+    depends_on: []              # No dependencies, runs first
     preconditions: []
     # This test case uses web-test-wallet-connect skill internally
     uses_skill: web-test-wallet-connect
@@ -369,6 +378,7 @@ test_cases:
     priority: critical
     web3: true
     wallet_popups: 1
+    depends_on: [WALLET-001]   # Must run after WALLET-001 completes
     preconditions:
       - WALLET-001 passed  # <-- Requires wallet connected first
       - Has native token balance
@@ -409,6 +419,7 @@ test_cases:
     priority: critical
     web3: true
     wallet_popups: 2
+    depends_on: [WALLET-001, SWAP-001]  # Runs after SWAP-001 (may need approval state from native swap)
     preconditions:
       - WALLET-001 passed
       - Has USDC balance
@@ -449,6 +460,7 @@ test_cases:
     priority: high
     web3: true
     wallet_popups: 0
+    depends_on: [WALLET-001]   # Only needs wallet connected
     preconditions:
       - WALLET-001 passed
     steps:
@@ -512,6 +524,7 @@ test_cases:
     priority: high
     web3: true
     wallet_popups: 1
+    depends_on: [WALLET-001]   # Needs wallet connected to test rejection
     preconditions:
       - WALLET-001 passed
     steps:
@@ -775,6 +788,50 @@ When wallet is disconnected, verify the UI shows appropriate prompts:
 1. Clear error message is displayed (not just console log)
 2. Error UI is visible (toast, alert, inline error, etc.)
 3. User can recover (retry button, form reset, etc.)
+
+### Test Case Dependencies (depends_on)
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  DEPENDENCY RULES - AGENT MUST DETERMINE FROM PROJECT ANALYSIS ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  1. Agent determines dependencies by:                          ║
+║     - Analyzing code during web-test-research                  ║
+║     - Understanding feature relationships                      ║
+║     - Observing UI flows and user journeys                     ║
+║                                                                ║
+║  2. Common dependency patterns:                                ║
+║     - WALLET-001 → All Web3 tests (must connect first)         ║
+║     - Login → All authenticated features                       ║
+║     - Create → Read/Update/Delete (CRUD order)                 ║
+║     - Form fill → Submit → Verify                              ║
+║                                                                ║
+║  3. depends_on field:                                          ║
+║     depends_on: []           # No dependencies                 ║
+║     depends_on: [WALLET-001] # Runs after WALLET-001           ║
+║     depends_on: [A, B]       # Runs after BOTH A and B pass    ║
+║                                                                ║
+║  4. Execution rules:                                           ║
+║     - Tests run ONE AT A TIME (never parallel)                 ║
+║     - Test waits for ALL depends_on tests to complete          ║
+║     - If ANY dependency fails, dependent test is SKIPPED       ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+**Why Dependencies Matter:**
+- Some tests modify state (create user, stake tokens)
+- Later tests may depend on that state
+- Screenshots would conflict if tests run in parallel
+- Proper ordering ensures predictable test results
+
+**Agent Responsibility:**
+The agent MUST analyze the project during web-test-research and determine:
+1. Which features require authentication/wallet connection
+2. Which features depend on data created by other tests
+3. The logical order of user workflows
+4. State dependencies between features
 
 ### Priority Assignment
 

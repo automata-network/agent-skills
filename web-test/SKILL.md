@@ -100,6 +100,36 @@ Always execute in this exact order:
 **Note:** `web-test-wallet-connect` is no longer called directly by this skill.
 It is invoked when executing WALLET-001 test case or as a precondition check.
 
+### Rule 4: SEQUENTIAL EXECUTION ONLY - ONE TEST AT A TIME
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║            ⛔ CRITICAL: NO PARALLEL TEST EXECUTION ⛔           ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  1. Execute ONLY ONE test case at a time                       ║
+║  2. WAIT for current test to FULLY COMPLETE before next        ║
+║  3. NEVER run multiple tests in parallel                       ║
+║                                                                ║
+║  ❌ FORBIDDEN:                                                 ║
+║     - Running 2+ tests simultaneously                          ║
+║     - Starting next test before screenshots captured           ║
+║     - Using parallel Task agents for different tests           ║
+║                                                                ║
+║  ✅ REQUIRED:                                                  ║
+║     - Complete test → capture screenshots → record result      ║
+║     - Only then start next test                                ║
+║     - Respect depends_on order from test-cases.yaml            ║
+║                                                                ║
+║  WHY: Parallel tests cause:                                    ║
+║     - Screenshot conflicts (wrong page captured)               ║
+║     - Browser state corruption                                 ║
+║     - Wallet popup handling failures                           ║
+║     - Unpredictable test results                               ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
 ---
 
 ## Prerequisites
@@ -215,14 +245,36 @@ Wallet connection is handled by test case WALLET-001 during test execution.
 ### Step 5: Execute Test Cases
 
 **⚠️ EXECUTE EVERY TEST - NO EXCEPTIONS FOR "TIME CONSTRAINTS" ⚠️**
+**⚠️ ONE TEST AT A TIME - NO PARALLEL EXECUTION ⚠️**
 
-For each test ID in `execution_order`:
+For each test ID in `execution_order` (SEQUENTIALLY, ONE AT A TIME):
 
 1. Find the test case in `test-cases.yaml`
-2. Check preconditions
-3. Execute each step
-4. Verify expected results
-5. Record pass/fail
+2. Check `depends_on` - skip if any dependency failed
+3. Check preconditions
+4. Execute each step
+5. Verify expected results
+6. Record pass/fail
+7. **WAIT for completion before next test**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  DEPENDENCY CHECK BEFORE EACH TEST                              │
+│                                                                 │
+│  if test.depends_on is not empty:                               │
+│      for each dep_id in test.depends_on:                        │
+│          if results[dep_id] != PASS:                            │
+│              SKIP this test                                     │
+│              reason: "Dependency {dep_id} did not pass"         │
+│                                                                 │
+│  Example:                                                       │
+│    SWAP-002 depends_on: [WALLET-001, SWAP-001]                  │
+│    - If WALLET-001 failed → SKIP SWAP-002                       │
+│    - If SWAP-001 failed → SKIP SWAP-002                         │
+│    - If both passed → RUN SWAP-002                              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -338,10 +390,11 @@ web3:
 
 execution_order:
   - WALLET-001    # Connect wallet (uses web-test-wallet-connect)
-  - SWAP-001      # Requires: WALLET-001 passed
+  - SWAP-001      # depends_on: [WALLET-001]
+  - SWAP-002      # depends_on: [WALLET-001, SWAP-001]
 ```
 
-**Execution flow:**
+**Execution flow (SEQUENTIAL - ONE AT A TIME):**
 
 ```
 1. ✓ Found tests/config.yaml
@@ -350,9 +403,12 @@ execution_order:
 4. Web3 DApp detected (web3.enabled: true)
    - Running web-test-wallet-setup... (ONCE at start)
    - Wallet extension ready
-5. Executing test cases:
+5. Executing test cases (SEQUENTIAL - ONE AT A TIME):
 
-   WALLET-001: Connect Wallet
+   ┌──────────────────────────────────────────────────────────────┐
+   │  TEST 1/3: WALLET-001                                        │
+   │  depends_on: [] (no dependencies)                            │
+   └──────────────────────────────────────────────────────────────┘
    ├─ [This test uses web-test-wallet-connect skill]
    ├─ navigate /
    ├─ vision-screenshot before-connect.jpg
@@ -364,11 +420,30 @@ execution_order:
    ├─ vision-screenshot after-connect.jpg
    └─ ✅ PASS - Wallet address displayed
 
-   SWAP-001: Swap Native Token
-   ├─ Check preconditions: WALLET-001 passed ✓
+   ⏳ WAITING for WALLET-001 to complete before next test...
+   ✓ WALLET-001 completed. Starting next test.
+
+   ┌──────────────────────────────────────────────────────────────┐
+   │  TEST 2/3: SWAP-001                                          │
+   │  depends_on: [WALLET-001] → checking...                      │
+   │  ✓ WALLET-001 passed - proceeding                            │
+   └──────────────────────────────────────────────────────────────┘
    ├─ navigate /swap
    ├─ [execute steps...]
    └─ ✅ PASS - Swap successful
+
+   ⏳ WAITING for SWAP-001 to complete before next test...
+   ✓ SWAP-001 completed. Starting next test.
+
+   ┌──────────────────────────────────────────────────────────────┐
+   │  TEST 3/3: SWAP-002                                          │
+   │  depends_on: [WALLET-001, SWAP-001] → checking...            │
+   │  ✓ WALLET-001 passed                                         │
+   │  ✓ SWAP-001 passed - proceeding                              │
+   └──────────────────────────────────────────────────────────────┘
+   ├─ navigate /swap
+   ├─ [execute steps...]
+   └─ ✅ PASS - ERC20 swap successful
 
 6. Generating report...
 7. Final cleanup (keeping data)...
@@ -376,8 +451,9 @@ execution_order:
 Test Results:
 ✅ WALLET-001: Connect Wallet - PASS
 ✅ SWAP-001: Swap Native Token - PASS
+✅ SWAP-002: Swap ERC20 Token - PASS
 
-2/2 tests passed (100%)
+3/3 tests passed (100%)
 ```
 
 ## Data Storage
