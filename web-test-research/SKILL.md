@@ -21,13 +21,34 @@ Analyze any web project to understand what it does and what needs to be tested.
 2. **Research** - WebSearch any unknown dependency/protocol to understand what it does
 3. **Read** - Read the actual code to understand how features are implemented
 4. **See** - Launch the app and take UI screenshots to discover visual features
-5. **Generate** - Create test requirements based on code AND visual analysis
+5. **Analyze Business** - Deep dive into business logic, user flows, and edge cases
+6. **Generate** - Create comprehensive test requirements based on code, UI, AND business analysis
 
 **Code analysis alone is NOT enough. UI screenshots reveal:**
 - Third-party UI components and features
 - Visual elements not obvious from code
 - Actual user-facing functionality
 - Hidden features from external packages
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  ⚠️  CRITICAL: BUSINESS FUNCTION ANALYSIS                      ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Test coverage quality depends on DEEP business understanding: ║
+║                                                                ║
+║  1. Identify ALL business functions, not just technical ones   ║
+║  2. Map complete user journeys from start to finish            ║
+║  3. Find business rules, validations, and constraints          ║
+║  4. Discover edge cases and boundary conditions                ║
+║  5. Understand state transitions and their triggers            ║
+║                                                                ║
+║  A swap test is NOT just "click swap button"                   ║
+║  It includes: token selection, amount validation, slippage,    ║
+║  price impact, approval flow, transaction states, etc.         ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
 
 ## Workflow Overview
 
@@ -44,13 +65,19 @@ Analyze any web project to understand what it does and what needs to be tested.
 │          ↓                                                      │
 │  Step 4: Read and Understand Code                               │
 │          ↓                                                      │
-│  Step 5: Visual UI Analysis ← NEW!                              │
+│  Step 5: Visual UI Analysis                                     │
 │          - Start dev server                                     │
 │          - Launch browser                                       │
 │          - Take screenshots of key pages                        │
 │          - AI analyzes UI to find features                      │
 │          ↓                                                      │
-│  Step 6: Generate Feature Analysis                              │
+│  Step 6: Deep Business Function Analysis ← CRITICAL!            │
+│          - Map complete user journeys                           │
+│          - Identify business rules and validations              │
+│          - Find edge cases and boundary conditions              │
+│          - Document state transitions                           │
+│          ↓                                                      │
+│  Step 7: Generate Comprehensive Feature Analysis                │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -208,9 +235,150 @@ Features to Test:
 5. Price chart loading
 ```
 
-## Step 6: Generate Feature Analysis
+## Step 6: Deep Business Function Analysis (CRITICAL!)
 
-**Combine code analysis AND visual analysis:**
+**This step is ESSENTIAL for comprehensive test coverage. You must analyze:**
+
+### 6.1 Map Complete User Journeys
+
+For EACH feature, document the complete user flow:
+
+```
+Feature: Token Swap
+├── Entry Point: How does user access this feature?
+│   - Direct URL (/swap)
+│   - Navigation menu click
+│   - Home page CTA
+├── Prerequisites: What must be true before using?
+│   - Wallet connected
+│   - Has token balance
+│   - Network selected
+├── Main Flow: Happy path steps
+│   1. Select source token
+│   2. Enter amount
+│   3. Select destination token
+│   4. Review quote/price
+│   5. Click swap
+│   6. Approve in wallet (if ERC20)
+│   7. Confirm transaction
+│   8. Wait for confirmation
+│   9. See success state
+├── Alternative Flows:
+│   - User changes amount mid-flow
+│   - User switches tokens
+│   - Quote expires, need refresh
+│   - Transaction pending too long
+└── Exit Points:
+    - Success → balance updated
+    - Cancel → back to form
+    - Error → error message shown
+```
+
+### 6.2 Identify Business Rules and Validations
+
+**For each input/action, find the validation rules:**
+
+```bash
+# Search for validation logic
+grep -rn "validate\|isValid\|error\|required" --include="*.ts" --include="*.tsx" src/
+```
+
+**Document ALL business rules:**
+
+| Feature | Rule | Condition | Error Message |
+|---------|------|-----------|---------------|
+| Swap | Min amount | amount > 0 | "Enter an amount" |
+| Swap | Max amount | amount <= balance | "Insufficient balance" |
+| Swap | Slippage range | 0.1% - 50% | "Slippage must be between 0.1% and 50%" |
+| Swap | Price impact | impact < 15% | "High price impact warning" |
+| Stake | Lock period | days >= 7 | "Minimum lock: 7 days" |
+| Stake | Min stake | amount >= 100 | "Minimum stake: 100 tokens" |
+
+### 6.3 Find Edge Cases and Boundary Conditions
+
+**Think about what could go wrong:**
+
+| Category | Edge Cases to Test |
+|----------|-------------------|
+| **Input Validation** | Empty input, zero, negative, very large number, special chars |
+| **Balance** | Zero balance, exact balance, insufficient balance, dust amounts |
+| **Token** | Native token vs ERC20, unsupported token, token with unusual decimals |
+| **Network** | Wrong network, network switch mid-transaction |
+| **Wallet** | Disconnect mid-flow, reject transaction, timeout |
+| **State** | Stale data, quote expired, concurrent operations |
+| **UI** | Rapid clicks, form resubmit, back button |
+
+### 6.4 Document State Transitions
+
+**Map all possible states and transitions:**
+
+```
+Token Swap States:
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│   [Idle] ──input──> [Amount Entered] ──fetch──> [Quote Ready]   │
+│     │                     │                          │          │
+│     │                     │ invalid                  │ click    │
+│     │                     ↓                          ↓          │
+│     │              [Validation Error]         [Confirming]      │
+│     │                     │                      │    │         │
+│     │                     │ fix                  │    │ reject  │
+│     │                     ↓                      │    ↓         │
+│     └──────────── [Ready to Swap] <──────────────┘  [Rejected]  │
+│                          │                                      │
+│                          │ approve+confirm                      │
+│                          ↓                                      │
+│                    [Pending] ──success──> [Completed]           │
+│                        │                                        │
+│                        │ fail                                   │
+│                        ↓                                        │
+│                    [Failed]                                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6.5 Analyze Specific Business Scenarios
+
+**Deep dive into business logic:**
+
+```bash
+# Find business logic files
+grep -rn "calculate\|compute\|getPrice\|getQuote" --include="*.ts" --include="*.tsx" src/
+
+# Read and understand the calculations
+cat src/utils/priceCalculation.ts
+```
+
+**Example Analysis for a DEX:**
+
+| Business Function | What to Test |
+|-------------------|--------------|
+| **Quote Calculation** | Correct price for different amounts, slippage applied correctly |
+| **Price Impact** | Warning shows when impact > threshold, blocking when too high |
+| **Token Approval** | First swap needs approval, subsequent swaps don't |
+| **Transaction Fee** | Gas estimation shown, updates with network conditions |
+| **Swap Route** | Multi-hop routes work, best route selected |
+
+### 6.6 Business Function Checklist
+
+**Before moving to Step 7, verify you have analyzed:**
+
+```
+□ All user entry points to the feature
+□ Complete happy path with all steps
+□ All input validation rules with error messages
+□ Balance and amount edge cases
+□ All possible error states and recovery flows
+□ State transitions and their triggers
+□ Concurrent/race condition scenarios
+□ Business-specific calculations and rules
+□ Integration points with external services
+□ Feature-specific edge cases (e.g., token decimals, gas limits)
+```
+
+## Step 7: Generate Comprehensive Feature Analysis
+
+**Combine code analysis, visual analysis, AND business analysis:**
 
 ```markdown
 # Project Analysis
@@ -261,14 +429,141 @@ Features found from UI that were NOT obvious from code:
 | Token List Modal | research-swap.jpg | Shows token search, balances |
 | Settings Popup | research-settings.jpg | Slippage, deadline settings |
 
-## Test Requirements
+## Business Function Analysis (CRITICAL FOR TEST COVERAGE)
 
-Based on code AND visual analysis:
+### User Journeys
 
-| Feature | What to Test | Source | Wallet Popups |
-|---------|--------------|--------|---------------|
-| [feature] | [test scenarios] | Code+UI | [0/1/2/...] |
-| [visual feature] | [test scenarios] | UI only | [0/1/2/...] |
+#### Journey: [Feature Name] - Happy Path
+| Step | Action | Expected Result | Screenshot |
+|------|--------|-----------------|------------|
+| 1 | Navigate to /swap | Swap page loads | swap-initial.jpg |
+| 2 | Select source token | Token selector opens | swap-token-select.jpg |
+| 3 | Enter amount "0.1" | Quote fetches | swap-quote.jpg |
+| ... | ... | ... | ... |
+
+#### Journey: [Feature Name] - Error Recovery
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Enter amount exceeding balance | Error message shown |
+| 2 | Reduce amount to valid | Error clears, quote loads |
+| ... | ... | ... |
+
+### Business Rules Discovered
+
+| Feature | Rule | Validation | Error Message | Code Location |
+|---------|------|------------|---------------|---------------|
+| Swap | Min amount | amount > 0 | "Enter an amount" | src/hooks/useSwap.ts:45 |
+| Swap | Balance check | amount <= balance | "Insufficient balance" | src/components/SwapForm.tsx:89 |
+| Swap | Slippage range | 0.1% - 50% | "Invalid slippage" | src/utils/validation.ts:23 |
+| Stake | Min stake | amount >= minStake | "Below minimum stake" | src/features/stake/index.tsx:67 |
+| Stake | Lock period | days >= 7 | "Minimum lock: 7 days" | src/features/stake/index.tsx:72 |
+
+### Edge Cases and Boundary Conditions
+
+| Category | Test Scenario | Expected Behavior | Priority |
+|----------|---------------|-------------------|----------|
+| Input | Zero amount | Button disabled, show hint | High |
+| Input | Negative number | Prevent input or show error | High |
+| Input | Decimal overflow (e.g., 0.0000001 for 6-decimal token) | Round or reject | Medium |
+| Balance | Exact balance swap | Should succeed | High |
+| Balance | Balance - gas not enough | Show gas warning | High |
+| Token | Token with 2 decimals | Display correctly | Medium |
+| Token | Swap same token | Prevent or show error | Medium |
+| Network | Wrong network selected | Show network switch prompt | High |
+| State | Quote expires (user waits too long) | Refresh quote prompt | Medium |
+| State | Double-click submit | Prevent duplicate tx | High |
+
+### State Transition Diagram
+
+```
+[Feature: Swap]
+
+Initial → [Wallet Not Connected]
+             │
+             ↓ connect wallet
+       [Wallet Connected]
+             │
+             ↓ enter amount
+       [Amount Entered] ←──────────────┐
+             │                          │
+             ├── invalid ──→ [Validation Error] ── fix ──┘
+             │
+             ↓ fetch quote
+       [Quote Ready]
+             │
+             ├── quote expires ──→ [Stale Quote] ── refresh ──→ [Quote Ready]
+             │
+             ↓ click swap
+       [Confirming]
+             │
+             ├── reject ──→ [Rejected] ──→ [Wallet Connected]
+             │
+             ↓ approve (if ERC20)
+       [Approving Token]
+             │
+             ↓ confirm tx
+       [Transaction Pending]
+             │
+             ├── fail ──→ [Transaction Failed] ──→ [Quote Ready]
+             │
+             ↓ success
+       [Swap Complete] ──→ [Wallet Connected]
+```
+
+## Comprehensive Test Requirements
+
+Based on code, UI, AND business analysis:
+
+### Core Business Functions (Critical Priority)
+
+| ID | Feature | Test Scenario | Business Rule | Expected | Wallet Popups |
+|----|---------|---------------|---------------|----------|---------------|
+| BF-001 | Swap | Swap native token for ERC20 | Happy path | Success, balance updated | 1 |
+| BF-002 | Swap | Swap ERC20 for native token | Requires approval | Approval + swap | 2 |
+| BF-003 | Swap | Swap with exact balance | Edge case | Success or insufficient gas warning | 1-2 |
+| BF-004 | Stake | Stake minimum amount | Min stake rule | Success | 1 |
+| BF-005 | Stake | Stake below minimum | Validation | Error message shown | 0 |
+
+### Input Validation Tests (High Priority)
+
+| ID | Feature | Input | Business Rule | Expected |
+|----|---------|-------|---------------|----------|
+| IV-001 | Swap | Empty amount | amount required | Button disabled |
+| IV-002 | Swap | "0" amount | amount > 0 | Error or disabled |
+| IV-003 | Swap | "abc" (non-numeric) | numeric only | Input rejected |
+| IV-004 | Swap | Negative "-1" | amount >= 0 | Input rejected or error |
+| IV-005 | Swap | Very large "9999999999" | amount <= balance | Insufficient balance error |
+| IV-006 | Swap | Decimal overflow | token decimals | Rounded or rejected |
+
+### Error Handling Tests (High Priority)
+
+| ID | Feature | Error Scenario | Expected Behavior |
+|----|---------|----------------|-------------------|
+| EH-001 | Swap | Transaction rejected in wallet | Error message, can retry |
+| EH-002 | Swap | Transaction reverted | Clear error, suggest retry |
+| EH-003 | Swap | Network error | Retry prompt |
+| EH-004 | Swap | Quote expired | Refresh quote button |
+| EH-005 | General | Wallet disconnected mid-flow | Prompt to reconnect |
+
+### State Transition Tests (Medium Priority)
+
+| ID | Feature | Transition | Test Scenario |
+|----|---------|------------|---------------|
+| ST-001 | Swap | Idle → Quote Ready | Enter valid amount |
+| ST-002 | Swap | Quote Ready → Stale | Wait for timeout |
+| ST-003 | Swap | Confirming → Rejected | Click reject in wallet |
+| ST-004 | Swap | Pending → Failed | Simulate tx failure |
+| ST-005 | Swap | Pending → Complete | Successful transaction |
+
+### UI/UX Tests (Medium Priority)
+
+| ID | Feature | Test Scenario | Expected |
+|----|---------|---------------|----------|
+| UX-001 | Swap | Double-click swap button | Single transaction only |
+| UX-002 | Swap | Rapidly change input | No race conditions |
+| UX-003 | Swap | Browser back during flow | Clean state |
+| UX-004 | Token | Token selector search | Filters correctly |
+| UX-005 | Settings | Change slippage | Applied to next swap |
 ```
 
 ## Example Complete Research Flow

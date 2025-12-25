@@ -356,17 +356,46 @@ Next steps:
 
 ### ID Generation Rules
 
-| Feature | ID Pattern | Example |
-|---------|------------|---------|
-| Wallet | WALLET-NNN | WALLET-001 |
-| Swap | SWAP-NNN | SWAP-002 |
-| Stake | STAKE-NNN | STAKE-001 |
-| Claim | CLAIM-NNN | CLAIM-001 |
-| Custom | CUSTOM-NNN | CUSTOM-001 |
+**Use meaningful IDs that indicate test type:**
+
+| Test Type | ID Pattern | Example | Description |
+|-----------|------------|---------|-------------|
+| Happy Path | FEATURE-HP-NNN | SWAP-HP-001 | Complete success journey |
+| Input Validation | FEATURE-IV-NNN | SWAP-IV-001 | Validation rule test |
+| Error Handling | FEATURE-EH-NNN | SWAP-EH-001 | Error scenario test |
+| Edge Case | FEATURE-EC-NNN | SWAP-EC-001 | Boundary condition test |
+| State Transition | FEATURE-ST-NNN | SWAP-ST-001 | State change test |
+| General | FEATURE-NNN | WALLET-001 | Basic feature test |
+
+**Feature prefixes:**
+
+| Feature | Prefix |
+|---------|--------|
+| Wallet Connection | WALLET |
+| Token Swap | SWAP |
+| Staking | STAKE |
+| Liquidity Pool | POOL |
+| Bridge | BRIDGE |
+| Claim/Rewards | CLAIM |
+| Settings | SETTINGS |
+| Login/Auth | AUTH |
+| Search | SEARCH |
+| Form | FORM |
+| Custom | CUSTOM |
+
+**Examples:**
+```
+SWAP-HP-001    → Swap Happy Path test #1
+SWAP-IV-001    → Swap Input Validation test #1
+SWAP-EH-001    → Swap Error Handling test #1
+SWAP-EC-001    → Swap Edge Case test #1
+STAKE-HP-001   → Stake Happy Path test #1
+WALLET-001     → Wallet Connection test (general)
+```
 
 Always check existing IDs and increment:
 ```bash
-grep "id:" ./tests/test-cases.yaml | tail -5
+grep "id:" ./tests/test-cases.yaml | tail -10
 ```
 
 ## Output Files
@@ -1135,6 +1164,428 @@ Next steps:
 
 ## Test Case Generation Rules
 
+```
+╔════════════════════════════════════════════════════════════════╗
+║  ⚠️  CRITICAL: GENERATE COMPREHENSIVE BUSINESS TESTS           ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Test coverage quality is CRITICAL. You MUST generate tests    ║
+║  for ALL business functions, not just basic happy paths.       ║
+║                                                                ║
+║  For EACH feature, generate tests for:                         ║
+║  ✓ Happy path (complete user journey)                          ║
+║  ✓ Input validation (all rules discovered)                     ║
+║  ✓ Error handling (all error states)                           ║
+║  ✓ Edge cases (boundary conditions)                            ║
+║  ✓ State transitions (all state changes)                       ║
+║                                                                ║
+║  A feature with just ONE test case is INCOMPLETE!              ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+### Business Function Test Generation
+
+For EACH feature discovered in web-test-research, you MUST generate multiple test cases:
+
+#### 1. Happy Path Tests (Critical Priority)
+
+Generate complete end-to-end tests for the main user journey:
+
+```yaml
+# Example: Complete swap happy path
+- id: SWAP-HP-001
+  name: Complete Token Swap Journey
+  module: swap
+  feature: Token Swap
+  priority: critical
+  web3: true
+  wallet_popups: 1
+  depends_on: [WALLET-001]
+  description:
+    purpose: |
+      Test complete swap flow from token selection to transaction confirmation.
+      Verifies the entire user journey works correctly.
+    business_rules:
+      - User can select source and destination tokens
+      - Amount input shows live balance
+      - Quote updates automatically
+      - Transaction completes successfully
+  preconditions:
+    - Has native token balance
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-screenshot
+      name: swap-initial
+    - action: vision-click
+      target: source token dropdown
+    - action: vision-screenshot
+      name: token-selector-open
+    - action: vision-click
+      target: ETH option
+    - action: vision-type
+      target: amount input
+      value: "0.1"
+    - action: wait
+      ms: 1000
+      reason: Wait for balance validation
+    - action: vision-click
+      target: destination token dropdown
+    - action: vision-click
+      target: USDC option
+    - action: wait
+      ms: 2000
+      reason: Wait for quote to load
+    - action: vision-screenshot
+      name: quote-ready
+    - action: vision-click
+      target: Swap button
+    - action: wallet-approve
+    - action: wait
+      ms: 3000
+      reason: Wait for transaction
+    - action: vision-screenshot
+      name: swap-complete
+  expected:
+    - Token selector shows available tokens with balances
+    - Quote displays exchange rate and output amount
+    - Transaction confirmation in wallet popup
+    - Success message displayed
+    - Balance updated after swap
+```
+
+#### 2. Input Validation Tests (High Priority)
+
+Generate tests for EVERY validation rule found in code:
+
+```yaml
+# Example: Empty amount validation
+- id: SWAP-IV-001
+  name: Swap Empty Amount Validation
+  module: swap
+  feature: Token Swap
+  priority: high
+  web3: true
+  wallet_popups: 0
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify swap button is disabled when no amount is entered
+    business_rule: "amount required - cannot swap with empty input"
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-screenshot
+      name: empty-amount-state
+  expected:
+    - Swap button disabled or shows "Enter an amount"
+    - No quote displayed
+    - Form is in idle state
+
+# Example: Insufficient balance validation
+- id: SWAP-IV-002
+  name: Swap Insufficient Balance Validation
+  module: swap
+  feature: Token Swap
+  priority: high
+  web3: true
+  wallet_popups: 0
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify error when amount exceeds balance
+    business_rule: "amount <= balance - cannot swap more than owned"
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-type
+      target: amount input
+      value: "999999999"
+    - action: wait
+      ms: 1000
+      reason: Wait for validation
+    - action: vision-screenshot
+      name: insufficient-balance-error
+  expected:
+    - Error message "Insufficient balance" or similar
+    - Swap button disabled
+    - Input field may show error styling
+
+# Example: Invalid input validation
+- id: SWAP-IV-003
+  name: Swap Invalid Input Rejection
+  module: swap
+  feature: Token Swap
+  priority: high
+  web3: true
+  wallet_popups: 0
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify non-numeric input is rejected
+    business_rule: "numeric only - amount must be a valid number"
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-type
+      target: amount input
+      value: "abc"
+    - action: vision-screenshot
+      name: invalid-input-state
+  expected:
+    - Input rejected or shows error
+    - Non-numeric characters not accepted
+```
+
+#### 3. Error Handling Tests (High Priority)
+
+Generate tests for each error scenario:
+
+```yaml
+# Example: Transaction rejection
+- id: SWAP-EH-001
+  name: Swap Transaction Rejection Handling
+  module: swap
+  feature: Token Swap
+  priority: high
+  web3: true
+  wallet_popups: 1
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify app handles user rejection gracefully
+    error_scenario: User clicks "Reject" in wallet popup
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-type
+      target: amount input
+      value: "0.01"
+    - action: wait
+      ms: 2000
+      reason: Wait for quote
+    - action: vision-click
+      target: Swap button
+    - action: wallet-reject
+    - action: wait
+      ms: 1000
+      reason: Wait for error handling
+    - action: vision-screenshot
+      name: rejection-handled
+  expected:
+    - Error message displayed (e.g., "Transaction rejected")
+    - Form remains usable for retry
+    - No balance change
+    - App does not crash
+
+# Example: Network error
+- id: SWAP-EH-002
+  name: Swap Quote Fetch Error
+  module: swap
+  feature: Token Swap
+  priority: high
+  web3: true
+  wallet_popups: 0
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify error handling when quote cannot be fetched
+    error_scenario: API returns error during quote fetch
+  steps:
+    - action: navigate
+      url: /swap
+    - action: mock-network-error
+      trigger: quote-fetch
+    - action: vision-type
+      target: amount input
+      value: "0.1"
+    - action: wait
+      ms: 3000
+      reason: Wait for error state
+    - action: vision-screenshot
+      name: quote-error-state
+  expected:
+    - Error message shown (not raw error)
+    - Retry option available
+    - User can try again
+```
+
+#### 4. Edge Case Tests (Medium Priority)
+
+Generate tests for boundary conditions and unusual scenarios:
+
+```yaml
+# Example: Exact balance swap
+- id: SWAP-EC-001
+  name: Swap Exact Balance Amount
+  module: swap
+  feature: Token Swap
+  priority: medium
+  web3: true
+  wallet_popups: 1
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify behavior when swapping entire balance
+    edge_case: User wants to swap 100% of their token balance
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-click
+      target: MAX button or balance display
+    - action: wait
+      ms: 1000
+      reason: Wait for amount to populate
+    - action: vision-screenshot
+      name: max-amount-set
+  expected:
+    - Max amount correctly filled
+    - Gas fee consideration shown (if applicable)
+    - Quote loads successfully
+
+# Example: Same token swap attempt
+- id: SWAP-EC-002
+  name: Swap Same Token Prevention
+  module: swap
+  feature: Token Swap
+  priority: medium
+  web3: true
+  wallet_popups: 0
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify app prevents swapping same token
+    edge_case: User selects same token for both source and destination
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-click
+      target: source token dropdown
+    - action: vision-click
+      target: ETH option
+    - action: vision-click
+      target: destination token dropdown
+    - action: vision-click
+      target: ETH option
+    - action: vision-screenshot
+      name: same-token-state
+  expected:
+    - Token automatically switched OR
+    - Error message shown OR
+    - Same token option disabled
+
+# Example: Decimal precision
+- id: SWAP-EC-003
+  name: Swap Decimal Precision Handling
+  module: swap
+  feature: Token Swap
+  priority: medium
+  web3: true
+  wallet_popups: 0
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify handling of high decimal precision
+    edge_case: Input exceeds token's decimal places
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-click
+      target: destination token dropdown
+    - action: vision-click
+      target: USDC option (6 decimals)
+    - action: vision-type
+      target: amount input
+      value: "0.0000001"
+    - action: vision-screenshot
+      name: decimal-precision
+  expected:
+    - Input rounded or truncated appropriately
+    - No calculation errors
+    - Clear display of actual amount
+```
+
+#### 5. State Transition Tests (Medium Priority)
+
+Generate tests to verify state changes:
+
+```yaml
+# Example: Quote refresh on input change
+- id: SWAP-ST-001
+  name: Quote Updates on Amount Change
+  module: swap
+  feature: Token Swap
+  priority: medium
+  web3: true
+  wallet_popups: 0
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify quote updates when user changes amount
+    state_transition: Quote Ready → Fetching → Quote Ready
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-type
+      target: amount input
+      value: "0.1"
+    - action: wait
+      ms: 2000
+      reason: Wait for initial quote
+    - action: vision-screenshot
+      name: quote-v1
+    - action: vision-type
+      target: amount input
+      value: "0.5"
+    - action: wait
+      ms: 2000
+      reason: Wait for updated quote
+    - action: vision-screenshot
+      name: quote-v2
+  expected:
+    - Quote changes when amount changes
+    - Loading state shown during fetch
+    - New quote reflects new amount
+
+# Example: Disconnect during operation
+- id: SWAP-ST-002
+  name: Wallet Disconnect Mid-Flow
+  module: swap
+  feature: Token Swap
+  priority: medium
+  web3: true
+  wallet_popups: 0
+  depends_on: [WALLET-001]
+  description:
+    purpose: Verify app handles wallet disconnect gracefully
+    state_transition: Quote Ready → Wallet Disconnected
+  steps:
+    - action: navigate
+      url: /swap
+    - action: vision-type
+      target: amount input
+      value: "0.1"
+    - action: wait
+      ms: 2000
+      reason: Wait for quote
+    - action: wallet-disconnect
+    - action: vision-screenshot
+      name: disconnected-state
+  expected:
+    - Connect wallet button appears
+    - Form resets or shows connect prompt
+    - No crash or error
+```
+
+### Test Count Guidelines Per Feature
+
+**Minimum test cases per business feature:**
+
+| Feature Complexity | Happy Path | Validation | Error | Edge Cases | Total Min |
+|-------------------|------------|------------|-------|------------|-----------|
+| Simple (1-2 inputs) | 1 | 2-3 | 1-2 | 1-2 | 5-8 |
+| Medium (3-5 inputs) | 1-2 | 4-6 | 2-3 | 2-3 | 9-14 |
+| Complex (multi-step) | 2-3 | 5-8 | 3-4 | 3-4 | 13-19 |
+
+**Example for Swap feature (Medium complexity):**
+- 1 complete happy path test
+- 5 validation tests (empty, insufficient, invalid, zero, max)
+- 3 error tests (reject, network, timeout)
+- 3 edge cases (exact balance, same token, decimals)
+- **Total: 12 tests for Swap alone**
+
 ### Wallet Connection as Precondition
 
 For Web3 DApps (`web3.enabled: true`), wallet connection handling:
@@ -1167,12 +1618,64 @@ For Web3 DApps (`web3.enabled: true`), wallet connection handling:
 
 ### From Research → Test Cases
 
-| Research Output | Generate |
-|-----------------|----------|
-| Feature with user flow | Happy path test case |
-| Input validation | Error handling test cases |
-| Wallet interaction | Test with wallet_popups count + precondition: WALLET-001 |
-| External protocol | Research-based test scenarios |
+**Map research output to comprehensive test cases:**
+
+| Research Output | Test Cases to Generate |
+|-----------------|------------------------|
+| **User Journey** | 1 Happy path (complete journey) |
+| **Business Rules** | 1 test per rule (validation) |
+| **Edge Cases** | 1 test per edge case |
+| **Error Scenarios** | 1 test per error state |
+| **State Transitions** | 1 test per transition |
+| **Wallet Interaction** | Tests with wallet_popups + depends_on |
+| **External Protocol** | Research-based scenarios |
+
+**Mapping Example (Swap Feature):**
+
+```
+Research Found:                     Test Cases Generated:
+──────────────────────────────────  ─────────────────────────────────────
+User Journey:
+├─ Token selection                  SWAP-HP-001: Complete Swap Journey
+├─ Amount input
+├─ Quote display
+├─ Transaction flow
+└─ Success confirmation
+
+Business Rules:
+├─ amount > 0                       SWAP-IV-001: Empty Amount Validation
+├─ amount <= balance                SWAP-IV-002: Insufficient Balance
+├─ numeric input only               SWAP-IV-003: Invalid Input Rejection
+├─ slippage 0.1% - 50%              SWAP-IV-004: Slippage Bounds Check
+└─ max decimals per token           SWAP-IV-005: Decimal Precision
+
+Edge Cases:
+├─ Exact balance swap               SWAP-EC-001: Max Balance Swap
+├─ Same token swap                  SWAP-EC-002: Same Token Prevention
+├─ Dust amount                      SWAP-EC-003: Minimum Amount
+└─ Token with unusual decimals      SWAP-EC-004: Low Decimal Token
+
+Error Scenarios:
+├─ Transaction rejected             SWAP-EH-001: Rejection Handling
+├─ Quote fetch failed               SWAP-EH-002: Quote Error
+├─ Transaction reverted             SWAP-EH-003: Revert Handling
+└─ Wallet disconnected              SWAP-EH-004: Disconnect Handling
+
+State Transitions:
+├─ Idle → Quote Ready               SWAP-ST-001: Quote Loading
+├─ Quote → Confirming               SWAP-ST-002: Transaction Start
+└─ Pending → Complete/Failed        SWAP-ST-003: Transaction Resolution
+
+TOTAL: 15 test cases for Swap feature
+```
+
+**Non-negotiable minimum tests per feature:**
+
+| Feature Type | Minimum Tests |
+|--------------|---------------|
+| Core business function | 10+ |
+| Secondary function | 5-8 |
+| Simple UI element | 3-5 |
 
 ### Negative Test Cases (Conditional)
 
