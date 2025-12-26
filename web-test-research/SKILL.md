@@ -5,7 +5,7 @@ license: MIT
 compatibility: Node.js 18+
 metadata:
   author: AI Agent
-  version: 5.0.0
+  version: 6.0.0
 allowed-tools: Bash Read Glob Grep WebSearch WebFetch Skill
 ---
 
@@ -13,617 +13,591 @@ allowed-tools: Bash Read Glob Grep WebSearch WebFetch Skill
 
 Analyze any web project to understand what it does and what needs to be tested.
 
-## Core Principle: Discover, Research, Understand, SEE
+## Core Principle: Full Code Tree Traversal + Visual Analysis
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  ⚠️  CRITICAL: FULL CODE TREE TRAVERSAL                        ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  You MUST read the ENTIRE codebase systematically:             ║
+║                                                                ║
+║  1. Start from entry files (index.ts, main.ts, App.tsx)        ║
+║  2. Follow ALL imports/references like a tree                  ║
+║  3. Read EVERY file that is referenced                         ║
+║  4. Build a complete module & function map                     ║
+║                                                                ║
+║  DO NOT:                                                       ║
+║  ✗ Only search for specific keywords                           ║
+║  ✗ Only read files you think are important                     ║
+║  ✗ Skip files because they "look simple"                       ║
+║  ✗ Miss functionality hidden in utility files                  ║
+║                                                                ║
+║  The goal is 100% code coverage understanding!                 ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
 
 **You must dynamically:**
 
 1. **Detect** - Is this a Web3 DApp? What dependencies does it use?
-2. **Research** - WebSearch any unknown dependency/protocol to understand what it does
-3. **Read** - Read the actual code to understand how features are implemented
-4. **See** - Launch the app and take UI screenshots to discover visual features
-5. **Analyze Business** - Deep dive into business logic, user flows, and edge cases
-6. **Generate** - Create comprehensive test requirements based on code, UI, AND business analysis
-
-**Code analysis alone is NOT enough. UI screenshots reveal:**
-- Third-party UI components and features
-- Visual elements not obvious from code
-- Actual user-facing functionality
-- Hidden features from external packages
-
-```
-╔════════════════════════════════════════════════════════════════╗
-║  ⚠️  CRITICAL: BUSINESS FUNCTION ANALYSIS                      ║
-╠════════════════════════════════════════════════════════════════╣
-║                                                                ║
-║  Test coverage quality depends on DEEP business understanding: ║
-║                                                                ║
-║  1. Identify ALL business functions, not just technical ones   ║
-║  2. Map complete user journeys from start to finish            ║
-║  3. Find business rules, validations, and constraints          ║
-║  4. Discover edge cases and boundary conditions                ║
-║  5. Understand state transitions and their triggers            ║
-║                                                                ║
-║  A swap test is NOT just "click swap button"                   ║
-║  It includes: token selection, amount validation, slippage,    ║
-║  price impact, approval flow, transaction states, etc.         ║
-║                                                                ║
-╚════════════════════════════════════════════════════════════════╝
-```
+2. **Find Docs** - Read README.md, design docs, architecture docs for requirements
+3. **Tree Traverse** - Start from entry files, read EVERY imported file
+4. **Map Modules** - Build complete module map with entry files
+5. **Research** - WebSearch any unknown dependency/protocol
+6. **See** - Launch the app and take UI screenshots to discover visual features
+7. **Analyze Business** - Deep dive into business logic, user flows, roles, and permissions
+8. **Generate** - Create comprehensive feature analysis for test case generation
 
 ## Workflow Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  web-test-research                                              │
+│  web-test-research - FULL CODE ANALYSIS                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Step 1: Check Dependencies (package.json)                      │
+│  Phase 1: Project Documentation Analysis                        │
 │          ↓                                                      │
-│  Step 2: Research Unknown Dependencies (WebSearch)              │
+│          - Read README.md for project overview                  │
+│          - Find design docs, architecture docs, API docs        │
+│          - Understand business requirements                     │
 │          ↓                                                      │
-│  Step 3: Find Feature Code (grep, find)                         │
+│  Phase 2: Entry Point Discovery                                 │
 │          ↓                                                      │
-│  Step 4: Read and Understand Code                               │
+│          - Find all entry files (index, main, App)              │
+│          - Map project structure                                │
+│          - Identify framework (React/Vue/Next/etc)              │
 │          ↓                                                      │
-│  Step 5: Visual UI Analysis                                     │
-│          - Start dev server                                     │
-│          - Launch browser                                       │
-│          - Take screenshots of key pages                        │
-│          - AI analyzes UI to find features                      │
+│  Phase 3: Full Code Tree Traversal ← CRITICAL!                  │
 │          ↓                                                      │
-│  Step 6: Deep Business Function Analysis ← CRITICAL!            │
-│          - Map complete user journeys                           │
-│          - Identify business rules and validations              │
-│          - Find edge cases and boundary conditions              │
-│          - Document state transitions                           │
+│          - Start from entry files                               │
+│          - Follow ALL imports recursively                       │
+│          - Read EVERY referenced file                           │
+│          - Build complete dependency graph                      │
 │          ↓                                                      │
-│  Step 7: Generate Comprehensive Feature Analysis                │
+│  Phase 4: Module & Function Mapping                             │
+│          ↓                                                      │
+│          - Group files into logical modules                     │
+│          - Identify each module's functions                     │
+│          - Document entry files per module                      │
+│          ↓                                                      │
+│  Phase 5: Dependency Research                                   │
+│          ↓                                                      │
+│          - Research unknown packages via WebSearch              │
+│          - Understand third-party functionality                 │
+│          ↓                                                      │
+│  Phase 6: Visual UI Analysis                                    │
+│          ↓                                                      │
+│          - Launch browser, take screenshots                     │
+│          - Discover features not obvious from code              │
+│          - Analyze third-party UI components                    │
+│          ↓                                                      │
+│  Phase 7: Role & Permission Analysis                            │
+│          ↓                                                      │
+│          - Identify user roles (guest, user, admin, owner)      │
+│          - Map permissions per role                             │
+│          - Find protected routes/features                       │
+│          ↓                                                      │
+│  Phase 8: Generate Comprehensive Analysis                       │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Step 1: Check Dependencies
+## Phase 1: Project Documentation Analysis
+
+**Find and read ALL project documentation:**
 
 ```bash
-# Read package.json to see all dependencies
+# Find README and documentation files
+find . -maxdepth 3 -name "README*" -o -name "DESIGN*" -o -name "ARCHITECTURE*" -o -name "API*" -o -name "*.md" | grep -v node_modules
+
+# Read the main README
+cat README.md
+
+# Look for docs folder
+ls -la docs/ documentation/ doc/
+```
+
+**Extract from documentation:**
+
+| Document Type | What to Extract |
+|--------------|-----------------|
+| README.md | Project purpose, features list, tech stack |
+| DESIGN.md | Business requirements, user flows |
+| ARCHITECTURE.md | System structure, module relationships |
+| API.md | Endpoints, data formats |
+| CONTRIBUTING.md | Code organization hints |
+
+**Ask user for missing docs:**
+If design documents are not found in the codebase, use AskUserQuestion to request:
+- Design specifications
+- Figma/design file links
+- Product requirements document
+- API documentation
+
+## Phase 2: Entry Point Discovery
+
+**Find all entry files:**
+
+```bash
+# React/Next.js entry points
+ls -la src/index.* src/main.* src/App.* app/layout.* app/page.* pages/_app.* pages/index.*
+
+# Vue entry points
+ls -la src/main.* src/App.vue
+
+# Package.json main field
+cat package.json | grep -A2 '"main"'
+
+# Build configuration
+cat vite.config.* webpack.config.* next.config.*
+```
+
+**Map project structure:**
+
+```bash
+# Get full directory structure (excluding node_modules)
+find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.vue" \) | grep -v node_modules | sort
+```
+
+## Phase 3: Full Code Tree Traversal (CRITICAL!)
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  TREE TRAVERSAL ALGORITHM                                      ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  1. Create a queue with entry files                            ║
+║  2. Create a "visited" set (initially empty)                   ║
+║  3. While queue is not empty:                                  ║
+║     a. Dequeue a file                                          ║
+║     b. If already visited, skip                                ║
+║     c. Read the file content                                   ║
+║     d. Extract all imports/requires                            ║
+║     e. Add imported files to queue                             ║
+║     f. Mark current file as visited                            ║
+║     g. Document file's purpose and exports                     ║
+║  4. Result: Complete map of all code and dependencies          ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+**Step-by-step execution:**
+
+### 3.1 Start from Entry File
+
+```bash
+# Read the main entry file
+cat src/index.tsx
+# or
+cat src/main.ts
+# or
+cat src/App.tsx
+```
+
+### 3.2 Extract Imports
+
+For each file read, extract ALL imports:
+
+```
+// Example: src/App.tsx
+import { Header } from './components/Header'        → Read src/components/Header.tsx
+import { useAuth } from './hooks/useAuth'          → Read src/hooks/useAuth.ts
+import { SwapPage } from './pages/Swap'            → Read src/pages/Swap.tsx
+import { StakingService } from './services/staking' → Read src/services/staking.ts
+import { config } from './config'                  → Read src/config.ts
+```
+
+### 3.3 Follow Each Import
+
+```bash
+# For each import found, read the file
+cat src/components/Header.tsx
+cat src/hooks/useAuth.ts
+cat src/pages/Swap.tsx
+cat src/services/staking.ts
+cat src/config.ts
+```
+
+### 3.4 Continue Recursively
+
+Each file may have its own imports - follow them all:
+
+```
+src/pages/Swap.tsx imports:
+├── ./components/TokenSelector → Read
+├── ./hooks/useSwap            → Read
+├── ../utils/formatAmount      → Read
+└── @/store/swapStore          → Read
+
+Continue until ALL files are read!
+```
+
+### 3.5 Document Each File
+
+As you read each file, document:
+
+| File Path | Purpose | Exports | Dependencies |
+|-----------|---------|---------|--------------|
+| src/components/Header.tsx | Navigation header | Header component | useAuth, useWallet |
+| src/hooks/useSwap.ts | Swap logic hook | useSwap | swapService, tokenStore |
+| src/services/staking.ts | Staking API calls | stake, unstake, getRewards | api, config |
+
+## Phase 4: Module & Function Mapping
+
+**After reading all files, create module map:**
+
+```markdown
+# Module Map
+
+## Module: Authentication (src/auth/)
+Entry file: src/auth/index.ts
+Files:
+- src/auth/AuthProvider.tsx - Auth context provider
+- src/auth/useAuth.ts - Auth hook
+- src/auth/LoginForm.tsx - Login form component
+- src/auth/guards.ts - Route guards
+
+Functions:
+- login(credentials) - User login
+- logout() - User logout
+- register(data) - New user registration
+- resetPassword(email) - Password reset
+
+## Module: Swap (src/features/swap/)
+Entry file: src/features/swap/index.ts
+Files:
+- src/features/swap/SwapPage.tsx - Main swap page
+- src/features/swap/SwapForm.tsx - Swap input form
+- src/features/swap/TokenSelector.tsx - Token dropdown
+- src/features/swap/useSwap.ts - Swap logic
+- src/features/swap/swapService.ts - API calls
+
+Functions:
+- getQuote(from, to, amount) - Get swap quote
+- executeSwap(params) - Execute token swap
+- getTokenList() - Fetch available tokens
+- approveToken(token, amount) - ERC20 approval
+
+## Module: Staking (src/features/staking/)
+...
+```
+
+## Phase 5: Dependency Research
+
+**Check package.json for all dependencies:**
+
+```bash
 cat package.json
 ```
 
-**Look for:**
-- Web3 libraries: wagmi, ethers, viem, web3.js, @rainbow-me/rainbowkit
-- Any `@protocol-name/sdk` packages
-- Contract interaction patterns
-
-**If Web3 dependencies found → It's a Web3 DApp**
-
-## Step 2: Research Unknown Dependencies
-
-**For EVERY unfamiliar dependency, use WebSearch:**
+**For EVERY unfamiliar package, WebSearch:**
 
 ```
-Found: @someprotocol/sdk in package.json
+Found: @uniswap/sdk
+→ WebSearch: "uniswap sdk documentation"
+→ Learn: DEX swap functionality
 
-→ WebSearch: "someprotocol SDK what is it"
-→ WebSearch: "someprotocol documentation"
-→ Learn what this protocol does
-→ Understand user actions and transaction flows
+Found: @rainbow-me/rainbowkit
+→ WebSearch: "rainbowkit wallet connection"
+→ Learn: Wallet connection UI
+
+Found: recharts
+→ WebSearch: "recharts react library"
+→ Learn: Chart/graph components
 ```
 
-**Questions to answer:**
-- What does this protocol/service do?
-- What are the main user actions?
-- Does it require blockchain transactions?
-- Are token approvals needed?
+**Document what each dependency provides:**
 
-## Step 3: Find Feature Code
+| Package | Purpose | UI Components | Functions |
+|---------|---------|---------------|-----------|
+| @uniswap/sdk | Token swaps | - | getQuote, swap |
+| rainbowkit | Wallet UI | ConnectButton, Modal | connect, disconnect |
+| recharts | Charts | LineChart, BarChart | - |
 
-```bash
-# Find where blockchain interactions happen
-grep -rn "writeContract\|useContractWrite\|sendTransaction" --include="*.ts" --include="*.tsx" .
-
-# Find where external SDKs are used
-grep -rn "from '@" --include="*.ts" --include="*.tsx" . | grep -v node_modules
-
-# Find main components/pages
-find . -path ./node_modules -prune -o -type f \( -name "*.tsx" -o -name "*.vue" \) -print | head -30
-```
-
-## Step 4: Read and Understand Code
-
-**For each feature file found, READ IT:**
-
-```bash
-cat src/features/SomeFeature.tsx
-```
-
-**Extract:**
-- What user inputs are there? (forms, dropdowns, buttons)
-- What happens when user clicks submit?
-- What SDK/contract calls are made?
-- What success/error states exist?
-
-## Step 5: Visual UI Analysis (IMPORTANT!)
+## Phase 6: Visual UI Analysis
 
 **Code analysis alone misses visual features. You MUST see the actual UI.**
 
-### 5.1 Start Dev Server
+### 6.1 Start Dev Server
 
 ```bash
-# Check how to start the project
-cat package.json | grep -A5 '"scripts"'
-
-# Common start commands:
 npm run dev
-# or
-npm start
-# or
-yarn dev
+# Wait for server ready message
 ```
 
-Wait for server to be ready (usually shows "ready on localhost:3000" or similar).
-
-### 5.2 Take Screenshots of Key Pages
-
-Use the web-test skill's test-helper.js to capture UI:
+### 6.2 Take Screenshots of ALL Pages
 
 ```bash
-# Navigate to homepage and take screenshot
-node $SKILL_DIR/../web-test/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
-node $SKILL_DIR/../web-test/scripts/test-helper.js screenshot research-home.jpg --headed --keep-open
+SKILL_DIR="/Users/duxiaofeng/code/agent-skills/web-test"
 
-# Navigate to other discovered routes and screenshot each
-node $SKILL_DIR/../web-test/scripts/test-helper.js navigate "http://localhost:3000/swap" --headed --keep-open
-node $SKILL_DIR/../web-test/scripts/test-helper.js screenshot research-swap.jpg --headed --keep-open
+# Homepage
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot research-home.jpg --headed --keep-open
 
-# Scroll down to see more content
-node $SKILL_DIR/../web-test/scripts/test-helper.js scroll down 500 --headed --keep-open
-node $SKILL_DIR/../web-test/scripts/test-helper.js screenshot research-scroll.jpg --headed --keep-open
+# Navigate to each route found in code
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000/swap" --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot research-swap.jpg --headed --keep-open
+
+# Scroll to see more content
+node $SKILL_DIR/scripts/test-helper.js scroll down 500 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot research-scroll.jpg --headed --keep-open
 ```
 
-### 5.3 Discover Routes to Screenshot
+### 6.3 Analyze Screenshots for Missing Features
 
-**Find routes from code:**
-```bash
-# React Router routes
-grep -rn "path=" --include="*.tsx" --include="*.ts" . | grep -v node_modules
+Compare code analysis with UI screenshots:
 
-# Next.js pages
-ls -la pages/ app/
+| Found in Code | Found in UI | Action |
+|---------------|-------------|--------|
+| SwapForm component | Swap interface | ✓ Covered |
+| - | TradingView chart | Add to features! |
+| - | Token logo images | Add to features! |
+| - | Social links footer | Add to features! |
 
-# Common routes to check:
-# /, /swap, /pool, /stake, /bridge, /dashboard, /settings
-```
-
-### 5.4 Analyze Screenshots
-
-**For each screenshot, analyze:**
-
-| Question | What to Look For |
-|----------|------------------|
-| What buttons exist? | Connect Wallet, Swap, Add Liquidity, Stake, etc. |
-| What forms/inputs? | Token selectors, amount inputs, slippage settings |
-| What third-party UI? | Modal popups, charts, token lists, price displays |
-| What navigation? | Header links, sidebar menu, tabs |
-| What states shown? | Loading spinners, error messages, success toasts |
-
-### 5.5 Example Visual Analysis
-
-```
-Screenshot: research-home.jpg
-
-Observed UI Elements:
-├── Header
-│   ├── Logo
-│   ├── Navigation: Swap | Pool | Stake | Bridge
-│   └── Connect Wallet button (top right)
-├── Main Content
-│   ├── Token swap interface
-│   │   ├── "From" token selector with balance display
-│   │   ├── Amount input field
-│   │   ├── Swap direction button (↓)
-│   │   ├── "To" token selector
-│   │   └── "Swap" button (disabled until wallet connected)
-│   └── Price chart (TradingView widget - third party)
-└── Footer
-    └── Social links, docs link
-
-Features to Test:
-1. Connect Wallet flow
-2. Token selection modal
-3. Amount input validation
-4. Swap button states
-5. Price chart loading
-```
-
-## Step 6: Deep Business Function Analysis (CRITICAL!)
-
-**This step is ESSENTIAL for comprehensive test coverage. You must analyze:**
-
-### 6.1 Map Complete User Journeys
-
-For EACH feature, document the complete user flow:
-
-```
-Feature: Token Swap
-├── Entry Point: How does user access this feature?
-│   - Direct URL (/swap)
-│   - Navigation menu click
-│   - Home page CTA
-├── Prerequisites: What must be true before using?
-│   - Wallet connected
-│   - Has token balance
-│   - Network selected
-├── Main Flow: Happy path steps
-│   1. Select source token
-│   2. Enter amount
-│   3. Select destination token
-│   4. Review quote/price
-│   5. Click swap
-│   6. Approve in wallet (if ERC20)
-│   7. Confirm transaction
-│   8. Wait for confirmation
-│   9. See success state
-├── Alternative Flows:
-│   - User changes amount mid-flow
-│   - User switches tokens
-│   - Quote expires, need refresh
-│   - Transaction pending too long
-└── Exit Points:
-    - Success → balance updated
-    - Cancel → back to form
-    - Error → error message shown
-```
-
-### 6.2 Identify Business Rules and Validations
-
-**For each input/action, find the validation rules:**
+### 6.4 Check Different Screen Sizes
 
 ```bash
-# Search for validation logic
-grep -rn "validate\|isValid\|error\|required" --include="*.ts" --include="*.tsx" src/
+# Desktop (1920x1080)
+node $SKILL_DIR/scripts/test-helper.js set-viewport 1920 1080 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot research-desktop.jpg --headed --keep-open
+
+# Tablet (768x1024)
+node $SKILL_DIR/scripts/test-helper.js set-viewport 768 1024 --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot research-tablet.jpg --headed --keep-open
+
+# Mobile (375x667)
+node $SKILL_DIR/scripts/test-helper.js set-viewport 375 667 --mobile --headed --keep-open
+node $SKILL_DIR/scripts/test-helper.js screenshot research-mobile.jpg --headed --keep-open
 ```
 
-**Document ALL business rules:**
+**Document layout differences:**
 
-| Feature | Rule | Condition | Error Message |
-|---------|------|-----------|---------------|
-| Swap | Min amount | amount > 0 | "Enter an amount" |
-| Swap | Max amount | amount <= balance | "Insufficient balance" |
-| Swap | Slippage range | 0.1% - 50% | "Slippage must be between 0.1% and 50%" |
-| Swap | Price impact | impact < 15% | "High price impact warning" |
-| Stake | Lock period | days >= 7 | "Minimum lock: 7 days" |
-| Stake | Min stake | amount >= 100 | "Minimum stake: 100 tokens" |
+| Element | Desktop | Tablet | Mobile |
+|---------|---------|--------|--------|
+| Navigation | Horizontal menu | Horizontal menu | Hamburger menu |
+| Swap form | Side panel | Centered | Full width |
+| Token list | Grid (4 cols) | Grid (3 cols) | List view |
 
-### 6.3 Find Edge Cases and Boundary Conditions
-
-**Think about what could go wrong:**
-
-| Category | Edge Cases to Test |
-|----------|-------------------|
-| **Input Validation** | Empty input, zero, negative, very large number, special chars |
-| **Balance** | Zero balance, exact balance, insufficient balance, dust amounts |
-| **Token** | Native token vs ERC20, unsupported token, token with unusual decimals |
-| **Network** | Wrong network, network switch mid-transaction |
-| **Wallet** | Disconnect mid-flow, reject transaction, timeout |
-| **State** | Stale data, quote expired, concurrent operations |
-| **UI** | Rapid clicks, form resubmit, back button |
-
-### 6.4 Document State Transitions
-
-**Map all possible states and transitions:**
+## Phase 7: Role & Permission Analysis
 
 ```
-Token Swap States:
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│   [Idle] ──input──> [Amount Entered] ──fetch──> [Quote Ready]   │
-│     │                     │                          │          │
-│     │                     │ invalid                  │ click    │
-│     │                     ↓                          ↓          │
-│     │              [Validation Error]         [Confirming]      │
-│     │                     │                      │    │         │
-│     │                     │ fix                  │    │ reject  │
-│     │                     ↓                      │    ↓         │
-│     └──────────── [Ready to Swap] <──────────────┘  [Rejected]  │
-│                          │                                      │
-│                          │ approve+confirm                      │
-│                          ↓                                      │
-│                    [Pending] ──success──> [Completed]           │
-│                        │                                        │
-│                        │ fail                                   │
-│                        ↓                                        │
-│                    [Failed]                                     │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+╔════════════════════════════════════════════════════════════════╗
+║  ⚠️  CRITICAL: ANALYZE ALL USER ROLES & PERMISSIONS            ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Search for role/permission patterns in code:                  ║
+║                                                                ║
+║  1. Role definitions (admin, user, guest, owner)               ║
+║  2. Permission checks (canAccess, isAllowed, hasPermission)    ║
+║  3. Protected routes (RequireAuth, ProtectedRoute)             ║
+║  4. Role-based UI (show/hide based on role)                    ║
+║                                                                ║
+║  Test that each role:                                          ║
+║  ✓ CAN access features they should have                        ║
+║  ✓ CANNOT access features they shouldn't have                  ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
 ```
 
-### 6.5 Analyze Specific Business Scenarios
-
-**Deep dive into business logic:**
+**Search for role patterns:**
 
 ```bash
-# Find business logic files
-grep -rn "calculate\|compute\|getPrice\|getQuote" --include="*.ts" --include="*.tsx" src/
+# Find role definitions
+grep -rn "role\|permission\|admin\|owner\|guest" --include="*.ts" --include="*.tsx" src/
 
-# Read and understand the calculations
-cat src/utils/priceCalculation.ts
+# Find route guards
+grep -rn "ProtectedRoute\|RequireAuth\|isAuthenticated\|canAccess" --include="*.ts" --include="*.tsx" src/
+
+# Find conditional rendering based on role
+grep -rn "isAdmin\|isOwner\|hasRole\|userRole" --include="*.ts" --include="*.tsx" src/
 ```
 
-**Example Analysis for a DEX:**
-
-| Business Function | What to Test |
-|-------------------|--------------|
-| **Quote Calculation** | Correct price for different amounts, slippage applied correctly |
-| **Price Impact** | Warning shows when impact > threshold, blocking when too high |
-| **Token Approval** | First swap needs approval, subsequent swaps don't |
-| **Transaction Fee** | Gas estimation shown, updates with network conditions |
-| **Swap Route** | Multi-hop routes work, best route selected |
-
-### 6.6 Business Function Checklist
-
-**Before moving to Step 7, verify you have analyzed:**
-
-```
-□ All user entry points to the feature
-□ Complete happy path with all steps
-□ All input validation rules with error messages
-□ Balance and amount edge cases
-□ All possible error states and recovery flows
-□ State transitions and their triggers
-□ Concurrent/race condition scenarios
-□ Business-specific calculations and rules
-□ Integration points with external services
-□ Feature-specific edge cases (e.g., token decimals, gas limits)
-```
-
-## Step 7: Generate Comprehensive Feature Analysis
-
-**Combine code analysis, visual analysis, AND business analysis:**
+**Document roles and permissions:**
 
 ```markdown
-# Project Analysis
+# Role & Permission Matrix
 
-## Project Type
-- **Is Web3 DApp:** Yes/No
-- **Framework:** [detected from package.json]
-- **Web3 Stack:** [detected libraries]
-- **Dev Server:** [npm run dev / npm start]
-- **URL:** http://localhost:3000
+## Roles Identified
+1. **Guest** - Unauthenticated visitor
+2. **User** - Logged in regular user
+3. **Admin** - Administrator with elevated privileges
+4. **Owner** - System owner with full access
+
+## Permission Matrix
+
+| Feature | Guest | User | Admin | Owner |
+|---------|-------|------|-------|-------|
+| View public pages | ✓ | ✓ | ✓ | ✓ |
+| Connect wallet | ✓ | ✓ | ✓ | ✓ |
+| Execute swap | ✗ | ✓ | ✓ | ✓ |
+| View own transactions | ✗ | ✓ | ✓ | ✓ |
+| View all transactions | ✗ | ✗ | ✓ | ✓ |
+| Modify settings | ✗ | ✗ | ✓ | ✓ |
+| Delete users | ✗ | ✗ | ✗ | ✓ |
+| System configuration | ✗ | ✗ | ✗ | ✓ |
+
+## Protected Routes
+
+| Route | Required Role | Redirect if Unauthorized |
+|-------|--------------|-------------------------|
+| /dashboard | User+ | /login |
+| /admin | Admin+ | /403 |
+| /settings | Owner | /403 |
+```
+
+## Phase 8: Generate Comprehensive Analysis
+
+**Output format for web-test-case-gen:**
+
+```markdown
+# Project Analysis Report
+
+## Project Overview
+
+- **Name:** [from package.json]
+- **Type:** Web3 DApp / Traditional Web App
+- **Framework:** React / Vue / Next.js / etc
+- **Dev Server:** npm run dev → http://localhost:3000
+
+## Documentation Found
+
+| Document | Location | Key Requirements |
+|----------|----------|------------------|
+| README.md | ./README.md | [summary] |
+| Design Spec | ./docs/design.md | [summary] |
+| API Docs | ./docs/api.md | [summary] |
 
 ## Dependencies Researched
 
-### [Dependency Name]
-- **Package:** @xxx/sdk
-- **What it does:** [from WebSearch]
-- **User actions:** [list of actions]
-- **Requires transactions:** Yes/No
-- **Requires approvals:** Yes/No
+| Package | Purpose | Features Provided |
+|---------|---------|-------------------|
+| wagmi | Wallet connection | connect, disconnect, sign |
+| @uniswap/sdk | Token swaps | getQuote, executeSwap |
 
-## Features Found (from Code + UI)
+## Module Map (from Code Tree Traversal)
 
-### Feature: [Name]
-- **Discovered via:** Code / UI / Both
-- **Code location:** [file path]
-- **UI location:** [page/section seen in screenshot]
-- **Screenshot:** [research-xxx.jpg]
-- **Uses:** [dependency/contract]
-- **UI Elements:**
-  - [button/input/selector seen]
-  - [third-party component identified]
-- **User flow:**
-  1. [step from reading code + seeing UI]
-  2. [step]
-  ...
-- **Wallet interactions:** [list any tx/signing]
+### Module: [Name]
+- **Entry File:** src/[module]/index.ts
+- **Files Read:**
+  - src/[module]/Component.tsx - [purpose]
+  - src/[module]/hook.ts - [purpose]
+  - src/[module]/service.ts - [purpose]
+- **Functions:**
+  - function1(params) - [description]
+  - function2(params) - [description]
+- **UI Components:**
+  - Component1 - [description]
+  - Component2 - [description]
 
-### Feature: [Next feature]
+### Module: [Next Module]
 ...
 
-## Visual-Only Discoveries
+## Features Summary
 
-Features found from UI that were NOT obvious from code:
+| Feature | Module | Entry File | Key Functions | UI Components |
+|---------|--------|------------|---------------|---------------|
+| Token Swap | swap | src/swap/index.ts | executeSwap, getQuote | SwapForm, TokenSelector |
+| Staking | staking | src/staking/index.ts | stake, unstake | StakingForm |
+| Wallet Connect | wallet | src/wallet/index.ts | connect, disconnect | ConnectButton |
 
-| Feature | Screenshot | Description |
-|---------|------------|-------------|
-| Price Chart | research-home.jpg | TradingView widget, needs loading test |
-| Token List Modal | research-swap.jpg | Shows token search, balances |
-| Settings Popup | research-settings.jpg | Slippage, deadline settings |
+## Visual-Only Discoveries (from Screenshots)
 
-## Business Function Analysis (CRITICAL FOR TEST COVERAGE)
+| Feature | Screenshot | Description | Not in Code Because |
+|---------|------------|-------------|---------------------|
+| TradingView Chart | research-home.jpg | Price chart widget | Third-party embed |
+| Token Logos | research-swap.jpg | Token icon images | CDN/external source |
 
-### User Journeys
+## Layout Analysis
 
-#### Journey: [Feature Name] - Happy Path
-| Step | Action | Expected Result | Screenshot |
-|------|--------|-----------------|------------|
-| 1 | Navigate to /swap | Swap page loads | swap-initial.jpg |
-| 2 | Select source token | Token selector opens | swap-token-select.jpg |
-| 3 | Enter amount "0.1" | Quote fetches | swap-quote.jpg |
-| ... | ... | ... | ... |
+| Viewport | Width | Screenshot | Key Differences |
+|----------|-------|------------|-----------------|
+| Desktop | 1920px | research-desktop.jpg | Full navigation, side panels |
+| Tablet | 768px | research-tablet.jpg | Stacked layout |
+| Mobile | 375px | research-mobile.jpg | Hamburger menu, single column |
 
-#### Journey: [Feature Name] - Error Recovery
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Enter amount exceeding balance | Error message shown |
-| 2 | Reduce amount to valid | Error clears, quote loads |
-| ... | ... | ... |
+## Role & Permission Analysis
 
-### Business Rules Discovered
+### Roles
+1. Guest - [description]
+2. User - [description]
+3. Admin - [description]
 
-| Feature | Rule | Validation | Error Message | Code Location |
-|---------|------|------------|---------------|---------------|
-| Swap | Min amount | amount > 0 | "Enter an amount" | src/hooks/useSwap.ts:45 |
-| Swap | Balance check | amount <= balance | "Insufficient balance" | src/components/SwapForm.tsx:89 |
-| Swap | Slippage range | 0.1% - 50% | "Invalid slippage" | src/utils/validation.ts:23 |
-| Stake | Min stake | amount >= minStake | "Below minimum stake" | src/features/stake/index.tsx:67 |
-| Stake | Lock period | days >= 7 | "Minimum lock: 7 days" | src/features/stake/index.tsx:72 |
+### Permission Matrix
+[table as shown above]
 
-### Edge Cases and Boundary Conditions
+### Protected Routes
+[table as shown above]
 
-| Category | Test Scenario | Expected Behavior | Priority |
-|----------|---------------|-------------------|----------|
-| Input | Zero amount | Button disabled, show hint | High |
-| Input | Negative number | Prevent input or show error | High |
-| Input | Decimal overflow (e.g., 0.0000001 for 6-decimal token) | Round or reject | Medium |
-| Balance | Exact balance swap | Should succeed | High |
-| Balance | Balance - gas not enough | Show gas warning | High |
-| Token | Token with 2 decimals | Display correctly | Medium |
-| Token | Swap same token | Prevent or show error | Medium |
-| Network | Wrong network selected | Show network switch prompt | High |
-| State | Quote expires (user waits too long) | Refresh quote prompt | Medium |
-| State | Double-click submit | Prevent duplicate tx | High |
+## Test Coverage Requirements
 
-### State Transition Diagram
+Based on analysis, the following test types are needed:
 
-```
-[Feature: Swap]
+### 1. Flow Tests (per module)
+For each module, test complete user flows:
+- Happy path: Complete flow from start to finish
+- Alternative paths: Different routes through the flow
+- Error recovery: What happens when errors occur
 
-Initial → [Wallet Not Connected]
-             │
-             ↓ connect wallet
-       [Wallet Connected]
-             │
-             ↓ enter amount
-       [Amount Entered] ←──────────────┐
-             │                          │
-             ├── invalid ──→ [Validation Error] ── fix ──┘
-             │
-             ↓ fetch quote
-       [Quote Ready]
-             │
-             ├── quote expires ──→ [Stale Quote] ── refresh ──→ [Quote Ready]
-             │
-             ↓ click swap
-       [Confirming]
-             │
-             ├── reject ──→ [Rejected] ──→ [Wallet Connected]
-             │
-             ↓ approve (if ERC20)
-       [Approving Token]
-             │
-             ↓ confirm tx
-       [Transaction Pending]
-             │
-             ├── fail ──→ [Transaction Failed] ──→ [Quote Ready]
-             │
-             ↓ success
-       [Swap Complete] ──→ [Wallet Connected]
-```
+### 2. UI Layout Tests
+- Desktop layout verification
+- Tablet layout verification
+- Mobile layout verification
+- Responsive transitions
 
-## Comprehensive Test Requirements
+### 3. Functionality Tests
+For each function identified:
+- Does it work correctly with valid input?
+- Does it handle invalid input properly?
+- Are error messages clear and helpful?
+- Does form validation work?
+- Does network error handling work?
 
-Based on code, UI, AND business analysis:
+### 4. Network Tests
+- High latency behavior
+- Request timeout handling
+- Packet loss recovery
+- Retry logic verification
 
-### Core Business Functions (Critical Priority)
+### 5. Role & Permission Tests
+For each role identified:
+- Can access permitted features
+- Cannot access restricted features
+- Proper error messages when denied
+- Role switching behavior
 
-| ID | Feature | Test Scenario | Business Rule | Expected | Wallet Popups |
-|----|---------|---------------|---------------|----------|---------------|
-| BF-001 | Swap | Swap native token for ERC20 | Happy path | Success, balance updated | 1 |
-| BF-002 | Swap | Swap ERC20 for native token | Requires approval | Approval + swap | 2 |
-| BF-003 | Swap | Swap with exact balance | Edge case | Success or insufficient gas warning | 1-2 |
-| BF-004 | Stake | Stake minimum amount | Min stake rule | Success | 1 |
-| BF-005 | Stake | Stake below minimum | Validation | Error message shown | 0 |
+## Files Read (Complete List)
 
-### Input Validation Tests (High Priority)
+[List every file that was read during tree traversal]
 
-| ID | Feature | Input | Business Rule | Expected |
-|----|---------|-------|---------------|----------|
-| IV-001 | Swap | Empty amount | amount required | Button disabled |
-| IV-002 | Swap | "0" amount | amount > 0 | Error or disabled |
-| IV-003 | Swap | "abc" (non-numeric) | numeric only | Input rejected |
-| IV-004 | Swap | Negative "-1" | amount >= 0 | Input rejected or error |
-| IV-005 | Swap | Very large "9999999999" | amount <= balance | Insufficient balance error |
-| IV-006 | Swap | Decimal overflow | token decimals | Rounded or rejected |
+1. src/index.tsx
+2. src/App.tsx
+3. src/components/Header.tsx
+4. src/hooks/useAuth.ts
+5. src/pages/Swap.tsx
+...
+[Continue until all files listed]
 
-### Error Handling Tests (High Priority)
+## Execution Order Recommendation
 
-| ID | Feature | Error Scenario | Expected Behavior |
-|----|---------|----------------|-------------------|
-| EH-001 | Swap | Transaction rejected in wallet | Error message, can retry |
-| EH-002 | Swap | Transaction reverted | Clear error, suggest retry |
-| EH-003 | Swap | Network error | Retry prompt |
-| EH-004 | Swap | Quote expired | Refresh quote button |
-| EH-005 | General | Wallet disconnected mid-flow | Prompt to reconnect |
+Based on dependencies between modules:
 
-### State Transition Tests (Medium Priority)
-
-| ID | Feature | Transition | Test Scenario |
-|----|---------|------------|---------------|
-| ST-001 | Swap | Idle → Quote Ready | Enter valid amount |
-| ST-002 | Swap | Quote Ready → Stale | Wait for timeout |
-| ST-003 | Swap | Confirming → Rejected | Click reject in wallet |
-| ST-004 | Swap | Pending → Failed | Simulate tx failure |
-| ST-005 | Swap | Pending → Complete | Successful transaction |
-
-### UI/UX Tests (Medium Priority)
-
-| ID | Feature | Test Scenario | Expected |
-|----|---------|---------------|----------|
-| UX-001 | Swap | Double-click swap button | Single transaction only |
-| UX-002 | Swap | Rapidly change input | No race conditions |
-| UX-003 | Swap | Browser back during flow | Clean state |
-| UX-004 | Token | Token selector search | Filters correctly |
-| UX-005 | Settings | Change slippage | Applied to next swap |
-```
-
-## Example Complete Research Flow
-
-```
-1. cat package.json
-   → Found: @xyz/sdk, wagmi, viem
-   → This is a Web3 DApp
-
-2. WebSearch: "xyz sdk documentation"
-   → Learned: XYZ is a DEX aggregator for token swaps
-   → User can: swap tokens, bridge cross-chain
-   → Requires: token approval + swap transaction
-
-3. grep for @xyz/sdk usage
-   → Found in: src/hooks/useSwap.ts
-
-4. cat src/hooks/useSwap.ts
-   → Uses xyz.getQuote() and xyz.executeSwap()
-   → Called from SwapButton component
-
-5. npm run dev
-   → Server started on http://localhost:3000
-
-6. Take screenshots:
-   → research-home.jpg: Homepage with swap interface
-   → research-swap.jpg: Swap page with token selectors
-   → research-pool.jpg: Liquidity pool page
-
-7. Analyze screenshots:
-   → Found: TradingView chart component (not in code search!)
-   → Found: Token list modal with search
-   → Found: Settings gear icon with slippage popup
-
-8. Generate test requirements:
-   - Test token swap (native token) → 1 popup
-   - Test token swap (ERC20) → 2 popups (approve + swap)
-   - Test insufficient balance → 0 popups, error shown
-   - Test price chart loading → 0 popups (visual only)
-   - Test token search in modal → 0 popups (visual only)
-   - Test slippage settings → 0 popups (visual only)
+1. WALLET tests (no dependencies)
+2. AUTH tests (may depend on wallet)
+3. SWAP tests (depends on wallet + auth)
+4. STAKING tests (depends on wallet + auth)
+5. ADMIN tests (depends on admin role)
 ```
 
 ## Key Rules
 
-1. **No assumptions** - Research every unknown dependency
-2. **Read the code** - Don't guess, read the actual implementation
-3. **WebSearch is your tool** - Use it to understand any protocol
-4. **SEE the UI** - Take screenshots, visual features are often missed
-5. **Be specific** - Test requirements must be based on real code AND real UI
-6. **Document sources** - Note whether each feature was found via code or UI
-
-## Output
-
-Provide a feature analysis that the **web-test-case-gen** skill can use to generate specific test cases.
-
-**The analysis MUST include:**
-- Features from code analysis
-- Features from UI screenshots
-- Visual-only discoveries (not found in code)
+1. **Read EVERY file** - Don't skip any file in the codebase
+2. **Follow ALL imports** - Tree traversal must be complete
+3. **Find documentation** - README, design docs, architecture docs
+4. **Research unknowns** - WebSearch any unfamiliar package
+5. **See the UI** - Screenshots reveal hidden features
+6. **Map all roles** - Identify every user role and permission
+7. **Document everything** - Complete map for test case generation
 
 ## Usage
 
