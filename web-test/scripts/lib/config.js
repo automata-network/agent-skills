@@ -5,9 +5,31 @@
 const path = require('path');
 const fs = require('fs');
 
-// Configuration paths - relative to current working directory (project root)
-// This ensures test-output is created in the directory where the command is run
-const OUTPUT_DIR = path.resolve(process.cwd(), 'test-output');
+// Find project root by looking for package.json or tests/ directory
+function findProjectRoot(startDir) {
+  let dir = startDir;
+  const root = path.parse(dir).root;
+
+  while (dir !== root) {
+    // Check for package.json (most reliable project root indicator)
+    if (fs.existsSync(path.join(dir, 'package.json'))) {
+      return dir;
+    }
+    // Check for tests/ directory with config.yaml (indicates we're in project root)
+    if (fs.existsSync(path.join(dir, 'tests', 'config.yaml'))) {
+      return dir;
+    }
+    dir = path.dirname(dir);
+  }
+
+  // Fallback to cwd if no project root found
+  return startDir;
+}
+
+// Configuration paths - relative to project root (not cwd)
+// This ensures test-output is always in project root, even if command runs from subdirectory
+const PROJECT_ROOT = findProjectRoot(process.cwd());
+const OUTPUT_DIR = path.resolve(PROJECT_ROOT, 'test-output');
 const SCREENSHOTS_DIR = path.join(OUTPUT_DIR, 'screenshots');
 const EXTENSIONS_DIR = path.join(OUTPUT_DIR, 'extensions');
 const STATE_FILE = path.join(OUTPUT_DIR, '.browser-state.json');
@@ -47,6 +69,7 @@ function ensureDirectories() {
 ensureDirectories();
 
 module.exports = {
+  PROJECT_ROOT,
   OUTPUT_DIR,
   SCREENSHOTS_DIR,
   EXTENSIONS_DIR,
@@ -60,4 +83,5 @@ module.exports = {
   SCREENSHOT_FORMAT,
   SCREENSHOT_QUALITY,
   ensureDirectories,
+  findProjectRoot,
 };

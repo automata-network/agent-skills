@@ -1114,12 +1114,17 @@ Based on research output, generate minimum tests:
 
 ```
 <target-project>/
-└── tests/
-    ├── config.yaml         # Project configuration
-    ├── test-cases.yaml     # All test cases
-    ├── case-summary.md     # Human-readable summary
-    └── README.md           # How to run tests
+├── tests/                  # Test case definitions (this skill creates these)
+│   ├── config.yaml         # Project configuration
+│   ├── test-cases.yaml     # All test cases
+│   ├── case-summary.md     # Human-readable summary
+│   └── README.md           # How to run tests
+└── test-output/            # Runtime artifacts (created by web-test, NOT here!)
+    └── screenshots/        # Screenshots saved here during test execution
 ```
+
+**IMPORTANT:** Screenshots are saved to `test-output/screenshots/`, NOT `tests/screenshots/`.
+The `tests/` directory only contains test case definitions (YAML/MD files).
 
 ### tests/config.yaml
 

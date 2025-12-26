@@ -1336,16 +1336,18 @@ All test artifacts in project directory:
 
 ```
 <project-root>/
-├── tests/                # Test cases (from web-test-case-gen)
-│   ├── config.yaml
+├── tests/                # Test case definitions ONLY (YAML/MD files)
+│   ├── config.yaml       # ← NO screenshots here!
 │   ├── test-cases.yaml
 │   └── README.md
-└── test-output/          # Test execution artifacts
-    ├── screenshots/      # Test screenshots
+└── test-output/          # Runtime artifacts (screenshots, logs, etc.)
+    ├── screenshots/      # ← ALL screenshots go here
     ├── chrome-profile/   # Browser state
     ├── console-logs.txt  # Browser console
     └── test-report-YYYYMMDD-HHMMSS.md  # Timestamped report (new file each run)
 ```
+
+**IMPORTANT:** Never save screenshots to `tests/`. Screenshots always go to `test-output/screenshots/`.
 
 ## Related Skills
 
