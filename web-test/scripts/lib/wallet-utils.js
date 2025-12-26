@@ -103,7 +103,8 @@ async function findMetaMaskPopup(context, timeout = 3000) {
     const notificationUrl = `chrome-extension://${extensionId}/notification.html`;
     const popup = await context.newPage();
     await popup.goto(notificationUrl, { waitUntil: 'domcontentloaded', timeout: 5000 });
-    await popup.waitForTimeout(1000);
+    // Wait for button to appear instead of fixed timeout
+    await popup.waitForSelector('button', { timeout: 2000 }).catch(() => {});
 
     // Check if there's actually content (not empty notification)
     const hasContent = await popup.evaluate(() => {
@@ -222,7 +223,7 @@ async function clickApproveButton(popup, popupType) {
 
         if (isVisible && isEnabled) {
           await btn.scrollIntoViewIfNeeded().catch(() => {});
-          await popup.waitForTimeout(200);
+          await popup.waitForTimeout(100);
           await btn.click({ timeout: 5000 });
           return { success: true, selector };
         }
@@ -252,7 +253,7 @@ async function clickRejectButton(popup) {
 
         if (isVisible && isEnabled) {
           await btn.scrollIntoViewIfNeeded().catch(() => {});
-          await popup.waitForTimeout(200);
+          await popup.waitForTimeout(100);
           await btn.click({ timeout: 5000 });
           return { success: true, selector };
         }
@@ -276,7 +277,7 @@ async function clickRejectButton(popup) {
  */
 async function handleWalletPopup(context, action = 'approve', timeout = 3000) {
   // Small delay to let popup appear
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise(resolve => setTimeout(resolve, 300));
 
   // Try to find popup
   const popup = await findMetaMaskPopup(context, timeout);
@@ -285,9 +286,9 @@ async function handleWalletPopup(context, action = 'approve', timeout = 3000) {
     return { hasPopup: false };
   }
 
-  // Wait for popup to load
+  // Wait for popup to load and content to appear
   await popup.waitForLoadState('domcontentloaded').catch(() => {});
-  await popup.waitForTimeout(500);
+  await popup.waitForSelector('button', { timeout: 2000 }).catch(() => {});
 
   // Detect popup type
   const popupInfo = await detectPopupType(popup);
@@ -322,9 +323,14 @@ async function handleWalletPopup(context, action = 'approve', timeout = 3000) {
   // Approve the popup
   const result = await clickApproveButton(popup, popupInfo.type);
 
-  // Wait a bit for the action to complete
+  // Wait for popup to close after approval (faster than fixed timeout)
   if (result.success) {
-    await popup.waitForTimeout(500);
+    try {
+      await popup.waitForEvent('close', { timeout: 3000 });
+    } catch (e) {
+      // Popup didn't close, wait briefly and continue
+      await popup.waitForTimeout(200);
+    }
   }
 
   return {

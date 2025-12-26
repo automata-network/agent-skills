@@ -54,7 +54,7 @@ async function tryConnectExistingBrowser() {
       resolve(res.statusCode === 200);
     });
     req.on('error', () => resolve(false));
-    req.setTimeout(300, () => { req.destroy(); resolve(false); });
+    req.setTimeout(100, () => { req.destroy(); resolve(false); });  // 100ms is enough for localhost
   });
 
   try {
@@ -222,7 +222,8 @@ async function startBrowser(options) {
         if (!metamaskExtensionId) {
           const testPage = await context.newPage();
           await testPage.goto('chrome://extensions/', { timeout: 2000 }).catch(() => {});
-          await testPage.waitForTimeout(300);
+          // Wait for extension items to render instead of fixed timeout
+          await testPage.waitForSelector('extensions-item', { timeout: 1000 }).catch(() => {});
 
           const extensionIds = await testPage.evaluate(() => {
             const items = document.querySelectorAll('extensions-item');

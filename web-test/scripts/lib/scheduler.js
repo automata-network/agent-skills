@@ -64,7 +64,8 @@ async function executeStep(taskPage, step, screenshotsDir, context = null) {
 
   switch (action) {
     case 'navigate':
-      await taskPage.goto(params.url, { waitUntil: 'networkidle', timeout: params.timeout || 30000 });
+      // Use 'load' instead of 'networkidle' for faster navigation (networkidle can hang on polling/websocket pages)
+      await taskPage.goto(params.url, { waitUntil: params.waitUntil || 'load', timeout: params.timeout || 15000 });
       break;
     case 'click':
       await taskPage.click(params.selector, { timeout: params.timeout || 10000 });

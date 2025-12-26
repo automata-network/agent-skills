@@ -30,7 +30,7 @@ const commands = {
     if (options.wait) {
       await page.waitForTimeout(parseInt(options.wait));
     } else {
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(100);
     }
 
     let screenshotPath = null;
@@ -78,7 +78,7 @@ const commands = {
     }
 
     await page.mouse.wheel(deltaX, deltaY);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(200);
 
     let screenshotPath = null;
     if (options.screenshot) {
@@ -110,7 +110,7 @@ const commands = {
       // Timeout is ok, just continue
     }
 
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(200);
 
     let screenshotPath = null;
     if (options.screenshot) {

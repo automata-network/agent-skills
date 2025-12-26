@@ -43,10 +43,10 @@ const commands = {
     const url = args[0];
     if (!url) throw new Error('URL required');
 
-    // First attempt: 10 seconds timeout
+    // First attempt: 10 seconds timeout with 'load' (faster than networkidle)
     let loaded = false;
     try {
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 10000 });
+      await page.goto(url, { waitUntil: 'load', timeout: 10000 });
       loaded = true;
     } catch (e) {
       if (e.name === 'TimeoutError' || e.message.includes('Timeout')) {
@@ -377,9 +377,9 @@ const commands = {
       });
     }
 
-    // Reload page to apply changes
+    // Reload page to apply changes (short timeout, viewport change is quick)
     try {
-      await page.reload({ waitUntil: 'networkidle', timeout: 10000 });
+      await page.reload({ waitUntil: 'load', timeout: 3000 });
     } catch (e) {
       // Ignore reload errors
     }
