@@ -548,6 +548,19 @@ Based on research module map, generate flow tests for each module:
 
 **Purpose:** Verify app handles network conditions gracefully.
 
+### Available Network Commands
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `set-network` | `--latency <ms>` | Add delay to all requests |
+| `set-network` | `--offline` | Simulate offline mode |
+| `set-network` | `--online` | Restore online mode |
+| `mock-route` | `<pattern> --status <code> --body <text>` | Mock API response |
+| `mock-api-error` | `<pattern> --status <code>` | Mock API error |
+| `mock-timeout` | `<pattern>` | Make request hang/timeout |
+| `throttle-network` | `<preset>` | Throttle (slow-3g, fast-3g, offline, none) |
+| `clear-network` | | Clear all network mocks |
+
 ```yaml
 # Network Test: High Latency
 - id: NET-LATENCY-001
@@ -565,7 +578,7 @@ Based on research module map, generate flow tests for each module:
       User should see loading indicator, not frozen UI.
   steps:
     - action: set-network
-      latency: 3000
+      options: "--latency 3000"
       comment: Add 3s delay to all requests
     - action: navigate
       url: /
@@ -576,6 +589,8 @@ Based on research module map, generate flow tests for each module:
       reason: Wait for delayed response
     - action: screenshot
       name: net-latency-loaded
+    - action: clear-network
+      comment: Restore normal network
   expected:
     - Loading indicator shown during wait
     - UI remains responsive (not frozen)
@@ -598,15 +613,16 @@ Based on research module map, generate flow tests for each module:
       Should show error message and offer retry.
   steps:
     - action: mock-timeout
-      endpoint: /api/data
-      timeout: 30000
+      pattern: "**/api/data"
+      comment: Make /api/data request hang forever
     - action: navigate
       url: /dashboard
     - action: wait
-      ms: 32000
-      reason: Wait for timeout
+      ms: 10000
+      reason: Wait for app's timeout handling
     - action: screenshot
       name: net-timeout-error
+    - action: clear-network
   expected:
     - Error message displayed (not crash)
     - Message mentions timeout or network issue
@@ -631,11 +647,14 @@ Based on research module map, generate flow tests for each module:
     - action: navigate
       url: /
     - action: set-network
-      offline: true
+      options: "--offline"
     - action: navigate
       url: /dashboard
     - action: screenshot
       name: net-offline-state
+    - action: set-network
+      options: "--online"
+      comment: Restore online mode
   expected:
     - Offline indicator shown
     - Cached content displayed (if applicable)
@@ -658,17 +677,53 @@ Based on research module map, generate flow tests for each module:
       Should show user-friendly error, not technical details.
   steps:
     - action: mock-api-error
-      endpoint: /api/data
-      status: 500
+      pattern: "**/api/data"
+      options: "--status 500"
     - action: navigate
       url: /dashboard
     - action: screenshot
       name: net-server-error
+    - action: clear-network
   expected:
     - User-friendly error message
     - No raw error or stack trace shown
     - Retry option available
     - Other parts of UI still functional
+
+# Network Test: Slow 3G Simulation
+- id: NET-SLOW3G-001
+  name: Slow 3G Network Simulation
+  type: network
+  module: api
+  feature: Network Handling - Slow Connection
+  priority: medium
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Verify app works on slow network connections.
+      Simulates slow-3g with 2s latency and limited bandwidth.
+  steps:
+    - action: throttle-network
+      preset: "slow-3g"
+    - action: navigate
+      url: /
+    - action: screenshot
+      name: net-slow3g-loading
+    - action: wait
+      ms: 5000
+      reason: Wait for slow load
+    - action: screenshot
+      name: net-slow3g-loaded
+    - action: throttle-network
+      preset: "none"
+      comment: Remove throttling
+  expected:
+    - App loads (slowly but successfully)
+    - Loading states shown appropriately
+    - Images may lazy load
+    - Core functionality works
 ```
 
 ## Test Type 5: Role & Permission Tests (ROLE-*)

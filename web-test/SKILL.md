@@ -717,6 +717,12 @@ For each test ID in `execution_order` (SEQUENTIALLY, ONE AT A TIME):
 | `wait`              | `ms`, `reason`                  | `node $SKILL_DIR/scripts/test-helper.js wait [step.ms] --headed --keep-open`                    |
 | `wallet-approve`    | `note`                          | Use `skill web-test-wallet-sign` with approve action                                            |
 | `wallet-reject`     | `note`                          | Use `skill web-test-wallet-sign` with reject action                                             |
+| `set-network`       | `options` (--latency/--offline/--online) | `node $SKILL_DIR/scripts/test-helper.js set-network [step.options] --headed --keep-open`  |
+| `mock-route`        | `pattern`, `options`            | `node $SKILL_DIR/scripts/test-helper.js mock-route "[step.pattern]" [step.options] --headed --keep-open` |
+| `mock-api-error`    | `pattern`, `options`            | `node $SKILL_DIR/scripts/test-helper.js mock-api-error "[step.pattern]" [step.options] --headed --keep-open` |
+| `mock-timeout`      | `pattern`                       | `node $SKILL_DIR/scripts/test-helper.js mock-timeout "[step.pattern]" --headed --keep-open`     |
+| `throttle-network`  | `preset`                        | `node $SKILL_DIR/scripts/test-helper.js throttle-network [step.preset] --headed --keep-open`    |
+| `clear-network`     | -                               | `node $SKILL_DIR/scripts/test-helper.js clear-network --headed --keep-open`                     |
 
 **Handling `uses_skill` Field:**
 
@@ -1014,6 +1020,203 @@ node $SKILL_DIR/scripts/test-helper.js dev-server-status
 
 # Stop dev server
 node $SKILL_DIR/scripts/test-helper.js dev-server-stop
+```
+
+---
+
+#### Network Emulation Commands
+
+Use these commands to test how your application handles various network conditions.
+
+| Command | Args/Options | Description |
+|---------|--------------|-------------|
+| `set-network` | `--latency <ms>` | Add delay to all network requests |
+| `set-network` | `--offline` | Simulate offline mode (all requests fail) |
+| `set-network` | `--online` | Restore online mode |
+| `mock-route` | `<pattern> --status <code> [--body <text>] [--json <json>] [--delay <ms>]` | Mock API response |
+| `mock-api-error` | `<pattern> --status <code> [--message <text>]` | Mock API error response |
+| `mock-timeout` | `<pattern> [--after <ms>]` | Make request hang/timeout |
+| `throttle-network` | `<preset>` | Throttle network (slow-3g, fast-3g, regular-4g, offline, none) |
+| `clear-network` | `[pattern]` | Clear all or specific network mocks |
+| `network-status` | - | Show current network emulation status |
+
+**Pattern Matching:**
+
+| Pattern | Matches |
+|---------|---------|
+| `**/api/users` | `/api/users`, `https://example.com/api/users` |
+| `**/api/*` | `/api/users`, `/api/posts`, `/api/data` |
+| `**/*.json` | All .json files |
+| `**/api/**` | `/api/v1/users/123` (multi-level paths) |
+
+**Examples:**
+
+```bash
+SKILL_DIR="/Users/duxiaofeng/code/agent-skills/web-test"
+
+# ============================================
+# LATENCY SIMULATION
+# ============================================
+
+# Add 3 second delay to all requests
+node $SKILL_DIR/scripts/test-helper.js set-network --latency 3000 --headed --keep-open
+
+# Navigate and observe loading behavior
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000" --headed --keep-open
+
+# Remove latency
+node $SKILL_DIR/scripts/test-helper.js set-network --latency 0 --headed --keep-open
+
+# ============================================
+# OFFLINE MODE
+# ============================================
+
+# Simulate offline mode
+node $SKILL_DIR/scripts/test-helper.js set-network --offline --headed --keep-open
+
+# Try to navigate (will fail, test error handling)
+node $SKILL_DIR/scripts/test-helper.js navigate "http://localhost:3000/dashboard" --headed --keep-open
+
+# Restore online mode
+node $SKILL_DIR/scripts/test-helper.js set-network --online --headed --keep-open
+
+# ============================================
+# API MOCKING
+# ============================================
+
+# Mock API to return custom response
+node $SKILL_DIR/scripts/test-helper.js mock-route "**/api/users" --status 200 --json '{"users":[]}' --headed --keep-open
+
+# Mock API to return 500 error
+node $SKILL_DIR/scripts/test-helper.js mock-api-error "**/api/data" --status 500 --message "Database connection failed" --headed --keep-open
+
+# Mock API with delayed response
+node $SKILL_DIR/scripts/test-helper.js mock-route "**/api/slow" --status 200 --body "OK" --delay 5000 --headed --keep-open
+
+# ============================================
+# TIMEOUT SIMULATION
+# ============================================
+
+# Make request hang forever (tests app timeout handling)
+node $SKILL_DIR/scripts/test-helper.js mock-timeout "**/api/data" --headed --keep-open
+
+# Make request hang for 10s then timeout
+node $SKILL_DIR/scripts/test-helper.js mock-timeout "**/api/data" --after 10000 --headed --keep-open
+
+# ============================================
+# NETWORK THROTTLING (3G/4G Simulation)
+# ============================================
+
+# Simulate slow 3G network (2s latency, ~50kb/s download)
+node $SKILL_DIR/scripts/test-helper.js throttle-network slow-3g --headed --keep-open
+
+# Simulate fast 3G network (560ms latency, ~1.5Mb/s download)
+node $SKILL_DIR/scripts/test-helper.js throttle-network fast-3g --headed --keep-open
+
+# Simulate regular 4G network (170ms latency, ~4Mb/s download)
+node $SKILL_DIR/scripts/test-helper.js throttle-network regular-4g --headed --keep-open
+
+# Remove throttling
+node $SKILL_DIR/scripts/test-helper.js throttle-network none --headed --keep-open
+
+# ============================================
+# CLEANUP
+# ============================================
+
+# Clear all network mocks and restore normal behavior
+node $SKILL_DIR/scripts/test-helper.js clear-network --headed --keep-open
+
+# Clear specific route mock
+node $SKILL_DIR/scripts/test-helper.js clear-network "**/api/data" --headed --keep-open
+
+# Check current network emulation status
+node $SKILL_DIR/scripts/test-helper.js network-status --headed --keep-open
+```
+
+**How Network Mocking Works:**
+
+```
+╔════════════════════════════════════════════════════════════════╗
+║  NETWORK INTERCEPTION MECHANISM                                ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Browser sends request                                         ║
+║       │                                                        ║
+║       ▼                                                        ║
+║  ┌─────────────────────────────┐                               ║
+║  │ Playwright Route Interceptor │                              ║
+║  │ (checks if pattern matches)  │                              ║
+║  └─────────────────────────────┘                               ║
+║       │                                                        ║
+║       ├── Pattern matches?                                     ║
+║       │   │                                                    ║
+║       │   ├── YES → Execute mock handler                       ║
+║       │   │         - mock-route: return fake response         ║
+║       │   │         - mock-api-error: return error response    ║
+║       │   │         - mock-timeout: never respond              ║
+║       │   │         - set-network --latency: delay then pass   ║
+║       │   │                                                    ║
+║       │   └── NO → Continue to real server                     ║
+║       │                                                        ║
+║  Real server NEVER receives intercepted requests!              ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+**Test Case Example with Network Mocking:**
+
+```yaml
+# Test API error handling
+- id: NET-ERROR-001
+  name: API 500 Error Handling
+  type: network
+  module: api
+  feature: Error Handling
+  priority: high
+  steps:
+    # Mock API to return 500 error
+    - action: mock-api-error
+      pattern: "**/api/data"
+      options: "--status 500"
+    # Navigate to page that calls this API
+    - action: navigate
+      url: /dashboard
+    # Take screenshot of error state
+    - action: screenshot
+      name: api-error-state
+    # Clean up mock
+    - action: clear-network
+  expected:
+    - User-friendly error message displayed
+    - Retry button available
+    - No raw error or stack trace shown
+
+# Test slow network handling
+- id: NET-SLOW-001
+  name: Slow Network Loading States
+  type: network
+  module: api
+  feature: Loading States
+  priority: medium
+  steps:
+    # Add 3s latency
+    - action: set-network
+      options: "--latency 3000"
+    # Navigate and observe loading
+    - action: navigate
+      url: /
+    - action: screenshot
+      name: loading-state
+    # Wait for content
+    - action: wait
+      ms: 4000
+    - action: screenshot
+      name: loaded-state
+    # Clean up
+    - action: clear-network
+  expected:
+    - Loading indicator shown during wait
+    - Content loads successfully after delay
 ```
 
 ---

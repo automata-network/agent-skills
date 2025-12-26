@@ -27,6 +27,15 @@
  *   wait-for <selector>      - Wait for element
  *   list-elements            - List all interactive elements
  *
+ * Network Emulation Commands:
+ *   set-network              - Set network conditions (--latency, --offline, --online)
+ *   mock-route <pattern>     - Mock API response (--status, --body, --delay)
+ *   mock-api-error <pattern> - Mock API error (--status, --message)
+ *   mock-timeout <pattern>   - Make request timeout
+ *   clear-network            - Clear all network mocks
+ *   network-status           - Show current network emulation status
+ *   throttle-network <preset> - Throttle network (slow-3g, fast-3g, offline, none)
+ *
  * Options:
  *   --screenshot <name>      - Take screenshot after action
  *   --wait <ms>              - Wait after action
@@ -45,6 +54,7 @@ const basicCommands = require('./commands/basic');
 const devServerCommands = require('./commands/dev-server');
 const loginCommands = require('./commands/login');
 const visionCommands = require('./commands/vision');
+const networkCommands = require('./commands/network');
 
 // Merge all commands
 const commands = {
@@ -52,6 +62,7 @@ const commands = {
   ...devServerCommands,
   ...loginCommands,
   ...visionCommands,
+  ...networkCommands,
 
   async help() {
     console.log(`
@@ -95,6 +106,19 @@ Dev Server Commands:
   dev-server-stop               Stop the running dev server
   dev-server-status             Check dev server status
 
+Network Emulation Commands:
+  set-network --latency <ms>    Add delay to all requests
+  set-network --offline         Simulate offline mode
+  set-network --online          Restore online mode
+  mock-route <pattern> --status <code> [--body <text>] [--delay <ms>]
+                                Mock API response
+  mock-api-error <pattern> --status <code> [--message <text>]
+                                Mock API error response
+  mock-timeout <pattern>        Make request never complete
+  clear-network [pattern]       Clear all or specific mocks
+  network-status                Show current network emulation status
+  throttle-network <preset>     Throttle network (slow-3g, fast-3g, offline, none)
+
 Options:
   --screenshot <name>       Take screenshot after action
   --wait <ms>               Wait after action
@@ -109,6 +133,12 @@ Examples:
   node test-helper.js click "#submit-btn" --wait 1000 --screenshot after-submit.png
   node test-helper.js fill "#email" "test@example.com"
   node test-helper.js list-elements
+
+Network Examples:
+  node test-helper.js set-network --latency 3000 --headed --keep-open
+  node test-helper.js mock-api-error "/api/data" --status 500 --headed --keep-open
+  node test-helper.js throttle-network slow-3g --headed --keep-open
+  node test-helper.js clear-network --headed --keep-open
 
 For Web3/Wallet testing, use:
   - web-test-wallet-setup skill
