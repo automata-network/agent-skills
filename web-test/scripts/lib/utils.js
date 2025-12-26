@@ -158,7 +158,7 @@ async function waitForServer(url, timeoutMs = 30000) {
       });
       return true; // Server is responding
     } catch (e) {
-      await new Promise(r => setTimeout(r, 500)); // Wait 500ms before retry
+      await new Promise(r => setTimeout(r, 200)); // Wait 200ms before retry
     }
   }
   return false;

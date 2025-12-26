@@ -592,7 +592,7 @@ const commands = {
           const { action, ...params } = step;
 
           if (action === 'navigate') {
-            await page.goto(params.url, { waitUntil: 'networkidle' });
+            await page.goto(params.url, { waitUntil: 'load', timeout: 15000 });
           } else if (action === 'click') {
             await page.click(params.selector);
           } else if (action === 'fill') {

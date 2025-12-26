@@ -267,17 +267,17 @@ async function startBrowser(options) {
     });
     chromeProcess.unref();
 
-    // Wait for CDP to be available (max 5 seconds)
+    // Wait for CDP to be available (max 3 seconds)
     let connected = false;
-    for (let i = 0; i < 10; i++) {
-      await new Promise(resolve => setTimeout(resolve, 300));
+    for (let i = 0; i < 15; i++) {
+      await new Promise(resolve => setTimeout(resolve, 200));
       try {
         const alive = await new Promise((resolve) => {
           const req = http.get(`http://127.0.0.1:${CDP_PORT}/json/version`, (res) => {
             resolve(res.statusCode === 200);
           });
           req.on('error', () => resolve(false));
-          req.setTimeout(500, () => { req.destroy(); resolve(false); });
+          req.setTimeout(200, () => { req.destroy(); resolve(false); });
         });
         if (alive) {
           connected = true;
