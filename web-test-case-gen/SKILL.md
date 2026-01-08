@@ -17,7 +17,7 @@ Generate persistent test cases that can be committed to version control for repe
 
 ### Full Project Analysis Mode
 1. **Runs web-test-research** - Full code tree traversal, UI screenshots, role analysis
-2. **Generates comprehensive test cases** - 6 test types for complete coverage
+2. **Generates comprehensive test cases** - 8 test types for complete coverage
 3. **Saves to ./tests/** - In the TARGET PROJECT (not agent-skills)
 4. **Ready for git commit** - Test cases persist across sessions
 
@@ -25,7 +25,7 @@ Generate persistent test cases that can be committed to version control for repe
 
 ```
 ╔════════════════════════════════════════════════════════════════╗
-║  6 TYPES OF TEST CASES FOR COMPLETE COVERAGE                   ║
+║  8 TYPES OF TEST CASES FOR COMPLETE COVERAGE                   ║
 ╠════════════════════════════════════════════════════════════════╣
 ║                                                                ║
 ║  1. FLOW TESTS (FLOW-*)                                        ║
@@ -63,6 +63,17 @@ Generate persistent test cases that can be committed to version control for repe
 ║     - Transaction rejection                                    ║
 ║     - Missing data handling                                    ║
 ║                                                                ║
+║  7. SEO & META TESTS (SEO-*)                                   ║
+║     - Head element validation (title, description, keywords)   ║
+║     - Open Graph meta tags (og:title, og:description, etc)     ║
+║     - Twitter Card meta tags                                   ║
+║     - Favicon and charset verification                         ║
+║                                                                ║
+║  8. EXTERNAL LINK TESTS (LINK-*)                               ║
+║     - External link accessibility                              ║
+║     - 404/Not Found detection                                  ║
+║     - Broken link identification                               ║
+║                                                                ║
 ╚════════════════════════════════════════════════════════════════╝
 ```
 
@@ -94,7 +105,7 @@ Add a test case for: [describe the feature you want to test]
 │          - UI screenshots (Desktop/Tablet/Mobile)               │
 │          - Role & permission analysis                           │
 │          ↓                                                      │
-│  Step 2: Generate 6 types of test cases                         │
+│  Step 2: Generate 8 types of test cases                         │
 │          ↓                                                      │
 │          - FLOW tests for each module                           │
 │          - LAYOUT tests for each viewport                       │
@@ -102,6 +113,8 @@ Add a test case for: [describe the feature you want to test]
 │          - NET tests for API interactions                       │
 │          - ROLE tests for each user role                        │
 │          - NEG tests for error scenarios                        │
+│          - SEO tests for meta tags & head elements              │
+│          - LINK tests for external link validation              │
 │          ↓                                                      │
 │  Step 3: Write test files                                       │
 │          ↓                                                      │
@@ -1052,6 +1065,510 @@ Based on research module map, generate flow tests for each module:
     - Can reconnect and continue
 ```
 
+## Test Type 7: SEO & Meta Tests (SEO-*)
+
+**Purpose:** Verify that all essential SEO and meta tags are present in the page head element.
+
+```yaml
+# SEO Test: Essential Head Elements
+- id: SEO-HEAD-001
+  name: Essential Head Elements Check
+  type: seo
+  module: seo
+  feature: SEO & Meta Tags
+  priority: high
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Verify that the page contains all essential head elements for SEO and social sharing.
+      These elements are critical for search engine indexing and social media previews.
+    required_elements:
+      - title tag
+      - meta description
+      - meta keywords
+      - meta charset
+      - meta viewport
+      - favicon link
+  steps:
+    - action: navigate
+      url: /
+    - action: check-head
+      elements:
+        - selector: "title"
+          required: true
+          validate: "not empty"
+        - selector: "meta[name='description']"
+          required: true
+          attribute: "content"
+          validate: "not empty"
+        - selector: "meta[name='keywords']"
+          required: true
+          attribute: "content"
+          validate: "not empty"
+        - selector: "meta[charset]"
+          required: true
+        - selector: "meta[name='viewport']"
+          required: true
+          attribute: "content"
+          validate: "contains width="
+        - selector: "link[rel='icon'], link[rel='shortcut icon']"
+          required: true
+          attribute: "href"
+          validate: "not empty"
+    - action: screenshot
+      name: seo-head-check
+  expected:
+    - Title tag exists and has content
+    - Meta description exists with meaningful content
+    - Meta keywords exist
+    - Charset is defined (usually utf-8)
+    - Viewport meta tag is set for responsive design
+    - Favicon link is present and valid
+
+# SEO Test: Open Graph Meta Tags
+- id: SEO-OG-001
+  name: Open Graph Meta Tags Check
+  type: seo
+  module: seo
+  feature: Social Sharing - Open Graph
+  priority: high
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Verify that Open Graph meta tags are present for proper social media sharing.
+      These tags control how the page appears when shared on Facebook, LinkedIn, etc.
+    required_elements:
+      - og:title
+      - og:description
+      - og:url
+      - og:image
+      - og:type
+  steps:
+    - action: navigate
+      url: /
+    - action: check-head
+      elements:
+        - selector: "meta[property='og:title']"
+          required: true
+          attribute: "content"
+          validate: "not empty"
+        - selector: "meta[property='og:description']"
+          required: true
+          attribute: "content"
+          validate: "not empty"
+        - selector: "meta[property='og:url']"
+          required: true
+          attribute: "content"
+          validate: "starts with http"
+        - selector: "meta[property='og:image']"
+          required: true
+          attribute: "content"
+          validate: "starts with http"
+        - selector: "meta[property='og:type']"
+          required: true
+          attribute: "content"
+          validate: "not empty"
+    - action: screenshot
+      name: seo-og-check
+  expected:
+    - og:title is set (e.g., "Why 1RPC | The Web3 relay to protect your privacy")
+    - og:description provides a clear description
+    - og:url is the canonical URL of the page
+    - og:image points to a valid image URL
+    - og:type is set (e.g., "website", "article")
+
+# SEO Test: Twitter Card Meta Tags
+- id: SEO-TWITTER-001
+  name: Twitter Card Meta Tags Check
+  type: seo
+  module: seo
+  feature: Social Sharing - Twitter
+  priority: high
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Verify that Twitter Card meta tags are present for proper Twitter sharing.
+      These tags control how the page appears when shared on Twitter/X.
+    required_elements:
+      - twitter:card
+      - twitter:title
+      - twitter:description
+      - twitter:image
+  steps:
+    - action: navigate
+      url: /
+    - action: check-head
+      elements:
+        - selector: "meta[name='twitter:card']"
+          required: true
+          attribute: "content"
+          validate: "in [summary, summary_large_image, app, player]"
+        - selector: "meta[name='twitter:title']"
+          required: true
+          attribute: "content"
+          validate: "not empty"
+        - selector: "meta[name='twitter:description']"
+          required: true
+          attribute: "content"
+          validate: "not empty"
+        - selector: "meta[name='twitter:image']"
+          required: true
+          attribute: "content"
+          validate: "starts with http"
+    - action: screenshot
+      name: seo-twitter-check
+  expected:
+    - twitter:card is set (typically "summary_large_image" for visual impact)
+    - twitter:title matches or complements og:title
+    - twitter:description provides a clear summary
+    - twitter:image points to a valid image URL
+
+# SEO Test: Complete Meta Tags Validation
+- id: SEO-COMPLETE-001
+  name: Complete SEO Meta Tags Validation
+  type: seo
+  module: seo
+  feature: Complete SEO Check
+  priority: critical
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Comprehensive check of all SEO-related meta tags.
+      This is the complete validation covering all essential elements.
+    example_tags: |
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Why 1RPC | The Web3 relay to protect your privacy</title>
+      <meta name="description" content="Experience how 1RPC protects users...">
+      <meta name="keywords" content="1RPC,Web3,privacy,RPC relay,blockchain">
+      <meta property="og:title" content="Why 1RPC | The Web3 relay...">
+      <meta property="og:description" content="Experience how 1RPC protects...">
+      <meta property="og:url" content="https://why.1rpc.io/">
+      <meta property="og:image" content="https://why-1rpc-web.vercel.app/og-image.png">
+      <meta property="og:type" content="website">
+      <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="Why 1RPC | The Web3 relay...">
+      <meta name="twitter:description" content="Experience how 1RPC protects...">
+      <meta name="twitter:image" content="https://why-1rpc-web.vercel.app/og-image.png">
+      <link rel="icon" href="/favicon.ico" sizes="256x256" type="image/x-icon">
+  steps:
+    - action: navigate
+      url: /
+    - action: check-head
+      elements:
+        # Basic meta tags
+        - selector: "title"
+          required: true
+        - selector: "meta[charset]"
+          required: true
+        - selector: "meta[name='viewport']"
+          required: true
+        - selector: "meta[name='description']"
+          required: true
+        - selector: "meta[name='keywords']"
+          required: true
+        - selector: "link[rel='icon'], link[rel='shortcut icon']"
+          required: true
+        # Open Graph tags
+        - selector: "meta[property='og:title']"
+          required: true
+        - selector: "meta[property='og:description']"
+          required: true
+        - selector: "meta[property='og:url']"
+          required: true
+        - selector: "meta[property='og:image']"
+          required: true
+        - selector: "meta[property='og:type']"
+          required: true
+        # Twitter Card tags
+        - selector: "meta[name='twitter:card']"
+          required: true
+        - selector: "meta[name='twitter:title']"
+          required: true
+        - selector: "meta[name='twitter:description']"
+          required: true
+        - selector: "meta[name='twitter:image']"
+          required: true
+    - action: screenshot
+      name: seo-complete-check
+  expected:
+    - All basic meta tags present (title, description, keywords, charset, viewport, favicon)
+    - All Open Graph tags present (og:title, og:description, og:url, og:image, og:type)
+    - All Twitter Card tags present (twitter:card, twitter:title, twitter:description, twitter:image)
+    - No missing required tags
+```
+
+## Test Type 8: External Link Tests (LINK-*)
+
+**Purpose:** Verify that all external links on the page are accessible and do not return 404 or "Not Found" errors.
+
+```yaml
+# External Link Test: Homepage External Links
+- id: LINK-HOME-001
+  name: Homepage External Links Check
+  type: external-link
+  module: links
+  feature: External Link Validation
+  priority: high
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Verify that all external links on the homepage are accessible.
+      Opens each external link in the browser and checks for 404/Not Found responses.
+    what_is_checked:
+      - HTTP status code (should not be 404)
+      - Page content does not contain "404" or "Not Found" text
+      - Link is reachable (no timeout or connection errors)
+  steps:
+    - action: navigate
+      url: /
+    - action: collect-external-links
+      selector: "a[href^='http']"
+      exclude_domains:
+        - localhost
+        - 127.0.0.1
+    - action: check-external-links
+      timeout: 10000
+      check_for_404: true
+      check_for_not_found_text: true
+    - action: screenshot
+      name: link-home-check
+  expected:
+    - All external links return HTTP 200 or redirect to valid pages
+    - No external link returns 404 status
+    - No external link page contains "404" or "Not Found" text
+    - All links are reachable within timeout
+
+# External Link Test: Footer Links
+- id: LINK-FOOTER-001
+  name: Footer External Links Check
+  type: external-link
+  module: links
+  feature: External Link Validation - Footer
+  priority: medium
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Verify that all external links in the footer are accessible.
+      Footer often contains important links like social media, legal pages, etc.
+  steps:
+    - action: navigate
+      url: /
+    - action: scroll
+      direction: down
+      to: "footer"
+    - action: collect-external-links
+      selector: "footer a[href^='http']"
+      exclude_domains:
+        - localhost
+        - 127.0.0.1
+    - action: check-external-links
+      timeout: 10000
+      check_for_404: true
+      check_for_not_found_text: true
+    - action: screenshot
+      name: link-footer-check
+  expected:
+    - All footer external links are accessible
+    - Social media links work
+    - Legal/policy page links work
+    - No broken links
+
+# External Link Test: Social Media Links
+- id: LINK-SOCIAL-001
+  name: Social Media Links Check
+  type: external-link
+  module: links
+  feature: External Link Validation - Social
+  priority: medium
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Verify that all social media links are accessible.
+      Checks Twitter/X, Discord, Telegram, GitHub, etc.
+  steps:
+    - action: navigate
+      url: /
+    - action: collect-external-links
+      selector: "a[href*='twitter.com'], a[href*='x.com'], a[href*='discord'], a[href*='telegram'], a[href*='github.com'], a[href*='linkedin'], a[href*='facebook']"
+    - action: check-external-links
+      timeout: 15000
+      check_for_404: true
+      check_for_not_found_text: true
+    - action: screenshot
+      name: link-social-check
+  expected:
+    - All social media links are accessible
+    - Twitter/X profile exists
+    - Discord server invite is valid
+    - GitHub repository exists
+    - No 404 or suspended accounts
+
+# External Link Test: Documentation Links
+- id: LINK-DOCS-001
+  name: Documentation Links Check
+  type: external-link
+  module: links
+  feature: External Link Validation - Documentation
+  priority: high
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Verify that all documentation links are accessible.
+      Broken documentation links create poor user experience.
+  steps:
+    - action: navigate
+      url: /
+    - action: collect-external-links
+      selector: "a[href*='docs'], a[href*='documentation'], a[href*='gitbook'], a[href*='notion']"
+    - action: check-external-links
+      timeout: 15000
+      check_for_404: true
+      check_for_not_found_text: true
+    - action: screenshot
+      name: link-docs-check
+  expected:
+    - All documentation links are accessible
+    - Gitbook/Notion pages load correctly
+    - No "Page not found" errors
+
+# External Link Test: All Pages External Links Scan
+- id: LINK-ALL-001
+  name: Full Site External Links Scan
+  type: external-link
+  module: links
+  feature: External Link Validation - Complete
+  priority: critical
+  web3: false
+  wallet_popups: 0
+  depends_on: []
+  description:
+    purpose: |
+      Comprehensive scan of all external links across all pages.
+      Crawls internal pages and validates all external links found.
+    algorithm: |
+      1. Start from homepage
+      2. Collect all internal links
+      3. For each internal page, collect external links
+      4. Deduplicate external links
+      5. Check each unique external link once
+      6. Report all broken links with source pages
+  steps:
+    - action: navigate
+      url: /
+    - action: collect-internal-links
+      base_url: /
+    - action: for-each-internal-link
+      steps:
+        - action: navigate
+          url: "{internal_link}"
+        - action: collect-external-links
+          selector: "a[href^='http']"
+          exclude_domains:
+            - localhost
+            - 127.0.0.1
+    - action: deduplicate-links
+    - action: check-external-links
+      timeout: 10000
+      check_for_404: true
+      check_for_not_found_text: true
+      report_source_page: true
+    - action: screenshot
+      name: link-all-check
+  expected:
+    - All external links across all pages are accessible
+    - Report identifies any broken links with their source pages
+    - No 404 errors
+    - No "Not Found" text on linked pages
+```
+
+### External Link Check Implementation
+
+When executing external link tests, the test runner should:
+
+1. **Collect all external links** from the page using the specified selector
+2. **Open each link in the browser** (in a new tab or by navigation)
+3. **Check the HTTP status** - fail if 404
+4. **Check page content** - fail if page contains "404" or "Not Found" (case insensitive)
+5. **Report broken links** with:
+   - Link URL
+   - Source page where link was found
+   - Error type (404 status, Not Found text, timeout, etc.)
+
+```javascript
+// Example implementation for check-external-links action
+async function checkExternalLinks(page, links, options) {
+  const results = [];
+
+  for (const link of links) {
+    try {
+      const response = await page.goto(link.url, { timeout: options.timeout });
+      const status = response.status();
+
+      // Check HTTP status
+      if (status === 404) {
+        results.push({
+          url: link.url,
+          source: link.sourcePage,
+          status: 'FAIL',
+          reason: 'HTTP 404 Not Found'
+        });
+        continue;
+      }
+
+      // Check page content for 404/Not Found text
+      const content = await page.content();
+      const lowerContent = content.toLowerCase();
+      if (lowerContent.includes('404') || lowerContent.includes('not found') || lowerContent.includes('page not found')) {
+        // Additional check: verify it's actually a 404 page, not just text mentioning 404
+        const title = await page.title();
+        if (title.toLowerCase().includes('404') || title.toLowerCase().includes('not found')) {
+          results.push({
+            url: link.url,
+            source: link.sourcePage,
+            status: 'FAIL',
+            reason: 'Page contains 404/Not Found content'
+          });
+          continue;
+        }
+      }
+
+      results.push({
+        url: link.url,
+        source: link.sourcePage,
+        status: 'PASS'
+      });
+
+    } catch (error) {
+      results.push({
+        url: link.url,
+        source: link.sourcePage,
+        status: 'FAIL',
+        reason: error.message
+      });
+    }
+  }
+
+  return results;
+}
+```
+
 ## Test Count Guidelines Per Module
 
 Based on research output, generate minimum tests:
@@ -1091,7 +1608,21 @@ Based on research output, generate minimum tests:
 ║  - 1 per error scenario identified                             ║
 ║  - 1 per validation rule                                       ║
 ║                                                                ║
+║  SEO tests (global, run once per site):                        ║
+║  - 1 basic head elements check                                 ║
+║  - 1 Open Graph meta tags check                                ║
+║  - 1 Twitter Card meta tags check                              ║
+║  - 1 complete SEO validation                                   ║
+║                                                                ║
+║  LINK tests (global, run once per site):                       ║
+║  - 1 homepage external links check                             ║
+║  - 1 footer links check                                        ║
+║  - 1 social media links check                                  ║
+║  - 1 documentation links check                                 ║
+║  - 1 full site external links scan                             ║
+║                                                                ║
 ║  TOTAL: 15-25 tests per major module                           ║
+║  + 4 SEO tests + 5 LINK tests (global)                         ║
 ║                                                                ║
 ╚════════════════════════════════════════════════════════════════╝
 ```
@@ -1106,6 +1637,8 @@ Based on research output, generate minimum tests:
 | Network | NET- | NET-LATENCY-001 |
 | Role/Permission | ROLE- | ROLE-GUEST-001 |
 | Negative | NEG- | NEG-TX-REJECT-001 |
+| SEO/Meta | SEO- | SEO-HEAD-001 |
+| External Link | LINK- | LINK-HOME-001 |
 | Wallet (Web3) | WALLET- | WALLET-001 |
 
 ## Output Files
